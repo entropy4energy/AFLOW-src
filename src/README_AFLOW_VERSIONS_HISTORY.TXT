@@ -1,3 +1,6 @@
+3.2.14 - 2022/XX/XX
+        Location: https://github.com/entropy4energy/AFLOW-src/releases/tag/v3.2.14
+        -- rearranged QHA code to enable calculation of thermodynamic properties if isEOS and isQHA (CO)
 3.2.13 - 2022/08/30
         Location: http://materials.duke.edu/AFLOW/aflow.3.2.13.tar.xz
         -- implemented QH-POCC and POCC+QHA (AS)

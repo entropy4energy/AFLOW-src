@@ -4,4 +4,4 @@ This is the <a href="https://entropy4energy.ai" target="_blank"><i>Entropy for E
 
 Branches:
 - `main`: JHU release.
-- `main_ao`: official aflow.org release.
+- `main-ao`: official aflow.org release.

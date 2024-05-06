@@ -40,7 +40,6 @@ void GenerateNewTrainingItem(string & SL_name) {
 // Generate new training item
 //*************************************
 void CalculateNewStateAFLOW(string & SL_name) {
-  string soliloquy=XPID+"CalculateNewStateAFLOW():";
 
   pid_t pID;
   int child_exit_status;
@@ -74,7 +73,7 @@ void CalculateNewStateAFLOW(string & SL_name) {
   pID= fork();
   if( pID < 0 ) {
     // fail to fork
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"fail to fork",_RUNTIME_ERROR_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"fail to fork",_RUNTIME_ERROR_); //CO20200624
   } else if( pID == 0 ) {
     // child process
 
@@ -147,7 +146,7 @@ void CalculateNewStateAFLOW(string & SL_name) {
 //    pID= fork();
 //    if( pID < 0 ) {
 //        // fail to fork
-//        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"fail to fork",_RUNTIME_ERROR_); //CO20200624
+//        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"fail to fork",_RUNTIME_ERROR_); //CO20200624
 //    } else if( pID == 0 ) {
 //        // child process
 //

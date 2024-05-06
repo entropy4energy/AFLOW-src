@@ -1,6 +1,6 @@
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow Cormac Toher - Duke University 2013-2021           *
 // *                                                                         *
 //****************************************************************************
@@ -83,13 +83,12 @@ namespace pocc {
 namespace pocc {
   void POccCalculator::generateElasticProperties(vector<double>& Bvoigt, vector<double>& Breuss, vector<double>& Bvrh, vector<double>& Gvoigt, vector<double>& Greuss, vector<double>& Gvrh,vector<double>& Poisson_ratio, vector<vector<vector<double> > >& elastic_tensor_list,  vector<vector<vector<double> > >& compliance_tensor_list) {
     bool LDEBUG=(FALSE || _DEBUG_POCC_AEL_AGL_ || XHOST.DEBUG);
-    string soliloquy="POccCalculator::generateElasticProperties():";
     uint aelerror = 0;
     if(LDEBUG) {
-      cerr << soliloquy << " BEGIN" << endl;
+      cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     }
     if(LDEBUG) {
-      cerr << soliloquy << " directory=[" << m_aflags.Directory << "]" << endl;
+      cerr << __AFLOW_FUNC__ << " directory=[" << m_aflags.Directory << "]" << endl;
     }
     double ael_bulk_modulus_voigt = 0.0, ael_bulk_modulus_reuss = 0.0, ael_bulk_modulus_vrh = 0.0;
     double ael_shear_modulus_voigt = 0.0, ael_shear_modulus_reuss = 0.0, ael_shear_modulus_vrh = 0.0;
@@ -117,18 +116,18 @@ namespace pocc {
       aurostd::StringstreamClean(aflow_ael_out);
       aurostd::StringstreamClean(aflow_elastic_tensor);
       aurostd::StringstreamClean(aflow_compliance_tensor);
-      if(LDEBUG){cerr << soliloquy << " look at pocc_directory_abs=" << pocc_directory_abs << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " look at pocc_directory_abs=" << pocc_directory_abs << endl;}
       //energy_dft
       ael_filename=pocc_directory_abs+"/aflow.ael.out";
-      if(LDEBUG) {cerr << soliloquy << " ael_filename=[" << ael_filename << "]" << endl;}
-      // if(!aurostd::EFileExist(ael_filename,ael_filename)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ael_filename=[" << ael_filename << "]" << endl;}
+      // if(!aurostd::EFileExist(ael_filename,ael_filename)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);}
       // [OBSOLETE] aelerror = AEL_functions::Get_ElasticProperties_AEL_postprocess(pocc_directory_abs, ael_bulk_modulus_voigt, ael_bulk_modulus_reuss, ael_bulk_modulus_vrh, ael_shear_modulus_voigt, ael_shear_modulus_reuss, ael_shear_modulus_vrh, ael_poisson_ratio, elastic_tensor, compliance_tensor);
       // [OBSOLETE] if (aelerror > 0) {
-      // [OBSOLETE]   throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem with AEL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+      // [OBSOLETE]   throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem with AEL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
       // [OBSOLETE] }
       aelerror = AEL_functions::AEL_Get_AflowInName(AflowInName, pocc_directory_abs, ael_aflowin_found);
       if (aelerror != 0) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem finding AEL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem finding AEL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
       }
       if (ael_aflowin_found) {
         if(aurostd::FileExist(pocc_directory_abs+"/ael.LOCK")) {
@@ -161,7 +160,7 @@ namespace pocc {
         //[SD20220520 - OBSOLETE]aurostd::StringstreamClean(aflow_ael_out);
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(pocc_directory_abs+"/"+"aflow.ael.out"),aflow_ael_out,"[AEL_RESULTS]START","[AEL_RESULTS]STOP");
         if(LDEBUG) {
-          cerr << soliloquy << " aflow.ael.out:" << endl << aflow_ael_out.str() << endl;
+          cerr << __AFLOW_FUNC__ << " aflow.ael.out:" << endl << aflow_ael_out.str() << endl;
         }
         aurostd::stream2vectorstring(aflow_ael_out,vline);
         for (uint i=0;i<vline.size();i++) {
@@ -181,7 +180,7 @@ namespace pocc {
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(ael_filename),aflow_elastic_tensor,"[AEL_STIFFNESS_TENSOR]START","[AEL_STIFFNESS_TENSOR]STOP");
         if(LDEBUG) {
           //aurostd::StringstreamClean(aus);
-          cerr << soliloquy << " aflow_elastic_tensor = " << endl << aflow_elastic_tensor.str() << endl;
+          cerr << __AFLOW_FUNC__ << " aflow_elastic_tensor = " << endl << aflow_elastic_tensor.str() << endl;
           //aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         }
         aurostd::stream2vectorstring(aflow_elastic_tensor,vline);
@@ -200,7 +199,7 @@ namespace pocc {
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(ael_filename),aflow_compliance_tensor,"[AEL_COMPLIANCE_TENSOR]START","[AEL_COMPLIANCE_TENSOR]STOP");
         if(LDEBUG) {
           //aurostd::StringstreamClean(aus);
-          cerr << soliloquy << " aflow_compliance_tensor = " << endl << aflow_compliance_tensor.str() << endl;
+          cerr << __AFLOW_FUNC__ << " aflow_compliance_tensor = " << endl << aflow_compliance_tensor.str() << endl;
           //aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         }
         aurostd::stream2vectorstring(aflow_compliance_tensor,vline);
@@ -227,8 +226,8 @@ namespace pocc {
         elastic_tensor.clear();
         compliance_tensor.clear();
       } else {
-        // [OBSOLETE] cerr << soliloquy << pocc_directory_abs << "/aflow.ael.out: File not found" << endl;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem with AEL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+        // [OBSOLETE] cerr << __AFLOW_FUNC__ << pocc_directory_abs << "/aflow.ael.out: File not found" << endl;
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem with AEL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
       }
     }
   }
@@ -241,14 +240,13 @@ namespace pocc {
 namespace pocc {
   void POccCalculator::getElasticProperties(vector<double>& Bvoigt, vector<double>& Breuss, vector<double>& Bvrh, vector<double>& Gvoigt, vector<double>& Greuss, vector<double>& Gvrh,vector<double>& Poisson_ratio, vector<vector<vector<double> > >& elastic_tensor_list,  vector<vector<vector<double> > >& compliance_tensor_list) {
     bool LDEBUG=(FALSE || _DEBUG_POCC_AEL_AGL_ || XHOST.DEBUG);
-    string soliloquy="POccCalculator::getElasticProperties():";
     stringstream message;
     //uint aelerror = 0;
     if(LDEBUG) {
-      cerr << soliloquy << " BEGIN" << endl;
+      cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     }
     if(LDEBUG) {
-      cerr << soliloquy << " directory=[" << m_aflags.Directory << "]" << endl;
+      cerr << __AFLOW_FUNC__ << " directory=[" << m_aflags.Directory << "]" << endl;
     }
     double ael_bulk_modulus_voigt = 0.0, ael_bulk_modulus_reuss = 0.0, ael_bulk_modulus_vrh = 0.0;
     double ael_shear_modulus_voigt = 0.0, ael_shear_modulus_reuss = 0.0, ael_shear_modulus_vrh = 0.0;
@@ -273,13 +271,13 @@ namespace pocc {
       aurostd::StringstreamClean(aflow_ael_out);
       aurostd::StringstreamClean(aflow_elastic_tensor);
       aurostd::StringstreamClean(aflow_compliance_tensor);
-      if(LDEBUG){cerr << soliloquy << " look at pocc_directory_abs=" << pocc_directory_abs << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " look at pocc_directory_abs=" << pocc_directory_abs << endl;}
       //energy_dft
       ael_filename=pocc_directory_abs+"/aflow.ael.out";
-      if(LDEBUG) {cerr << soliloquy << " ael_filename=[" << ael_filename << "]" << endl;}
-      // if(!aurostd::EFileExist(ael_filename,ael_filename)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ael_filename=[" << ael_filename << "]" << endl;}
+      // if(!aurostd::EFileExist(ael_filename,ael_filename)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);}
       if(aurostd::EFileExist(ael_filename,ael_filename)){
-        message << "Reading " << m_ARUN_directories[isupercell]+"/aflow.ael.out";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404
+        message << "Reading " << m_ARUN_directories[isupercell]+"/aflow.ael.out";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404
         aflow_ael_out.str(aurostd::substring2string(aurostd::efile2string(ael_filename),"[AEL_RESULTS]START","[AEL_RESULTS]STOP",0));
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(ael_filename),aflow_ael_out,"[AEL_RESULTS]START","[AEL_RESULTS]STOP");
         aelfilezipped = true;
@@ -287,11 +285,11 @@ namespace pocc {
         //[CO20200404 - OBSOLETE]  aurostd::ExtractToStringstreamEXPLICIT(aurostd::file2string(ael_filename),aflow_ael_out,"[AEL_RESULTS]START","[AEL_RESULTS]STOP");
         //[CO20200404 - OBSOLETE]  aelfilezipped = false;
     } else {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No aflow.ael.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
     }
     if(LDEBUG) {
       //aurostd::StringstreamClean(aus);
-      cerr << soliloquy << " aflow_ael_out:" << endl << aflow_ael_out.str() << endl;
+      cerr << __AFLOW_FUNC__ << " aflow_ael_out:" << endl << aflow_ael_out.str() << endl;
       //aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     }
     aurostd::stream2vectorstring(aflow_ael_out,vline);
@@ -317,7 +315,7 @@ namespace pocc {
     }
     if(LDEBUG) {
       //aurostd::StringstreamClean(aus);
-      cerr << soliloquy << " aflow_elastic_tensor = " << endl << aflow_elastic_tensor.str() << endl;
+      cerr << __AFLOW_FUNC__ << " aflow_elastic_tensor = " << endl << aflow_elastic_tensor.str() << endl;
       //aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     }
     aurostd::stream2vectorstring(aflow_elastic_tensor,vline);
@@ -341,7 +339,7 @@ namespace pocc {
     }
     if(LDEBUG) {
       //aurostd::StringstreamClean(aus);
-      cerr << soliloquy << " aflow_compliance_tensor = " << endl << aflow_compliance_tensor.str() << endl;
+      cerr << __AFLOW_FUNC__ << " aflow_compliance_tensor = " << endl << aflow_compliance_tensor.str() << endl;
       //aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     }
     aurostd::stream2vectorstring(aflow_compliance_tensor,vline);
@@ -382,7 +380,6 @@ namespace pocc {
 namespace pocc {
   void POccCalculator::getAverageElasticProperties(const vector<double>& v_temperatures, bool ael_write_full_results, vector<double>& Bvoigt, vector<double>& Breuss, vector<double>& Bvrh, vector<double>& Gvoigt, vector<double>& Greuss, vector<double>& Gvrh,vector<double>& Poisson_ratio, vector<vector<vector<double> > >& elastic_tensor_list,  vector<vector<vector<double> > >& compliance_tensor_list) {
     bool LDEBUG=(FALSE || _DEBUG_POCC_AEL_AGL_ || XHOST.DEBUG);
-    string soliloquy="POccCalculator::getAverageElasticProperties():";
     stringstream message;
     ostringstream aus;
     ofstream FileMESSAGE;
@@ -414,7 +411,7 @@ namespace pocc {
     double kval = 0.0, kvalsq = 0.0;
     stringstream ossmain, ossfull;
 
-    if(LDEBUG){cerr << soliloquy << " v_temperatures=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(v_temperatures,5),",") << endl;}  //CO20200404
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " v_temperatures=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(v_temperatures,5),",") << endl;}  //CO20200404
 
     // Calculate elastic modulus, hardness and ductility 
     unsigned long long int isupercell = 0;
@@ -529,7 +526,7 @@ namespace pocc {
 
     for (uint jt = 0; jt < v_temperatures.size(); jt++) {
       T = v_temperatures.at(jt);
-      message << "Averaging elastic properties at T=" << T << "K";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404 //CO20200502 - no getTemperatureString(T) needed here
+      message << "Averaging elastic properties at T=" << T << "K";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404 //CO20200502 - no getTemperatureString(T) needed here
       setPOccStructureProbabilities(T);
       Bvoigt_ave = 0.0;
       Breuss_ave = 0.0;
@@ -847,16 +844,15 @@ namespace pocc {
   void POccCalculator::generateDebyeThermalProperties(vector<double>& Debye_temperature, vector<double>& Debye_acoustic, vector<double>& Gruneisen, vector<double>& Cv300K, vector<double>& Cp300K, vector<double>& Fvib300K_atom, vector<double>& Fvib300K_cell, vector<double>& Svib300K_atom, vector<double>& Svib300K_cell, vector<double>& kappa300K, vector<vector<double> >& agl_temperatures, vector<vector<double> >& agl_gibbs_energies_atom, vector<vector<double> >& agl_vibrational_energies_atom) {
     bool LDEBUG=(FALSE || _DEBUG_POCC_AEL_AGL_ || XHOST.DEBUG);
     uint aglerror = 0;
-    string soliloquy="POccCalculator::generateDebyeThermalProperties():";
     if(LDEBUG) {
-      cerr << soliloquy << " BEGIN" << endl;
+      cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     }
     if(LDEBUG) {
-      cerr << soliloquy << " directory=[" << m_aflags.Directory << "]" << endl;
+      cerr << __AFLOW_FUNC__ << " directory=[" << m_aflags.Directory << "]" << endl;
     }
     // string aflowin;
     // aflowin=string(directory +"/"+_AFLOWIN_);
-    // if(!aurostd::FileExist(aflowin)) {throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"pocc::POccCalculator::generateDebyeThermalProperties():",_RUNTIME_ERROR_);}
+    // if(!aurostd::FileExist(aflowin)) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"pocc::POccCalculator::generateDebyeThermalProperties():",_RUNTIME_ERROR_);}
     // string str_AflowIn; aurostd::file2string(aflowin, str_AflowIn);
     double agl_debye_temperature = 0.0, agl_debye_acoustic = 0.0, agl_gruneisen = 0.0;
     double agl_heat_capacity_Cv_300K = 0.0, agl_heat_capacity_Cp_300K = 0.0;
@@ -887,12 +883,12 @@ namespace pocc {
       agl_vibrational_energy_atom.clear(); //CT20200729
       // [OBSOLETE] aglerror = AGL_functions::Get_ThermalProperties_AGL_postprocess(pocc_directory_abs, ntemperature, stemperature, npressure, spressure, agl_temperature, agl_gibbs_energy_atom, agl_vibrational_energy_atom);
       // [OBSOLETE] if (aglerror > 0) {
-      // [OBSOLETE]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem with AGL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+      // [OBSOLETE]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem with AGL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
       // [OBSOLETE] }
       //CT20200722 Run AGL postprocessing through KBIN
       aglerror = AGL_functions::AGL_Get_AflowInName(AflowInName, pocc_directory_abs, agl_aflowin_found);
       if (aglerror != 0) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem finding AGL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem finding AGL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
       }
       if (agl_aflowin_found) {
         if(aurostd::FileExist(pocc_directory_abs+"/agl.LOCK")) {
@@ -923,7 +919,7 @@ namespace pocc {
         //[SD20220520 - OBSOLETE]aurostd::StringstreamClean(aflow_agl_out);
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(pocc_directory_abs+"/"+"aflow.agl.out"),aflow_agl_out,"[AGL_RESULTS]START","[AGL_RESULTS]STOP");
         if(LDEBUG) {
-          cerr << soliloquy << " aflow.agl.out:" << endl << aflow_agl_out.str() << endl;
+          cerr << __AFLOW_FUNC__ << " aflow.agl.out:" << endl << aflow_agl_out.str() << endl;
         }
         aurostd::stream2vectorstring(aflow_agl_out,vline);
         for (uint i=0;i<vline.size();i++) {
@@ -947,7 +943,7 @@ namespace pocc {
         //[SD20220520 - OBSOLETE]aurostd::StringstreamClean(aflow_agl_energies_out);
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(pocc_directory_abs+"/"+"aflow.agl.out"),aflow_agl_energies_out,"[AGL_ENERGIES_TEMPERATURE]START","[AGL_ENERGIES_TEMPERATURE]STOP");
         if(LDEBUG) {
-          cerr << soliloquy << " aflow_agl_energies:" << endl << aflow_agl_energies_out.str() << endl;
+          cerr << __AFLOW_FUNC__ << " aflow_agl_energies:" << endl << aflow_agl_energies_out.str() << endl;
         }
         aurostd::stream2vectorstring(aflow_agl_energies_out,vline);
         for (uint i=0;i<vline.size();i++) {
@@ -977,8 +973,8 @@ namespace pocc {
         agl_gibbs_energies_atom.push_back(agl_gibbs_energy_atom);
         agl_vibrational_energies_atom.push_back(agl_vibrational_energy_atom);
       } else {
-        // [OBSOLETE] cerr << soliloquy << pocc_directory_abs << "/aflow.agl.out: File not found" << endl;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Problem with AGL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+        // [OBSOLETE] cerr << __AFLOW_FUNC__ << pocc_directory_abs << "/aflow.agl.out: File not found" << endl;
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem with AGL calculation: [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
       }
     }
   }
@@ -993,12 +989,11 @@ namespace pocc {
     bool LDEBUG=(FALSE || _DEBUG_POCC_AEL_AGL_ || XHOST.DEBUG);
     stringstream message;
     // [OBSOLETE] uint aglerror = 0;
-    string soliloquy="POccCalculator::generateDebyeThermalProperties():";
     if(LDEBUG) {
-      cerr << soliloquy << " BEGIN" << endl;
+      cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     }
     if(LDEBUG) {
-      cerr << soliloquy << " directory=[" << m_aflags.Directory << "]" << endl;
+      cerr << __AFLOW_FUNC__ << " directory=[" << m_aflags.Directory << "]" << endl;
     }
     double agl_debye_temperature = 0.0, agl_debye_acoustic = 0.0, agl_gruneisen = 0.0;
     double agl_heat_capacity_Cv_300K = 0.0, agl_heat_capacity_Cp_300K = 0.0;
@@ -1024,7 +1019,7 @@ namespace pocc {
       agl_vibrational_energy_atom.clear(); //CT20200729
       agl_filename=pocc_directory_abs+"/aflow.agl.out";
       if(aurostd::EFileExist(agl_filename,agl_filename)){
-        message << "Reading " << m_ARUN_directories[isupercell]+"/aflow.agl.out";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404
+        message << "Reading " << m_ARUN_directories[isupercell]+"/aflow.agl.out";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404
         aflow_agl_out.str(aurostd::substring2string(aurostd::efile2string(agl_filename),"[AGL_RESULTS]START","[AGL_RESULTS]STOP",0));
         //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::efile2string(agl_filename),aflow_agl_out,"[AGL_RESULTS]START","[AGL_RESULTS]STOP");
         aglfilezipped = true;
@@ -1032,10 +1027,10 @@ namespace pocc {
         //[CO20200404 - OBSOLETE]  aurostd::ExtractToStringstreamEXPLICIT(aurostd::file2string(agl_filename),aflow_agl_out,"[AGL_RESULTS]START","[AGL_RESULTS]STOP");
         //[CO20200404 - OBSOLETE]  aglfilezipped = false;
     } else {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No aflow.agl.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No aflow.agl.out file found [dir="+pocc_directory_abs+"]",_FILE_NOT_FOUND_);
     }
     if(LDEBUG) {
-      cerr << soliloquy << " aflow.agl.out:" << endl << aflow_agl_out.str() << endl;
+      cerr << __AFLOW_FUNC__ << " aflow.agl.out:" << endl << aflow_agl_out.str() << endl;
     }
     aurostd::stream2vectorstring(aflow_agl_out,vline);
     for (uint i=0;i<vline.size();i++) {
@@ -1064,7 +1059,7 @@ namespace pocc {
       //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(aurostd::file2string(agl_filename),aflow_agl_energies_out,"[AGL_ENERGIES_TEMPERATURE]START","[AGL_ENERGIES_TEMPERATURE]STOP");
     }
     if(LDEBUG) {
-      cerr << soliloquy << " aflow_agl_energies:" << endl << aflow_agl_energies_out.str() << endl;
+      cerr << __AFLOW_FUNC__ << " aflow_agl_energies:" << endl << aflow_agl_energies_out.str() << endl;
     }
     aurostd::stream2vectorstring(aflow_agl_energies_out,vline);
     for (uint i=0;i<vline.size();i++) {
@@ -1104,7 +1099,6 @@ namespace pocc {
 // ***************************************************************************
 namespace pocc {
   void POccCalculator::getAverageDebyeThermalProperties(const vector<double>& v_temperatures, bool agl_write_full_results, vector<double>& Debye_temperature, vector<double>& Debye_acoustic, vector<double>& Gruneisen, vector<double>& Cv300K, vector<double>& Cp300K, vector<double>& Fvib300K_atom, vector<double>& Fvib300K_cell, vector<double>& Svib300K_atom, vector<double>& Svib300K_cell, vector<double>& kappa300K, vector<vector<double> >& agl_temperatures, vector<vector<double> >& agl_gibbs_energies_atom, vector<vector<double> >& agl_vibrational_energies_atom) {
-    string soliloquy="POccCalculator::getAverageDebyeThermalProperties():";
     stringstream message;
     ostringstream aus;
     ofstream FileMESSAGE;
@@ -1142,7 +1136,7 @@ namespace pocc {
       }
     }
     if (tmaxlow < 1.0) {
-      message << "Maximum temperature = " << tmaxlow;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_); //CO20200404
+      message << "Maximum temperature = " << tmaxlow;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_); //CO20200404
     }
     // Next, set temperatures for averaged thermal properties equal to temperatures of smallest range
     for (uint j = 0; j < jtmaxlow; j++) {
@@ -1155,7 +1149,7 @@ namespace pocc {
     ossfull.str(std::string());    
     for (uint jt = 0; jt < v_temperatures.size(); jt++) {
       T = v_temperatures.at(jt);
-      message << "Averaging Debye thermal properties at T=" << T << "K";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404 //CO20200502 - no (*this).getTemperatureString(T) needed here
+      message << "Averaging Debye thermal properties at T=" << T << "K";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_); //CO20200404 //CO20200502 - no (*this).getTemperatureString(T) needed here
       setPOccStructureProbabilities(T);
       Debye_temperature_ave = 0.0;
       Debye_acoustic_ave = 0.0;
@@ -1315,7 +1309,7 @@ namespace pocc {
 
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow Cormac Toher - Duke University 2013-2021           *
 // *                                                                         *
 //****************************************************************************

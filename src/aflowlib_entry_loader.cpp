@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // This EntryLoader class is the combination/evolution of different prior solutions to integrate with the AFLOW database.
@@ -43,7 +43,7 @@ namespace aflowlib {
   ///   el.loadAUID("aflow:7dd846bc04c764e8"); // no duplicates will be stored
   ///   el.getEntriesViewFlat(results);
   /// }
-  /// for (std::shared_ptr<aflowlib::_aflowlib_entry>> & entry : results) std::cout << entry->auid << std::endl;
+  /// for (std::shared_ptr<aflowlib::_aflowlib_entry>> entry : results) std::cout << entry->auid << std::endl;
   /// @endcode
 
   // class constructor
@@ -67,7 +67,7 @@ namespace aflowlib {
     return *this;
   }
 
-  /// @brief initialize the class (privat)
+  /// @brief initialize the class (private)
   /// create shared pointer used to store the data views and read default values from flags
   void EntryLoader::init() {
     m_out_silent = true;
@@ -78,7 +78,7 @@ namespace aflowlib {
 
     m_sqlite_file = DEFAULT_AFLOW_DB_FILE;
     m_sqlite_alloy_file = DEFAULT_ENTRY_LOADER_ALLOY_DB_FILE;
-    m_sqlite_collection = "WEB";
+    m_sqlite_collection = "RAW";
 
     m_aflux_server = DEFAULT_ENTRY_LOADER_AFLUX_SERVER;
     m_aflux_path = DEFAULT_ENTRY_LOADER_AFLUX_PATH;
@@ -203,6 +203,7 @@ namespace aflowlib {
   /// @param AUID list of AURLs
   /// @authors
   /// @mod{HE,20220216,created}
+  /// @mod{HE,20221117,ensure that aflux URL is not longer than 8000 characters}
   void EntryLoader::loadAUID(const std::vector<std::string> &AUID) {
     selectSource();
     std::vector <std::string> clean_AUID;
@@ -223,7 +224,24 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::AFLUX: {
-        std::string AUID_combined = aurostd::joinWDelimiter(clean_AUID, "':'");
+        std::string AUID_combined = "";
+        bool first = true;
+        for (size_t i=0; i<clean_AUID.size(); i++){
+          if ((AUID_combined+ clean_AUID[i]).size()  < 5000) {
+            if (first) {
+              AUID_combined=clean_AUID[i];
+              first=false;
+            }
+            else AUID_combined+="':'" + clean_AUID[i];
+          }
+          else {
+            AUID_combined = "'" + AUID_combined + "'";
+            loadAFLUXMatchbook({{"*",    ""},
+                                {"auid", AUID_combined}});
+            AUID_combined = clean_AUID[i];
+          }
+        }
+
         AUID_combined = "'" + AUID_combined + "'";
         loadAFLUXMatchbook({{"*",    ""},
                             {"auid", AUID_combined}});
@@ -295,13 +313,13 @@ namespace aflowlib {
 
       case Source::SQLITE: {
         std::string where = "aurl='\"" + AURL + "\"'";
-        where = std::regex_replace(where, m_re_aurl2file, "$1_" + m_sqlite_collection + "/");
+        where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
         loadSqliteWhere(where);
         break;
       }
 
       case Source::AFLUX: {
-        AURL = std::regex_replace(AURL, m_re_aurl2file, "$1_" + m_aflux_collection + "/");
+        AURL = std::regex_replace(AURL, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
         std::map <std::string, std::string> matchbook{{"*",    ""},
                                                       {"aurl", "'" + AURL + "'"}};
         loadAFLUXMatchbook(matchbook);
@@ -329,6 +347,7 @@ namespace aflowlib {
   /// @param AURL list of AURLs
   /// @authors
   /// @mod{HE,20220322,created}
+  /// @mod{HE,20221117,ensure that aflux URL is not longer than 8000 characters}
   void EntryLoader::loadAURL(const std::vector <std::string> &AURL) {
     selectSource();
 
@@ -349,9 +368,27 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::AFLUX: {
-        std::string AURL_combined = aurostd::joinWDelimiter(clean_AURL, "':'");
+        std::string AURL_combined = "";
+        bool first = true;
+        for (size_t i=0; i<clean_AURL.size(); i++){
+          if ((AURL_combined+ clean_AURL[i]).size()  < 5000) {
+            if (first) {
+              AURL_combined=clean_AURL[i];
+              first=false;
+            }
+            else AURL_combined+="':'" + clean_AURL[i];
+          }
+          else {
+            AURL_combined = "'" + AURL_combined + "'";
+            AURL_combined = std::regex_replace(AURL_combined, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
+            loadAFLUXMatchbook({{"*",    ""},
+                                {"aurl", AURL_combined}});
+            AURL_combined = clean_AURL[i];
+          }
+        }
+
         AURL_combined = "'" + AURL_combined + "'";
-        AURL_combined = std::regex_replace(AURL_combined, m_re_aurl2file, "$1_" + m_aflux_collection + "/");
+        AURL_combined = std::regex_replace(AURL_combined, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
         loadAFLUXMatchbook({{"*",    ""},
                             {"aurl", AURL_combined}});
         break;
@@ -359,7 +396,7 @@ namespace aflowlib {
 
       case Source::SQLITE: {
         std::string where = aurostd::joinWDelimiter(clean_AURL, "\"','\"");
-        where = std::regex_replace(where, m_re_aurl2file, "$1_" + m_sqlite_collection + "/");
+        where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
         where = "aurl IN ('\"" + where + "\"')";
         loadSqliteWhere(where);
         break;
@@ -369,7 +406,7 @@ namespace aflowlib {
       case Source::RESTAPI_RAW: {
         std::vector <std::string> queries;
         for (std::vector<std::string>::const_iterator AURL_single = clean_AURL.begin(); AURL_single != clean_AURL.end(); AURL_single++) {
-          std::string rest_query = std::regex_replace(AURL_single->substr(28), m_re_aurl2file, "$1_" + m_sqlite_collection + "/") + "/";
+          std::string rest_query = std::regex_replace(AURL_single->substr(28), aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/") + "/";
           queries.push_back(rest_query);
         }
         loadRestAPIQueries(queries);
@@ -381,7 +418,7 @@ namespace aflowlib {
         std::vector <std::string> files;
         for (std::vector<std::string>::const_iterator AURL_single = clean_AURL.begin(); AURL_single != clean_AURL.end(); AURL_single++) {
           std::string file_path = m_filesystem_path + AURL_single->substr(28) + "/" + m_filesystem_outfile;
-          file_path = std::regex_replace(file_path, m_re_aurl2file, "$1/" + m_filesystem_collection + "/");
+          file_path = std::regex_replace(file_path, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
           files.push_back(file_path);
         }
         loadFiles(files);
@@ -522,7 +559,7 @@ namespace aflowlib {
     outDebug(__AFLOW_FUNC__);
 
     size_t start_size = m_entries_flat->size();
-    loadVector(keys, content);
+    loadVector(keys, content, where);
 
     m_logger_message << "Loaded " << m_entries_flat->size() - start_size << " new entries";
     outInfo(__AFLOW_FUNC__);
@@ -536,7 +573,7 @@ namespace aflowlib {
   /// @note #m_aflux_server and #m_aflux_path will be added
   void EntryLoader::loadAFLUXQuery(const std::string &query) {
     size_t start_size = m_entries_flat->size();
-    loadText(getRawAFLUXQuery(query));
+    loadText(getRawAFLUXQuery(query), query);
     m_logger_message << "Loaded " << m_entries_flat->size() - start_size << " new entries";
     outInfo(__AFLOW_FUNC__);
   }
@@ -560,7 +597,7 @@ namespace aflowlib {
     size_t start_size = m_entries_flat->size();
     size_t done_downloads = 0;
     for (std::vector<std::string>::const_iterator query = queries.begin(); query != queries.end(); query++) {
-      loadText({getRawRestAPIQuery(*query, full_url)});
+      loadText({getRawRestAPIQuery(*query, full_url)}, *query);
       done_downloads++;
       if (done_downloads%100 == 0){
         m_logger_message << "Loaded " << done_downloads << " of " << queries.size();
@@ -578,28 +615,109 @@ namespace aflowlib {
   /// @note doesn't add #m_filesystem_path or #m_filesystem_collection
   void EntryLoader::loadFiles(const std::vector <std::string> &files) {
     size_t start_size = m_entries_flat->size();
+    Source last_source = m_current_source;
+    m_current_source = Source::FILESYSTEM_RAW;
     for (std::vector<std::string>::const_iterator file_path = files.begin(); file_path != files.end(); file_path++) {
        std::string file_content;
        if (aurostd::file2string(*file_path, file_content) > 0) {
-         loadText({file_content});
+         loadText({file_content}, *file_path);
        }
     }
     m_logger_message << "Loaded " << m_entries_flat->size() - start_size << " new entries";
     outInfo(__AFLOW_FUNC__);
+    m_current_source = last_source;
+  }
+
+  /// @brief load a entry from a file path
+  /// @param file_path file paths
+  /// @authors
+  /// @mod{HE,20220913,created}
+  /// @note doesn't add #m_filesystem_path or #m_filesystem_collection
+  void EntryLoader::loadFiles(const std::string &file_path) {
+    loadFiles((vector<std::string>){file_path});
+  }
+
+  /// @brief load all entries in the given folders and their sub-folders
+  /// @param folders list of folder paths
+  /// @authors
+  /// @mod{HE,20220913,created}
+  /// @note EntryLoader::m_filesystem_outfile (default aflowlib.out) is used to identify entries
+  void EntryLoader::loadFolders(const std::vector<std::string> &folders) {
+    std::vector <std::string> found_entries;
+
+    char **paths = new char*[folders.size()+1](); // initialize the array with nullptr, +1 ensures it is null terminated
+    for (size_t list_idx = 0; list_idx < folders.size(); list_idx++) {
+      paths[list_idx] = (char *) folders[list_idx].c_str();
+    }
+
+    size_t scanned = 0;
+    size_t found = 0;
+    struct stat file_stats{};
+
+    // initialize a file tree scan
+    // https://man7.org/linux/man-pages/man3/fts.3.html
+    // FTS_PHYSICAL - don't follow symlinks
+    // FTS_NOCHDIR - don't change the workdir of the program
+    // FTS_XDEV - don't descend into folders that are on a different device
+    FTS *tree = fts_open(paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nullptr);
+    FTSENT *node;
+    if (tree == nullptr) {
+      m_logger_message << "Failed to initialize the file tree used to search for alloys!";
+      outHardError(__AFLOW_FUNC__, __LINE__,_FILE_ERROR_);
+      return;
+    }
+
+    // Iterate over all entries found in the folders listed in paths
+    while ((node = fts_read(tree))) {
+      scanned += 1;
+      if (m_out_debug && ((scanned-1) % 1000 == 0)) {
+        m_logger_message << (scanned-1) << " objects scanned; " << found << " entries found; next scan: " << node->fts_path;
+        outDebug(__AFLOW_FUNC__);
+      }
+      if ((node->fts_info & FTS_D)) {
+        std::string base_path = node->fts_path;
+        std::string full_path = base_path + "/" + m_filesystem_outfile;
+        if (stat(full_path.c_str(), &file_stats) == 0) {
+          found += 1;
+          found_entries.emplace_back(full_path);
+        }
+      }
+    }
+    fts_close(tree);
+    delete[] paths;
+
+    m_logger_message << "Finishing search in the filesystem after scanning " << scanned << " objects";
+    outInfo(__AFLOW_FUNC__);
+    Source last_source = m_current_source;
+    m_current_source = Source::FILESYSTEM_RAW;
+    loadFiles(found_entries);
+    m_current_source = last_source;
+  }
+
+  /// @brief load all entries recursive in the given folder and its sub-folders
+  /// @param folder_path folder path
+  /// @authors
+  /// @mod{HE,20220913,created}
+  /// @note EntryLoader::m_filesystem_outfile (default aflowlib.out) is used to identify entries
+  void EntryLoader::loadFolders(const std::string &folder_path) {
+    loadFolders((vector<std::string>){folder_path});
   }
 
   /// @brief load entries from a list of strings
   /// @param raw_data_lines list of data strings
+  /// @param source string describing the source, like a SQL query or a path
   /// @authors
   /// @mod{HE,20220216,created}
   /// @note each entry in raw_data_lines should correspond to one AFLOW lib entry
-  void EntryLoader::loadText(const std::vector <std::string> &raw_data_lines) {
+  void EntryLoader::loadText(const std::vector <std::string> &raw_data_lines, const std::string &source) {
     for (std::vector<std::string>::const_iterator line = raw_data_lines.begin(); line != raw_data_lines.end(); line++) {
       std::shared_ptr <aflowlib::_aflowlib_entry> entry = std::make_shared<aflowlib::_aflowlib_entry>();
       entry->Load(*line, *p_oss);
+      entry->el_source_type = getSourceString();
+      entry->el_source = source;
       if (!entry->auid.empty() && (std::find(m_auid_list.begin(),m_auid_list.end(), entry->auid) == m_auid_list.end())) {
         m_entries_flat->push_back(entry);
-        (*m_entries_layered_map)[entry->nspecies][entry->species_pp].push_back(entry);
+        (*m_entries_layered_map)[entry->nspecies][entry->species].push_back(entry);
         m_auid_list.emplace_back(entry->auid);
         if (m_xstructure_original) addXstructure(*entry, true);
         if (m_xstructure_relaxed) addXstructure(*entry);
@@ -610,18 +728,21 @@ namespace aflowlib {
   /// @brief load entries from vectors
   /// @param keys list of keys
   /// @param content list of keys
+  /// @param source string describing the source, like a SQL query or a path
   /// @authors
   /// @mod{HE,20220216,created}
   /// @note each entry in content should correspond to one AFLOW lib entry
-  void EntryLoader::loadVector(const std::vector<std::string> &keys, const std::vector<std::vector<std::string>> & content) {
+  void EntryLoader::loadVector(const std::vector<std::string> &keys, const std::vector<std::vector<std::string>> & content, const std::string & source) {
     std::vector<uint64_t> hash_list;
     for (std::vector<std::string>::const_iterator key = keys.begin(); key != keys.end(); key++) hash_list.emplace_back(aurostd::crc64(*key));
     for (std::vector<std::vector<std::string>>::const_iterator row=content.begin(); row!=content.end(); row++) {
       std::shared_ptr <aflowlib::_aflowlib_entry> entry = std::make_shared<aflowlib::_aflowlib_entry>();
       entry->Load(hash_list, *row);
+      entry->el_source_type = getSourceString();
+      entry->el_source = source;
       if (!entry->auid.empty() && (std::find(m_auid_list.begin(),m_auid_list.end(), entry->auid) == m_auid_list.end())) {
         m_entries_flat->push_back(entry);
-        (*m_entries_layered_map)[entry->nspecies][entry->species_pp].push_back(entry);
+        (*m_entries_layered_map)[entry->nspecies][entry->species].push_back(entry);
         m_auid_list.emplace_back(entry->auid);
         if (m_xstructure_original) addXstructure(*entry, true);
         if (m_xstructure_relaxed) addXstructure(*entry);
@@ -632,6 +753,21 @@ namespace aflowlib {
   /// @brief returns the active data source
   EntryLoader::Source EntryLoader::getSource() const{
     return m_current_source;
+  }
+
+  /// @brief returns the active data source as string
+  std::string EntryLoader::getSourceString() const {
+    switch(m_current_source) {
+      case Source::SQLITE: return "SQLITE";
+      case Source::AFLUX: return "AFLUX";
+      case Source::FILESYSTEM: return "FILESYSTEM";
+      case Source::FILESYSTEM_RAW: return "FILESYSTEM_RAW";
+      case Source::RESTAPI: return "RESTAPI";
+      case Source::RESTAPI_RAW: return "RESTAPI_RAW";
+      case Source::NONE: return "NONE";
+      case Source::FAILED: return "FAILED";
+      default: return "NONE";
+    }
   }
 
   /// @brief change the currently used source and prepares them
@@ -862,8 +998,14 @@ namespace aflowlib {
   /// @note does not add the structure to entry.vstr
   bool EntryLoader::loadXstructureFile(const aflowlib::_aflowlib_entry &entry, xstructure &new_structure, std::vector <std::string> possible_files) {
     std::string base_url = m_restapi_server + m_restapi_path + entry.aurl.substr(28) + "/";
-    std::string base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
-    base_folder = std::regex_replace(base_folder, m_re_aurl2file, "$1/" + m_filesystem_collection + "/");
+    std::string base_folder;
+    bool direct_fs = entry.el_source_type.substr(0, 10) == "FILESYSTEM"; // catch FILESYSTEM and FILESYSTEM_RAW
+    if (direct_fs){
+      base_folder = entry.el_source.substr(0, entry.el_source.size()-m_filesystem_outfile.size());
+    } else {
+      base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
+      base_folder = std::regex_replace(base_folder, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
+    }
     std::string poscar;
     if (entry.catalog =="LIB0" && !m_filesystem_available && entry.aurl.substr(entry.aurl.size() - 2)=="/0"){
       return false; // no entries in RESTAPI for WEB0 /0
@@ -873,7 +1015,7 @@ namespace aflowlib {
     if (possible_files.empty()) possible_files = m_xstructure_final_file_name;
 
     std::vector <std::string> available_files;
-    if (m_filesystem_available) {
+    if (m_filesystem_available || direct_fs) {
       aurostd::DirectoryLS(base_folder, available_files);
     } else {
       listRestAPI(base_url, available_files, false);
@@ -882,7 +1024,7 @@ namespace aflowlib {
     std::string selected_file;
     for (std::vector<std::string>::const_iterator file_name = possible_files.begin(); file_name != possible_files.end(); file_name++) {
       if (aurostd::EWithinList(available_files, *file_name, selected_file)) {
-        if (m_filesystem_available) aurostd::efile2string(base_folder + selected_file, poscar);
+        if (m_filesystem_available || direct_fs) aurostd::efile2string(base_folder + selected_file, poscar);
         else poscar = getRawRestAPIQuery(base_url + selected_file, true);
         if (!poscar.empty()) { // load from aflow.in
           new_structure = xstructure((std::stringstream) poscar, IOVASP_AUTO);
@@ -902,12 +1044,18 @@ namespace aflowlib {
   /// @note this is always the original structure
   /// @note does not add the structure to entry.vstr
   bool EntryLoader::loadXstructureAflowIn(const aflowlib::_aflowlib_entry &entry, xstructure &new_structure, const int index) {
+    std::string base_folder;
+    bool direct_fs = entry.el_source_type.substr(0, 10) == "FILESYSTEM"; // catch FILESYSTEM and FILESYSTEM_RAW
+    if (direct_fs){
+      base_folder = entry.el_source.substr(0, entry.el_source.size()-m_filesystem_outfile.size());
+    } else {
+      base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
+      base_folder = std::regex_replace(base_folder, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
+    }
     std::string base_url = m_restapi_server + m_restapi_path + entry.aurl.substr(28) + "/";
-    std::string base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
-    base_folder = std::regex_replace(base_folder, m_re_aurl2file, "$1/" + m_filesystem_collection + "/");
     std::string aflowin_content;
 
-    if (m_filesystem_available) {
+    if (m_filesystem_available || direct_fs) {
       std::stringstream buffer;
       std::ifstream open_file(base_folder + "aflow.in");
       buffer << open_file.rdbuf();
@@ -1387,11 +1535,11 @@ namespace aflowlib {
       name.erase(std::min(name.find("_ICSD_"), name.size()));
     } else if (lib_type == 'L') { //LIBX
       name.erase(std::min(name.find(':'), name.size()));
-      name = std::regex_replace(name, m_re_ppclean,"");
+      name = std::regex_replace(name, aurostd::regex_ppclean,"");
     } else {
       return "";
     }
-    std::vector <std::string> element_match(std::sregex_token_iterator(name.begin(), name.end(), m_re_elements),
+    std::vector <std::string> element_match(std::sregex_token_iterator(name.begin(), name.end(), aurostd::regex_elements),
                                             std::sregex_token_iterator());
     std::sort(element_match.begin(), element_match.end());
     return aurostd::joinWDelimiter(element_match, "");
@@ -1431,6 +1579,6 @@ namespace aflowlib {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

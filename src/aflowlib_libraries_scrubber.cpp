@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo - 2020
@@ -32,8 +32,7 @@ namespace aflowlib {
 // will be moved near LI2RAW
 namespace aflowlib {
   uint LIB2SCRUB(string library,bool VERBOSE) {
-    string soliloquy = XPID + "aflowlib::LIB2SCRUB:";
-    if(VERBOSE) acerr << soliloquy << " BEGIN" << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> vlib;
     uint fixes=0;
     if(library=="ALL" || library=="all") {
@@ -53,8 +52,8 @@ namespace aflowlib {
     if(library=="AUID" || library=="auid") { vlib.push_back("AUID");}
 
     for(uint i=0;i<vlib.size();i++) {
-      if(VERBOSE) acerr << soliloquy << " **********************************" << endl;
-      if(VERBOSE) acerr << soliloquy << " TESTING vlib.at(i)=" << vlib.at(i) << endl;
+      if(VERBOSE) acerr << __AFLOW_FUNC__ << " **********************************" << endl;
+      if(VERBOSE) acerr << __AFLOW_FUNC__ << " TESTING vlib.at(i)=" << vlib.at(i) << endl;
       vector<string> list2found;
       vector<string> listLIB2RAW,listRM,listANRL,listANRL_subst,listENTHALPY,listppAUID,listINCOMPLETE,listAGL2FIX,listTOUCH,listLIB2AUID,listREMOVE_MARYLOU,listICSD2LINK,listZIPNOMIX,listBROKEN,listAUIDerrors;
       stringstream ossLIB2RAW,ossRM,ossANRL,ossANRL_subst,ossENTHALPY,ossppAUID,ossINCOMPLETE,ossAGL2FIX,ossTOUCH,ossLIB2AUID,ossREMOVE_MARYLOU,ossICSD2LINK,ossZIPNOMIX,ossBROKEN,ossAUIDerrors;
@@ -70,15 +69,15 @@ namespace aflowlib {
             for(uint l=0;l<tokens.size();l++) {
               for(uint m=0;m<tokens.size();m++) {
                 string digits_jklm="aflow:"+tokens.at(j)+tokens.at(k)+"/"+tokens.at(l)+tokens.at(m)+"/";
-                // 	acout << soliloquy << " TESTING /common/" << vlib.at(i) << "/RAW/"  << digits_jklm << "*.json links" << endl;
-                //	acout << soliloquy << " TIME" << Message(_AFLOW_FILE_NAME_,aflags,"user,host,time") << endl;
+                // 	acout << __AFLOW_FUNC__ << " TESTING /common/" << vlib.at(i) << "/RAW/"  << digits_jklm << "*.json links" << endl;
+                //	acout << __AFLOW_FUNC__ << " TIME" << Message(__AFLOW_FILE__,aflags,"user,host,time") << endl;
                 aurostd::string2vectorstring(aurostd::execute2string("find /common/AUID/"+digits_jklm+"* -name RAW"),list2found);
-                //	acout << soliloquy << " TIME" << Message(_AFLOW_FILE_NAME_,aflags,"user,host,time") << endl;
-                //	acout << soliloquy << " list2found.size()=" << list2found.size() << endl;
-                //	acout << soliloquy << " ordering " << endl;
+                //	acout << __AFLOW_FUNC__ << " TIME" << Message(__AFLOW_FILE__,aflags,"user,host,time") << endl;
+                //	acout << __AFLOW_FUNC__ << " list2found.size()=" << list2found.size() << endl;
+                //	acout << __AFLOW_FUNC__ << " ordering " << endl;
                 sort(list2found.begin(),list2found.end());
-                //	acout << soliloquy << " list2found.size()=" << list2found.size() << endl;
-                //  acout << soliloquy << " TIME" << Message(_AFLOW_FILE_NAME_,aflags,"user,host,time") << endl;
+                //	acout << __AFLOW_FUNC__ << " list2found.size()=" << list2found.size() << endl;
+                //  acout << __AFLOW_FUNC__ << " TIME" << Message(__AFLOW_FILE__,aflags,"user,host,time") << endl;
                 for(uint n=0;n<list2found.size();n++) {
                   AUID_found++;
                   string filename_auid_json=list2found.at(n),filename_json;
@@ -89,7 +88,7 @@ namespace aflowlib {
                   filename_json=list2found.at(n)+"/aflowlib.json";	  
                   if(!aurostd::FileExist(filename_auid_json)) {
                     AUID_errors++;
-                    acout << soliloquy << " MISSING " << filename_auid_json << "   AUID_found=" << AUID_found << "   AUID_errors=" << AUID_errors << "  filename_json=" << filename_json << endl;
+                    acout << __AFLOW_FUNC__ << " MISSING " << filename_auid_json << "   AUID_found=" << AUID_found << "   AUID_errors=" << AUID_errors << "  filename_json=" << filename_json << endl;
                     listAUIDerrors.push_back(list2found.at(n));
                     ossAUIDerrors << "fix " << list2found.at(n) << endl;
                   }
@@ -98,18 +97,18 @@ namespace aflowlib {
             }
           }
         }
-        acout << soliloquy << " AUID_found=" << AUID_found << endl;
-        acout << soliloquy << " AUID_errors=" << AUID_errors << endl;
+        acout << __AFLOW_FUNC__ << " AUID_found=" << AUID_found << endl;
+        acout << __AFLOW_FUNC__ << " AUID_errors=" << AUID_errors << endl;
       }      
       if(vlib.at(i)!="AUID") {
         //   if(level==0) // just LIB/aflow.in RAW/aflowlib.out
         // testing all libraries
-        acerr << soliloquy << " TESTING /common/" << vlib.at(i) << "/LIB/*/" << _AFLOWIN_ << " <=> /common/" << vlib.at(i) << "/RAW/*/aflowlib.out" << endl;
+        acerr << __AFLOW_FUNC__ << " TESTING /common/" << vlib.at(i) << "/LIB/*/" << _AFLOWIN_ << " <=> /common/" << vlib.at(i) << "/RAW/*/aflowlib.out" << endl;
         aurostd::string2vectorstring(aurostd::execute2string("find /common/"+vlib.at(i)+"/LIB -name "+_AFLOWIN_),list2found);
-        acerr << soliloquy << " list2found.size()=" << list2found.size() << endl;
-        //      acerr << soliloquy << " ordering " << endl;
+        acerr << __AFLOW_FUNC__ << " list2found.size()=" << list2found.size() << endl;
+        //      acerr << __AFLOW_FUNC__ << " ordering " << endl;
         sort(list2found.begin(),list2found.end());
-        //     acerr << soliloquy << " list2found.size()=" << list2found.size() << endl;
+        //     acerr << __AFLOW_FUNC__ << " list2found.size()=" << list2found.size() << endl;
 
         vector<string> vremoveALL;
         aurostd::string2tokens("aflow.in~,agl_aflow.in~,WAVECAR.xz,REPORT.xz,POTCAR.relax1.xz,POTCAR.relax2.xz,POTCAR.relax3.xz,POTCAR.static.xz,POTCAR.bands.xz,AECCAR0.xz,AECCAR1.xz,AECCAR2.xz,AECCAR1.static.xz,AECCAR0.bands.xz,AECCAR1.bands.xz,AECCAR2.bands.xz,AECCAR0.relax1.xz,AECCAR1.relax1.xz,AECCAR2.relax1.xz,AECCAR0.relax2.xz,AECCAR1.relax2.xz,AECCAR2.relax2.xz",vremoveALL,",");
@@ -183,7 +182,7 @@ namespace aflowlib {
               aurostd::StringSubst(directory_MARYLOU,"//","");
               aurostd::StringSubst(directory_MARYLOU,"//","");
 
-              //    acerr << soliloquy << " fixing " << directory_LIB << endl;
+              //    acerr << __AFLOW_FUNC__ << " fixing " << directory_LIB << endl;
               listREMOVE_MARYLOU.push_back(directory_MARYLOU);
               ossREMOVE_MARYLOU << "rm -rfv \"" << directory_MARYLOU << "\"" << endl;
               //	    fixes++;
@@ -194,7 +193,7 @@ namespace aflowlib {
           if(ZIPNOMIX) { //SC20200318
             if(FileExist_directory_LIB_AFLOW_IN) {
               if(aurostd::FileExist(directory_LIB+"/"+"aflow.immiscibility.out")) {
-                //    acerr << soliloquy << " fixing " << directory_LIB << endl;
+                //    acerr << __AFLOW_FUNC__ << " fixing " << directory_LIB << endl;
                 listZIPNOMIX.push_back(directory_LIB);
                 ossZIPNOMIX << "zip -9rmv /common/" << vlib.at(i) << "/nomix.zip \"" << directory_LIB << "\"" << endl;
                 fixes++;
@@ -231,14 +230,14 @@ namespace aflowlib {
           if(LIB2AUID) {
             if(FileExist_directory_LIB_AFLOW_IN || FileExist_directory_RAW_AFLOWLIB_ENTRY_OUT) {
               if(aflowlib::LIB2AUID(directory_LIB,TRUE,FALSE)) {	    
-                //    acerr << soliloquy << " fixing " << directory_LIB << endl;
+                //    acerr << __AFLOW_FUNC__ << " fixing " << directory_LIB << endl;
                 listLIB2AUID.push_back(directory_LIB);
                 if(_AFLOWIN_=="aflow.in") {
                   ossLIB2AUID << "aflow "<< "--use_aflow.in=" << _AFLOWIN_ << " --lib2auid=\"" << directory_LIB << "\"" << endl;
                   fixes++;
                 }
-                //	  if(_AFLOWIN_=="agl_aflow.in" && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
-                if(_AFLOWIN_=="agl_aflow.in" && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+                //	  if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
+                if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
                 { //CO20200106 - patching for auto-indenting
                   ossLIB2AUID << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --lib2auid=\"" << directory_LIB << "\"" << endl;
                   fixes++;
@@ -250,14 +249,14 @@ namespace aflowlib {
           // check LIB2RAW MISSING	
           if(!FileExist_directory_RAW_AFLOW_IN || !FileExist_directory_RAW_AFLOWLIB_ENTRY_OUT || !aurostd::FileExist(directory_RAW+"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_JSON)) {
             if(!aurostd::FileExist(directory_LIB+"/"+"aflow.immiscibility.out")) {
-              //    acerr << soliloquy << " fixing " << directory_LIB << endl;
+              //    acerr << __AFLOW_FUNC__ << " fixing " << directory_LIB << endl;
               listLIB2RAW.push_back(directory_LIB);
               if(_AFLOWIN_=="aflow.in") {
                 ossLIB2RAW << "aflow "<< "--use_aflow.in=" << _AFLOWIN_ << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;
                 fixes++;
               }
-              //	  if(_AFLOWIN_=="agl_aflow.in" && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
-              if(_AFLOWIN_=="agl_aflow.in" && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+              //	  if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
+              if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
               { //CO20200106 - patching for auto-indenting
                 ossLIB2RAW << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;
                 fixes++;
@@ -266,11 +265,11 @@ namespace aflowlib {
           }
           // check LIB2RAW EXISTENT BUT MESSED UP
           if(FileExist_directory_RAW_AFLOW_IN && FileExist_directory_RAW_AFLOWLIB_ENTRY_OUT) {
-            //    acerr << soliloquy << " fixing " << directory_LIB << endl;
+            //    acerr << __AFLOW_FUNC__ << " fixing " << directory_LIB << endl;
             if(aurostd::FileExist(directory_RAW+"/aflow.fgroup.orig.json") ||
                 aurostd::FileExist(directory_RAW+"/aflow.pgroupk_xtal.relax.json") || // force
                 aurostd::FileExist(directory_RAW+"/aflow.pgroup_xtal.relax.out")) {
-              //	    acerr << soliloquy << " FOUND OVERWRITTEN = " << directory_RAW << " " << endl;
+              //	    acerr << __AFLOW_FUNC__ << " FOUND OVERWRITTEN = " << directory_RAW << " " << endl;
               listINCOMPLETE.push_back(directory_LIB);
               ossINCOMPLETE << "aflow "<< "--use_aflow.in=" << _AFLOWIN_ << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;
               fixes++;
@@ -280,7 +279,7 @@ namespace aflowlib {
           // check REMOVE normal
           for(uint k=0;k<vremoveALL.size();k++) {
             if(aurostd::FileExist(directory_LIB+"/"+vremoveALL.at(k))) {
-              //   acerr << soliloquy << " removing " << directory_LIB << "/" << vremoveALL.at(k) << endl;
+              //   acerr << __AFLOW_FUNC__ << " removing " << directory_LIB << "/" << vremoveALL.at(k) << endl;
               listRM.push_back(directory_LIB+"/"+vremoveALL.at(k));
               ossRM << "rm -fv \"" << directory_LIB << "/" << vremoveALL.at(k) << "\"" << endl;
               fixes++;	    
@@ -299,12 +298,12 @@ namespace aflowlib {
               FILE_static=directory_LIB+"/"+vremoveLIB6_LIB7.at(k)+".static.xz";
               if(aurostd::FileExist(FILE_static)) {
                 if(aurostd::FileExist(FILE_relax1)) {
-                  //   acerr << soliloquy << " removing " << FILE_relax1 << endl;
+                  //   acerr << __AFLOW_FUNC__ << " removing " << FILE_relax1 << endl;
                   listRM.push_back(FILE_relax1);
                   ossRM << "rm -fv \"" << FILE_relax1 << "\"" << endl;
                   fixes++; }
                 if(aurostd::FileExist(FILE_relax2)) {
-                  //   acerr << soliloquy << " removing " << FILE_relax2 << endl;
+                  //   acerr << __AFLOW_FUNC__ << " removing " << FILE_relax2 << endl;
                   listRM.push_back(FILE_relax2);
                   ossRM << "rm -fv \"" << FILE_relax2 << "\"" << endl;
                   fixes++; }
@@ -313,8 +312,8 @@ namespace aflowlib {
           }
 
           // check AGL_FIX
-          if(aurostd::FileExist(directory_LIB+"/agl_aflow.in") && aurostd::FileExist(directory_LIB+"/LOCK") && !aurostd::FileExist(directory_LIB+"/agl.LOCK")) {
-            listAGL2FIX.push_back(directory_LIB+"/agl_aflow.in");
+          if(aurostd::FileExist(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_) && aurostd::FileExist(directory_LIB+"/LOCK") && !aurostd::FileExist(directory_LIB+"/agl.LOCK")) {
+            listAGL2FIX.push_back(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_);
             ossAGL2FIX << "cp \"" << directory_LIB << "/" << "LOCK\"" << " \"" << directory_LIB << "/" << "agl.LOCK\"" << endl;
             fixes++;	    
           }
@@ -442,84 +441,84 @@ namespace aflowlib {
           aurostd::ProgressBar(acerr,"aflowlib::LIB2SCRUB ",j,list2found.size(),1,1,1);
         }
       }
-      acerr << soliloquy << " listLIB2RAW.size()=" << listLIB2RAW.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listLIB2RAW.size()=" << listLIB2RAW.size() << endl;
       if(listLIB2RAW.size()) {
         aurostd::stringstream2file(ossLIB2RAW,XHOST.tmpfs+"/xscrubber."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber."+vlib.at(i));
       }
-      acerr << soliloquy << " listICSD2LINK.size()=" << listICSD2LINK.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listICSD2LINK.size()=" << listICSD2LINK.size() << endl;
       if(listICSD2LINK.size()) {
         aurostd::stringstream2file(ossICSD2LINK,XHOST.tmpfs+"/xscrubber_ICSD2LINK."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ICSD2LINK."+vlib.at(i));
       }
-      acerr << soliloquy << " listZIPNOMIX.size()=" << listZIPNOMIX.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listZIPNOMIX.size()=" << listZIPNOMIX.size() << endl;
       if(listZIPNOMIX.size()) {
         aurostd::stringstream2file(ossZIPNOMIX,XHOST.tmpfs+"/xscrubber_ZIPNOMIX."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ZIPNOMIX."+vlib.at(i));
       }
-      acerr << soliloquy << " listBROKEN.size()=" << listBROKEN.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listBROKEN.size()=" << listBROKEN.size() << endl;
       if(listBROKEN.size()) {
         aurostd::stringstream2file(ossBROKEN,XHOST.tmpfs+"/xscrubber_BROKEN."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_BROKEN."+vlib.at(i));
       }
-      acerr << soliloquy << " listLIB2AUID.size()=" << listLIB2AUID.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listLIB2AUID.size()=" << listLIB2AUID.size() << endl;
       if(listLIB2AUID.size()) {
         aurostd::stringstream2file(ossLIB2AUID,XHOST.tmpfs+"/xscrubber_LIB2AUID."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_LIB2AUID."+vlib.at(i));
       }
-      acerr << soliloquy << " listREMOVE_MARYLOU.size()=" << listREMOVE_MARYLOU.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listREMOVE_MARYLOU.size()=" << listREMOVE_MARYLOU.size() << endl;
       if(listREMOVE_MARYLOU.size()) {
         aurostd::stringstream2file(ossREMOVE_MARYLOU,XHOST.tmpfs+"/xscrubber_REMOVE_MARYLOU."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_REMOVE_MARYLOU."+vlib.at(i));
       }
-      acerr << soliloquy << " listRM.size()=" << listRM.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listRM.size()=" << listRM.size() << endl;
       if(listRM.size()) {
         aurostd::stringstream2file(ossRM,XHOST.tmpfs+"/xscrubber_RM."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_RM."+vlib.at(i));
       }
-      acerr << soliloquy << " listANRL.size()=" << listANRL.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listANRL.size()=" << listANRL.size() << endl;
       if(listANRL.size()) {
         aurostd::stringstream2file(ossANRL,XHOST.tmpfs+"/xscrubber_ANRL."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ANRL."+vlib.at(i));
       }
-      acerr << soliloquy << " listANRL_subst.size()=" << listANRL_subst.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listANRL_subst.size()=" << listANRL_subst.size() << endl;
       if(listANRL_subst.size()) {
         aurostd::stringstream2file(ossANRL_subst,XHOST.tmpfs+"/xscrubber_ANRL_subst."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ANRL_subst."+vlib.at(i));
       }
-      acerr << soliloquy << " listENTHALPY.size()=" << listENTHALPY.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listENTHALPY.size()=" << listENTHALPY.size() << endl;
       if(listENTHALPY.size()) {
         aurostd::stringstream2file(ossENTHALPY,XHOST.tmpfs+"/xscrubber_ENTHALPY."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ENTHALPY."+vlib.at(i));
       }
-      acerr << soliloquy << " listppAUID.size()=" << listppAUID.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listppAUID.size()=" << listppAUID.size() << endl;
       if(listppAUID.size()) {
         aurostd::stringstream2file(ossppAUID,XHOST.tmpfs+"/xscrubber_ppAUID."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_ppAUID."+vlib.at(i));
       }
-      acerr << soliloquy << " listINCOMPLETE.size()=" << listINCOMPLETE.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listINCOMPLETE.size()=" << listINCOMPLETE.size() << endl;
       if(listINCOMPLETE.size()) {
         aurostd::stringstream2file(ossINCOMPLETE,XHOST.tmpfs+"/xscrubber_INCOMPLETE."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_INCOMPLETE."+vlib.at(i));
       }
-      acerr << soliloquy << " listAGL2FIX.size()=" << listAGL2FIX.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listAGL2FIX.size()=" << listAGL2FIX.size() << endl;
       if(listAGL2FIX.size()) {
         aurostd::stringstream2file(ossAGL2FIX,XHOST.tmpfs+"/xscrubber_AGL2FIX."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_AGL2FIX."+vlib.at(i));
       }
-      acerr << soliloquy << " listTOUCH.size()=" << listTOUCH.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listTOUCH.size()=" << listTOUCH.size() << endl;
       if(listTOUCH.size()) {
         aurostd::stringstream2file(ossTOUCH,XHOST.tmpfs+"/xscrubber_TOUCH."+vlib.at(i));
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_TOUCH."+vlib.at(i));
       }
-      acerr << soliloquy << " listAUIDerrors.size()=" << listAUIDerrors.size() << endl;
+      acerr << __AFLOW_FUNC__ << " listAUIDerrors.size()=" << listAUIDerrors.size() << endl;
       if(listAUIDerrors.size()) {
         aurostd::stringstream2file(ossAUIDerrors,XHOST.tmpfs+"/xscrubber_AUIDerrors");
         aurostd::ChmodFile("755",XHOST.tmpfs+"/xscrubber_AUIDerrors");
       }
     }
-    if(VERBOSE) acerr << soliloquy << " fixes=" << fixes << endl;
-    if(VERBOSE) acerr << soliloquy << " END" << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ << " fixes=" << fixes << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ << " END" << endl;
     return fixes;
   }
 }
@@ -529,12 +528,11 @@ namespace aflowlib {
   bool LIB2AUID(string entry,bool TEST,bool _VERBOSE) {
     if(_VERBOSE){;} //CO20190906 - keep _VERBOSE busy
     bool VERBOSE=FALSE;// _VERBOSE;
-    string soliloquy = XPID + "aflowlib::LIB2AUID:";
-    if(VERBOSE) acerr << soliloquy + " BEGIN" << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " BEGIN" << endl;
     string _entry=entry,directory_LIB,directory_RAW,directory_WEB;
     aurostd::StringSubst(_entry,"/aflow.in","");
-    aurostd::StringSubst(_entry,"/ael_aflow.in","");
-    aurostd::StringSubst(_entry,"/agl_aflow.in","");
+    aurostd::StringSubst(_entry,"/"+_AFLOWIN_AEL_DEFAULT_,"");
+    aurostd::StringSubst(_entry,"/"+_AFLOWIN_AGL_DEFAULT_,"");
     aurostd::StringSubst(_entry,"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT,"");
     aurostd::StringSubst(_entry,"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_JSON,"");
     aurostd::StringSubst(_entry,"RAW/","LIB/");
@@ -542,25 +540,25 @@ namespace aflowlib {
     directory_LIB=_entry;
     directory_RAW=_entry;aurostd::StringSubst(directory_RAW,"LIB/","RAW/");
     directory_WEB=_entry;aurostd::StringSubst(directory_WEB,"LIB/","WEB/");
-    // acout << soliloquy + " entry=" << entry << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_LIB=" << directory_LIB << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_RAW=" << directory_RAW << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_WEB=" << directory_WEB << endl;
+    // acout << __AFLOW_FUNC__ + " entry=" << entry << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_LIB=" << directory_LIB << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_RAW=" << directory_RAW << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_WEB=" << directory_WEB << endl;
 
     // if(aurostd::FileExist(directory_LIB)) {
-    //   // acout << soliloquy + " EXIST   = " << directory_LIB << endl;
+    //   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_LIB << endl;
     // } else {
-    //   // acout << soliloquy + " MISSING = " << directory_LIB << endl;
+    //   // acout << __AFLOW_FUNC__ + " MISSING = " << directory_LIB << endl;
     // }
     // if(aurostd::FileExist(directory_RAW)) {
-    //   // acout << soliloquy + " EXIST   = " << directory_RAW << endl;
+    //   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_RAW << endl;
     // } else {
-    //   // acout << soliloquy + " MISSING = " << directory_RAW << endl;
+    //   // acout << __AFLOW_FUNC__ + " MISSING = " << directory_RAW << endl;
     // }
     // if(aurostd::FileExist(directory_WEB)) {
-    //   // acout << soliloquy + " EXIST   = " << directory_WEB << endl;
+    //   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_WEB << endl;
     // } else {
-    //   // acout << soliloquy + " MISSING = " << directory_WEB << endl;
+    //   // acout << __AFLOW_FUNC__ + " MISSING = " << directory_WEB << endl;
     // }
 
     string directory_old_LIB_AUID,directory_old_RAW_AUID,directory_old_WEB_AUID;
@@ -570,7 +568,7 @@ namespace aflowlib {
       string auid=entry_tmp.auid;
       if(auid.size()!=22) {
         string message = "error on size of auid=";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       directory_old_LIB_AUID=init::AFLOW_Projects_Directories("AUID")+"/LIB";
       directory_old_RAW_AUID=init::AFLOW_Projects_Directories("AUID")+"/RAW";
@@ -594,76 +592,76 @@ namespace aflowlib {
 
       if(!TEST) {
         // [OBSOLETE] if(aurostd::FileExist(directory_old_LIB_AUID)) {
-        // [OBSOLETE]   // acout << soliloquy + " EXIST   = " << directory_old_LIB_AUID << endl;
+        // [OBSOLETE]   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_old_LIB_AUID << endl;
         // [OBSOLETE] } else {
-        // [OBSOLETE]   acout << soliloquy + " MISSING = " << directory_old_LIB_AUID << endl;
+        // [OBSOLETE]   acout << __AFLOW_FUNC__ + " MISSING = " << directory_old_LIB_AUID << endl;
         // [OBSOLETE] }
         // [OBSOLETE] if(aurostd::FileExist(directory_old_RAW_AUID)) {
-        // [OBSOLETE]   // acout << soliloquy + " EXIST   = " << directory_old_RAW_AUID << endl;
+        // [OBSOLETE]   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_old_RAW_AUID << endl;
         // [OBSOLETE] } else {
-        // [OBSOLETE]   acout << soliloquy + " MISSING = " << directory_old_RAW_AUID << endl;
+        // [OBSOLETE]   acout << __AFLOW_FUNC__ + " MISSING = " << directory_old_RAW_AUID << endl;
         // [OBSOLETE] }
         // [OBSOLETE] if(aurostd::FileExist(directory_old_WEB_AUID)) {
-        // [OBSOLETE]   // acout << soliloquy + " EXIST   = " << directory_old_WEB_AUID << endl;
+        // [OBSOLETE]   // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_old_WEB_AUID << endl;
         // [OBSOLETE] } else {
-        // [OBSOLETE]   acout << soliloquy + " MISSING = " << directory_old_WEB_AUID << endl;
+        // [OBSOLETE]   acout << __AFLOW_FUNC__ + " MISSING = " << directory_old_WEB_AUID << endl;
         // [OBSOLETE] }
         if(aurostd::FileExist(directory_new_LIB_AUID)) {
-          // acout << soliloquy + " EXIST   = " << directory_new_LIB_AUID << endl;
+          // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_new_LIB_AUID << endl;
         } else {
-          acout << soliloquy + " MISSING = " << directory_new_LIB_AUID << endl;
+          acout << __AFLOW_FUNC__ + " MISSING = " << directory_new_LIB_AUID << endl;
         }
         if(aurostd::FileExist(directory_new_RAW_AUID)) {
-          // acout << soliloquy + " EXIST   = " << directory_new_RAW_AUID << endl;
+          // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_new_RAW_AUID << endl;
         } else {
-          acout << soliloquy + " MISSING = " << directory_new_RAW_AUID << endl;
+          acout << __AFLOW_FUNC__ + " MISSING = " << directory_new_RAW_AUID << endl;
         }
         if(aurostd::FileExist(directory_new_WEB_AUID)) {
-          // acout << soliloquy + " EXIST   = " << directory_new_WEB_AUID << endl;
+          // acout << __AFLOW_FUNC__ + " EXIST   = " << directory_new_WEB_AUID << endl;
         } else {
-          acout << soliloquy + " MISSING = " << directory_new_WEB_AUID << endl;
+          acout << __AFLOW_FUNC__ + " MISSING = " << directory_new_WEB_AUID << endl;
         }
       }
 
       if(aurostd::FileExist(directory_RAW) && !aurostd::FileExist(directory_new_RAW_AUID)) {
-        //	acout << soliloquy + ": directory_AUID_RAW=" << directory_new_RAW_AUID << " -> " << directory_RAW << endl;
+        //	acout << __AFLOW_FUNC__ + ": directory_AUID_RAW=" << directory_new_RAW_AUID << " -> " << directory_RAW << endl;
         if(TEST) {
           return true;
         } else {
-          acout << soliloquy + ": linking file AUID_LIB->LIB: " << directory_new_LIB_AUID << " -> " << directory_LIB << endl; acout.flush();
+          acout << __AFLOW_FUNC__ + ": linking file AUID_LIB->LIB: " << directory_new_LIB_AUID << " -> " << directory_LIB << endl; acout.flush();
           aurostd::DirectoryMake(directory_new_AUID);
           aurostd::LinkFile(directory_LIB,directory_new_LIB_AUID);         // LINK
           //	aurostd::execute(XHOST.command("beep")+" -f 2500 -l 1");
         }
       }
       if(aurostd::FileExist(directory_RAW) && !aurostd::FileExist(directory_new_RAW_AUID)) {
-        //	acout << soliloquy + ": directory_AUID_RAW=" << directory_new_RAW_AUID << " -> " << directory_RAW << endl;
+        //	acout << __AFLOW_FUNC__ + ": directory_AUID_RAW=" << directory_new_RAW_AUID << " -> " << directory_RAW << endl;
         if(TEST) {
           return true;
         } else {
-          acout << soliloquy + ": linking file AUID_RAW->RAW: " << directory_new_RAW_AUID << " -> " << directory_RAW << endl; acout.flush();
+          acout << __AFLOW_FUNC__ + ": linking file AUID_RAW->RAW: " << directory_new_RAW_AUID << " -> " << directory_RAW << endl; acout.flush();
           aurostd::DirectoryMake(directory_new_AUID);
           aurostd::LinkFile(directory_RAW,directory_new_RAW_AUID);         // LINK
           //	aurostd::execute(XHOST.command("beep")+" -f 2600 -l 1");
         }
       }
       if(aurostd::FileExist(directory_WEB) && !aurostd::FileExist(directory_new_WEB_AUID)) {
-        //	acout << soliloquy + ": directory_AUID_WEB=" << directory_new_WEB_AUID << " -> " << directory_WEB << endl;
+        //	acout << __AFLOW_FUNC__ + ": directory_AUID_WEB=" << directory_new_WEB_AUID << " -> " << directory_WEB << endl;
         if(TEST) {
           return true;
         } else {
-          acout << soliloquy + ": linking file AUID_WEB->WEB: " << directory_new_WEB_AUID << " -> " << directory_WEB << endl; acout.flush();
+          acout << __AFLOW_FUNC__ + ": linking file AUID_WEB->WEB: " << directory_new_WEB_AUID << " -> " << directory_WEB << endl; acout.flush();
           aurostd::DirectoryMake(directory_new_AUID);
           aurostd::LinkFile(directory_WEB,directory_new_WEB_AUID);         // LINK
           //	aurostd::execute(XHOST.command("beep")+" -f 2500 -l 1");
         }
       }
       if(!aurostd::FileExist(directory_WEB) && aurostd::FileExist(directory_RAW) && !aurostd::FileExist(directory_new_WEB_AUID)) { // no WEB so point to RAW
-        //	acout << soliloquy + ": directory_AUID_WEB=" << directory_new_WEB_AUID << " -> " << directory_RAW << endl;
+        //	acout << __AFLOW_FUNC__ + ": directory_AUID_WEB=" << directory_new_WEB_AUID << " -> " << directory_RAW << endl;
         if(TEST) {
           return true;
         } else {
-          acout << soliloquy + ": linking file AUID_WEB->RAW: " << directory_new_WEB_AUID << " -> " << directory_RAW << endl; acout.flush();
+          acout << __AFLOW_FUNC__ + ": linking file AUID_WEB->RAW: " << directory_new_WEB_AUID << " -> " << directory_RAW << endl; acout.flush();
           aurostd::DirectoryMake(directory_new_AUID);
           aurostd::LinkFile(directory_RAW,directory_new_WEB_AUID);         // LINK
           //	aurostd::execute(XHOST.command("beep")+" -f 2500 -l 1");
@@ -672,14 +670,14 @@ namespace aflowlib {
 
       //      directory_old_LIB_AUID=init::AFLOW_Projects_Directories("AUID")+"/LIB/"+auid.substr(0,8); for(uint i=8;i<=20;i+=2) directory_old_LIB_AUID+="/"+auid.substr(i,2);  // splitting aflow:ab/cd..
     }
-    if(VERBOSE) acerr << soliloquy + " directory_old_LIB_AUID=" << directory_old_LIB_AUID << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_old_RAW_AUID=" << directory_old_RAW_AUID << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_old_WEB_AUID=" << directory_old_WEB_AUID << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_new_LIB_AUID=" << directory_new_LIB_AUID << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_new_RAW_AUID=" << directory_new_RAW_AUID << endl;
-    if(VERBOSE) acerr << soliloquy + " directory_new_WEB_AUID=" << directory_new_WEB_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_old_LIB_AUID=" << directory_old_LIB_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_old_RAW_AUID=" << directory_old_RAW_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_old_WEB_AUID=" << directory_old_WEB_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_new_LIB_AUID=" << directory_new_LIB_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_new_RAW_AUID=" << directory_new_RAW_AUID << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " directory_new_WEB_AUID=" << directory_new_WEB_AUID << endl;
 
-    if(VERBOSE) acerr << soliloquy + " END" << endl;
+    if(VERBOSE) acerr << __AFLOW_FUNC__ + " END" << endl;
     return false;
   }
 }
@@ -688,6 +686,6 @@ namespace aflowlib {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

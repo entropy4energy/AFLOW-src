@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Andriy Smolyanyuk (andriy.smolyanyuk@duke.edu)
@@ -48,8 +48,6 @@ enum PH_DATA_FILE {PH_DF_DIRECTORY, PH_DF_HARMIFC, PH_DF_PHPOSCAR};
 #define EOS_METHOD_FILE_BIRCH_MURNAGHAN3 "birch-murnaghan3."
 #define EOS_METHOD_FILE_BIRCH_MURNAGHAN4 "birch-murnaghan4."
 #define EOS_METHOD_FILE_MURNAGHAN "murnaghan."
-
-#define QHA_AFLOWIN_DEFAULT string("aflow_qha.in")
 
 // labels to specify what contributions to the free energy are included
 #define F_ELEC 1
@@ -527,7 +525,7 @@ namespace apl
       msg << "[AFLOW_APL]TPT.";
       msg << "Specify as TPT="+AFLOWRC_DEFAULT_APL_TPT+"." << std::endl;
       msg << "See README_AFLOW_APL.TXT for the details.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg,
+      throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg,
           _INPUT_NUMBER_);
     }
     double tp_start = tokens[0];
@@ -578,7 +576,7 @@ namespace apl
     // ME20220427 - must be one or the other
     if (!isEOS && !isGP_FD) {
       string message = "Nothing to be done. Selector EOS=ON or GP_FINITE_DIFF=ON";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
       return;
     }
     string msg = "Performing a QHA calculation.";
@@ -677,7 +675,7 @@ namespace apl
             // Add NOTICE when no static calculations have been performed, or QHA will
             // finish as DONE without telling the user why no output has been produed.
             string message = "Waiting for required STATIC calculations.";
-            pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
           }
 
           createSubdirectoriesStaticRun(xflags, aflags, kflags, file_is_present);
@@ -1174,7 +1172,7 @@ namespace apl
         // Add NOTICE when no phonon calculations have been performed, or QHA will
         // finish as DONE without telling the user why no output has been produed.
         string message = "Waiting for required PHONON calculations.";
-        pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
       }
       createSubdirectoriesAPLRun(xflags, aflags, kflags, file_is_present, qhatype);
     }
@@ -1330,18 +1328,18 @@ namespace apl
         filename += DEFAULT_QHA_FILE_PREFIX + DEFAULT_QHA_KPOINTS_FILE;
         if (!aurostd::stringstream2file(qpath_stream, filename)){
           msg = "Error writing to " + filename + "file.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
         }
       }
       else{
         if (qpWeights.size() != phcalc.getQMesh().getWeights().size()){
           msg = "Inconsistent size of q-points weights for calculations at different volumes.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INDEX_MISMATCH_);
+          throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INDEX_MISMATCH_);
         }
 
         if (qPoints.size() != phcalc.getQMesh().getIrredQPointsFPOS().size()){
           msg = "Inconsistent number of irreducible q-points for calculations at different volumes.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INDEX_MISMATCH_);
+          throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INDEX_MISMATCH_);
         }
       }
 
@@ -1422,13 +1420,13 @@ namespace apl
     if (aurostd::FileExist(filename)){
       if (!aurostd::string2file(msg, filename, "APPEND")){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
     else{
       if (!aurostd::string2file(msg, filename)){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
 
@@ -1599,7 +1597,7 @@ namespace apl
       msg = "Wrong size of the xomega array passed to calcGrueneisenFD function.";
       msg += "Expected size: 3. Actual size: ";
       msg += aurostd::utype2string<int>(xomega.rows);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INDEX_BOUNDS_);
+      throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INDEX_BOUNDS_);
     }
 
     if (xomega[2] > _ZERO_TOL_){
@@ -1663,7 +1661,7 @@ namespace apl
           break;
         default:
           msg = "Nonexistent QHA method was passed to " + string(__func__);
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg,
+          throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg,
               _INPUT_UNKNOWN_);
           break;
       }
@@ -1829,7 +1827,7 @@ namespace apl
     if (!isMinimumWithinBounds(E)){
       msg = "Calculation is stopped since there is no free energy minimum";
       msg += " within a given volume range.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_VALUE_RANGE_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_VALUE_RANGE_);
     }
 
     xvector<double> fit_params;
@@ -1922,7 +1920,7 @@ namespace apl
         break;
       default:
         msg = "Nonexistent EOS method was passed to " + string(__func__);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
 
@@ -1955,7 +1953,7 @@ namespace apl
         break;
       default:
         msg = "Nonexistent EOS method was passed to " + string(__func__);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
 
@@ -2421,7 +2419,7 @@ namespace apl
             order_begin = TaylorExpansionOrder - order;
             order_end = order_begin + 2*order;
             for (int i=order_begin, j=order; i<=order_end; i+=2, j--){
-              deriv += std::pow(-1,j) * combinations(order, j) * xomega[i+1];
+              deriv += std::pow(-1,j) * aurostd::combinations(order, j) * xomega[i+1];
             }
             deriv /= pow(2*gp_distortion*V0, order);
             result += deriv * pow(V-V0,order)/aurostd::factorial(order);
@@ -2432,7 +2430,7 @@ namespace apl
       case (QHA_CALC):
         msg = "QHA::extrapolateFrequency() function is designed to be used only with QHA3P, QHANP or SCQHA method.";
         msg += " However, QHA method was requested.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg,
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg,
             _INPUT_ILLEGAL_);
         break;
     }
@@ -2478,7 +2476,7 @@ namespace apl
               order_begin = TaylorExpansionOrder - order;
               order_end = order_begin + 2*order;
               for (int i=order_begin, j=order; i<=order_end; i+=2, j--){
-                deriv += std::pow(-1,j) * combinations(order, j) * xomega[i+1];
+                deriv += std::pow(-1,j) * aurostd::combinations(order, j) * xomega[i+1];
               }
               deriv /= pow(2*gp_distortion*V0, order);
               // gamma = -V/w dw/dV: reduce power in (V-V0)^order expression
@@ -2490,7 +2488,7 @@ namespace apl
         default:
           string message = "QHA::extrapolateGrueneisen() function is designed to be used only with QHA3P, QHANP or SCQHA method.";
           message += " However, QHA method was requested.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, message,
+          throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, message,
               _INPUT_ILLEGAL_);
           break;
       }
@@ -2557,7 +2555,7 @@ namespace apl
         w = extrapolateFrequency(V, xomega, qha_method) * THz2Hz * PLANCKSCONSTANTEV_h;
         ui = 0.5*w;
 
-        if (w>_mm_epsilon && T>_mm_epsilon) ui += w/(exp(w*beta)-1.0);
+        if (w>_AUROSTD_XSCALAR_TOLERANCE_IDENTITY_ && T>_AUROSTD_XSCALAR_TOLERANCE_IDENTITY_) ui += w/(exp(w*beta)-1.0);
 
         ui *= qpWeights[q];
         U += ui;
@@ -2593,7 +2591,7 @@ namespace apl
         w = extrapolateFrequency(V, xomega, SCQHA_CALC) * THz2Hz * PLANCKSCONSTANTEV_h;
         ui = 0.5*w;
 
-        if (w>_mm_epsilon && T>_mm_epsilon) ui += w/(exp(w*beta)-1.0);
+        if (w>_AUROSTD_XSCALAR_TOLERANCE_IDENTITY_ && T>_AUROSTD_XSCALAR_TOLERANCE_IDENTITY_) ui += w/(exp(w*beta)-1.0);
 
         ui *= qpWeights[q];
         calcVPgamma += ui * extrapolateGrueneisen(V, xomega, SCQHA_CALC);
@@ -2704,7 +2702,7 @@ namespace apl
         break;
       default:
         msg = "Nonexistent EOS method was passed to " + string(__func__);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
 
@@ -2857,7 +2855,7 @@ namespace apl
 
     if (!aurostd::stringstream2file(file, filename, "APPEND")){
       msg = "Error writing to " + filename + "file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -2892,7 +2890,7 @@ namespace apl
         break;
       default:
         msg = "Nonexistent QHA method was passed to " + string(__func__);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
 
@@ -2916,7 +2914,7 @@ namespace apl
         break;
       default:
         msg = "Nonexistent EOS method was passed to " + string(__func__);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
 
@@ -3125,13 +3123,13 @@ namespace apl
     if (aurostd::FileExist(filename)){
       if (!aurostd::stringstream2file(file, filename, "APPEND")){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
     else{
       if (!aurostd::stringstream2file(file, filename)){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
 
@@ -3143,13 +3141,13 @@ namespace apl
     if (aurostd::FileExist(filename)){
       if (!aurostd::stringstream2file(file_coeff, filename, "APPEND")){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
     else{
       if (!aurostd::stringstream2file(file_coeff, filename)){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
   }
@@ -3206,7 +3204,7 @@ namespace apl
 
     if (!aurostd::stringstream2file(file, filename)){
       msg = "Error writing to " + filename + "file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -3252,7 +3250,7 @@ namespace apl
     aurostd::stringstream2file(eigenval, filename);
     if (!aurostd::FileExist(filename)){
       msg = "Cannot open "+filename+" file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -3296,7 +3294,7 @@ namespace apl
 
     if (!aurostd::stringstream2file(file, filename)){
       msg = "Error writing to " + filename + "file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -3351,7 +3349,7 @@ namespace apl
     file << xeigen;
     if (!aurostd::stringstream2file(file, filename)){
       msg = "Error writing to " + filename + "file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -3379,7 +3377,7 @@ namespace apl
 
     if (!aurostd::stringstream2file(file, filename)){
       msg = "Error writing to " + filename + "file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 
@@ -3496,7 +3494,7 @@ namespace apl
         filename += ".T"+aurostd::PaddedNumString(T, ndigits)+"K.out";
         if (!aurostd::stringstream2file(eig_stream, filename)){
           msg = "An error occurred when attempted to write "+filename+" file.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
         }
       } catch (aurostd::xerror e){
         // QHA throws _VALUE_RANGE_ exception only when there is no minimum in
@@ -3577,7 +3575,7 @@ namespace apl
       string filename = directory + '/' + DEFAULT_QHA_FILE_PREFIX + "out";
       if (!aurostd::stringstream2file(aflow_qha_out, filename)){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     } catch (aurostd::xerror e){
       // QHA throws _VALUE_RANGE_ exception only when there is no minimum in
@@ -3611,7 +3609,7 @@ namespace apl{
     string stmp="";
     if (!AflowInName.empty()) vaflowins.push_back(AflowInName);
     if (!_AFLOWIN_.empty()) vaflowins.push_back(_AFLOWIN_);
-    vaflowins.push_back(QHA_AFLOWIN_DEFAULT);
+    vaflowins.push_back(_AFLOWIN_QHA_DEFAULT_);
 
     string aflowin_name = "", aflowin = "", fullpath_aflowin_name = "";
     for (uint i=0; i<vaflowins.size(); i++){
@@ -3657,7 +3655,7 @@ namespace apl{
         break;
       default:
         msg = "Nonexistent EOS method was passed to " + function;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
   }
@@ -3681,7 +3679,7 @@ namespace apl{
         break;
       default:
         msg = "Nonexistent QHA method was passed to " + function;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
+        throw aurostd::xerror(__AFLOW_FILE__, QHA_ARUN_MODE, msg, _INPUT_UNKNOWN_);
         break;
     }
   }
@@ -3698,7 +3696,7 @@ namespace apl{
     bool has_imaginary = false;
     if (!aurostd::efile2vectorstring(filename, vlines)){
       msg = "File " + filename + " does not exist.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, function, msg, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, function, msg, _FILE_NOT_FOUND_);
     }
 
     vector<string> tokens;
@@ -3709,7 +3707,7 @@ namespace apl{
           if (tokens.size() != 2){
             msg = "Incorrect number of tokens: should be 2 instead of ";
             msg += tokens.size();
-            throw aurostd::xerror(_AFLOW_FILE_NAME_, function, msg, _FILE_CORRUPT_);
+            throw aurostd::xerror(__AFLOW_FILE__, function, msg, _FILE_CORRUPT_);
           }
 
           has_imaginary = tokens[1].find("YES") != std::string::npos;

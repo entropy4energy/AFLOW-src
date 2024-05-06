@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************
@@ -224,7 +224,7 @@ namespace apl {
     if ((include_inversions && !xs.pgroupk_Patterson_calculated) ||
         (!include_inversions && !xs.pgroupk_xtal_calculated)) {
       string message = "Calculation of the crystallographic point group of the reciprocal cell unsuccessful.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     if (include_inversions) _recCell.pgroup=xs.pgroupk_Patterson;
@@ -237,7 +237,7 @@ namespace apl {
   void QMesh::generateGridPoints(bool force_gamma) {
     stringstream message;
     message << "Generating a " << _qptGrid[1] << "x" << _qptGrid[2] << "x" << _qptGrid[3] << " q-point mesh.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _directory, *p_FileMESSAGE, *p_oss);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _directory, *p_FileMESSAGE, *p_oss);
     _qpoints.resize(_nQPs);
     _ibzqpts.resize(_nQPs);  // Before making the mesh irreducible, treat all q-points as irreducible q-points
     _weights.assign(_nQPs, 1);
@@ -354,7 +354,7 @@ namespace apl {
     }
     _reduced = true;
     message << "Found " << _nIQPs << " irreducible qpoints.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _directory, *p_FileMESSAGE, *p_oss);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _directory, *p_FileMESSAGE, *p_oss);
   }
 
   //ME20200109
@@ -534,7 +534,7 @@ namespace apl {
       return _littleGroups[iq];
     } else {
       string message = "Little groups are only calculated for irreducible q-points.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_RANGE_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_RANGE_);
     }
   }
 
@@ -579,7 +579,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       string message = "Could not write q-points to file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -620,7 +620,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       string message = "Could not write irreducible q-points to file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -866,7 +866,7 @@ namespace apl {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow CORMAC TOHER - Duke University 2013-2021           *
 // *                                                                         *
 // ***************************************************************************
@@ -77,8 +77,8 @@ namespace AEL_functions {
     // [OBSOLETE] vector<string> vaflowins;
     // [OBSOLETE] if(AflowInName.length()>0){vaflowins.push_back(AflowInName);}
     // [OBSOLETE] if(_AFLOWIN_.length()>0){vaflowins.push_back(_AFLOWIN_);}
-    // [OBSOLETE] vaflowins.push_back("ael_aflow.in");
-    // [OBSOLETE] vaflowins.push_back("agl_aflow.in");
+    // [OBSOLETE] vaflowins.push_back(_AFLOWIN_AEL_DEFAULT_);
+    // [OBSOLETE] vaflowins.push_back(_AFLOWIN_AGL_DEFAULT_);
     // [OBSOLETE] for(uint iaf=0;iaf<vaflowins.size()&&!ael_aflowin_found;iaf++){
     // [OBSOLETE]   const string& aflowinname = vaflowins.at(iaf);
     // [OBSOLETE]   if((!ael_aflowin_found) && (aurostd::FileExist(directory_LIB+"/"+aflowinname))) {
@@ -181,23 +181,23 @@ namespace AEL_functions {
           !aurostd::substring2bool(AflowIn,"[AFLOW_MODE_ZIP")) {
         kflags.KZIP_COMPRESS=FALSE;
         for(int i=0;i<1;i++) {
-          aus << "WWWWW  Warning no compression of output files... " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "WWWWW  Warning no compression of output files... " << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintWarningStream(FileMESSAGE,aus,XHOST.QUIET);
         }
       } else {
         if(!aurostd::substring2bool(AflowIn,"[AFLOW_MODE_ZIP")) { // "[AFLOW_MODE_ZIP=" not found
           kflags.KZIP_BIN=DEFAULT_KZIP_BIN;  // take default
-          aus << "00000  MESSAGE Taking DEFAULT KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "00000  MESSAGE Taking DEFAULT KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         }
         if(aurostd::substring2bool(AflowIn,"[AFLOW_MODE_ZIP]")) { // "[AFLOW_MODE_ZIP]" not found
           kflags.KZIP_BIN=aurostd::substring2string(AflowIn,"[AFLOW_MODE_ZIP]");
-          aus << "00000  MESSAGE Taking KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "00000  MESSAGE Taking KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         }
         if(aurostd::substring2bool(AflowIn,"[AFLOW_MODE_ZIP=")) { // "[AFLOW_MODE_ZIP=" found
           kflags.KZIP_BIN=aurostd::RemoveCharacter(aurostd::substring2string(AflowIn,"[AFLOW_MODE_ZIP="),']');
-          aus << "00000  MESSAGE Taking KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "00000  MESSAGE Taking KZIP_BIN=\"" << kflags.KZIP_BIN << "\" "  << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         }
       }
@@ -315,8 +315,8 @@ namespace AEL_functions {
     vector<string> vaflowins;
     if(AflowInName.length()>0){vaflowins.push_back(AflowInName);} // Check if AflowInName exists
     if(_AFLOWIN_.length()>0){vaflowins.push_back(_AFLOWIN_);} // Otherwise, check if _AFLOWIN_ file is AEL input file
-    vaflowins.push_back("ael_aflow.in"); // Otherwise, check for other commonly used names for AEL aflow.in file
-    vaflowins.push_back("agl_aflow.in");
+    vaflowins.push_back(_AFLOWIN_AEL_DEFAULT_); // Otherwise, check for other commonly used names for AEL aflow.in file
+    vaflowins.push_back(_AFLOWIN_AGL_DEFAULT_);
     for(uint iaf=0;iaf<vaflowins.size()&&!ael_aflowin_found;iaf++){
       aflowinname = vaflowins.at(iaf);
       if(aurostd::EFileExist(directory_LIB+"/"+aflowinname,stmp)&&aurostd::IsCompressed(stmp)){aurostd::UncompressFile(stmp);}  //CO20210204 - fix aflow.in.xz
@@ -1379,7 +1379,7 @@ namespace AEL_functions {
 #endif  // _AFLOW_AEL_GET_STRESS_CPP
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow CORMAC TOHER - Duke University 2013-2021           *
 // *                                                                         *
 // ***************************************************************************

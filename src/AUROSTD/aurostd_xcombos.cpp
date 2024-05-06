@@ -1,7 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
-// *           Aflow COREY OSES - Duke University 2013-2021                  *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -117,7 +116,7 @@ namespace aurostd {
 
   xcombos& xcombos::operator++() {  //remember, this is PREFIX (faster than POSTFIX)
     if(!m_initialized) {
-      throw xerror(_AFLOW_FILE_NAME_,"xcombos::operator++()", "Cannot increment uninitialized xcombos class.",  _RUNTIME_INIT_);
+      throw xerror(__AFLOW_FILE__,"xcombos::operator++()", "Cannot increment uninitialized xcombos class.",  _RUNTIME_INIT_);
     }
     if(m_mode=='P') {incrementPermutation();}
     else {
@@ -233,11 +232,10 @@ namespace aurostd {
       m_choose = (int)m_input.size(); //DX+ME20210111
     } else {
       if(LDEBUG) {
-        string soliloquy="xcombos::initialize():";  //CO20200404
         if (m_mode == 'C') {
-          std::cerr << soliloquy << " combinations: " << n_choices << " choose " << m_choose << ((m_repeat)? " with " : " without ") << "repetitions."; //CO20200404
+          std::cerr << __AFLOW_FUNC__ << " combinations: " << n_choices << " choose " << m_choose << ((m_repeat)? " with " : " without ") << "repetitions."; //CO20200404
         } else {
-          std::cerr << soliloquy << " enumerations of length " << m_choose << std::endl;  //CO20200404
+          std::cerr << __AFLOW_FUNC__ << " enumerations of length " << m_choose << std::endl;  //CO20200404
         }
       }
       if ((m_repeat) || (m_mode == 'E')) {
@@ -272,7 +270,6 @@ namespace aurostd {
   }
 
   template<class utype> std::vector<utype> xcombos::applyCombo(const std::vector<utype>& v_items) const {
-    string soliloquy="xcombos::applyCombo()";
     std::vector<utype> v_items_new;
     if(!(m_mode=='P' || m_mode=='C')){return v_items_new;}
     //if permutations, then m_current contains indices
@@ -281,19 +278,18 @@ namespace aurostd {
     std::vector<int> v_indices=m_current;
     if((m_mode=='C') && !(m_repeat)){v_indices.clear();v_indices=getIndices();} // combo indices
     for(uint i=0;i<v_indices.size();i++){
-      if(v_indices[i]>=(int)v_items.size()){throw xerror(_AFLOW_FILE_NAME_,soliloquy,"Invalid index",_INDEX_MISMATCH_);}
+      if(v_indices[i]>=(int)v_items.size()){throw xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Invalid index",_INDEX_MISMATCH_);}
       v_items_new.push_back(v_items[v_indices[i]]);
     }
     return v_items_new;
   }
 
   template<class utype> std::vector<utype> xcombos::applyCombo(const std::vector<std::vector<utype> >& v_items) const {
-    string soliloquy="xcombos::applyCombo()";
     std::vector<utype> v_items_new;
     if(m_mode!='E'){return v_items_new;} //only applies to enumerations
     std::vector<int> v_indices=m_current;
     for(uint i=0;i<v_indices.size();i++){
-      if(v_indices[i]>=(int)v_items[i].size()){throw xerror(_AFLOW_FILE_NAME_,soliloquy,"Invalid index",_INDEX_MISMATCH_);}
+      if(v_indices[i]>=(int)v_items[i].size()){throw xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Invalid index",_INDEX_MISMATCH_);}
       v_items_new.push_back(v_items[i][v_indices[i]]);
     }
     return v_items_new;
@@ -350,11 +346,11 @@ namespace aurostd {
         }
       }
       if(count>safety){
-        throw xerror(_AFLOW_FILE_NAME_,"xcombos::incrementPermutation()", "[HEAP] Uncontrolled while loop. Algorithm is not working as expected.",  _RUNTIME_ERROR_);
+        throw xerror(__AFLOW_FILE__,"xcombos::incrementPermutation()", "[HEAP] Uncontrolled while loop. Algorithm is not working as expected.",  _RUNTIME_ERROR_);
       }
     }
     else{ //DX2020111
-      throw xerror(_AFLOW_FILE_NAME_,"xcombos::incrementPermutation()", "Invalide algorithm type, only Shen (shen_alg_xcombos) and Heap's (heap_alg_xcombos) algorithms are available.",  _INPUT_ERROR_);
+      throw xerror(__AFLOW_FILE__,"xcombos::incrementPermutation()", "Invalide algorithm type, only Shen (shen_alg_xcombos) and Heap's (heap_alg_xcombos) algorithms are available.",  _INPUT_ERROR_);
     }
   }
 
@@ -515,7 +511,7 @@ namespace aurostd {
 #endif  // _AUROSTD_XCOMBOS_CPP_
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow COREY OSES - Duke University 2013-2021                  *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo - Corey Oses
@@ -79,7 +79,7 @@ bool xAIMSOUT::GetPropertiesFile(const string& fileIN,uint natoms_check,bool QUI
   if(aurostd::abs(natoms_check-(double) natoms)>0.1) {
     stringstream message;
     message << "natoms_check(" << natoms_check << ")!= (int) natoms(" << natoms << ")";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xAIMSOUT::GetPropertiesFile():",message,_FILE_CORRUPT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,"xAIMSOUT::GetPropertiesFile():",message,_FILE_CORRUPT_); //CO20200624
   }
   return flag;
 }
@@ -174,6 +174,6 @@ bool xAIMSOUT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 #endif //  _AFLOW_OAIMS_CPP_
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

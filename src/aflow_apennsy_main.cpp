@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -117,7 +117,6 @@ uint ApennsyARGs(vector<string> &argv,vector<string> &cmds,aurostd::xoption &vfl
 
 // ---------------------------------------------------------------------------
 int Apennsymain(vector<string> &argv,vector<string> &cmds) {
-  string soliloquy=XPID+"Apennsymain():";
   stringstream message;
   //  bool LDEBUG=(FALSE || XHOST.DEBUG);
   if(cmds.size()) {;} //dummy load
@@ -134,22 +133,22 @@ int Apennsymain(vector<string> &argv,vector<string> &cmds) {
   cerr << aflow::Banner("BANNER_BIG");
   // *****************************************************************************
   if(!XHOST.is_command("gnuplot")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"gnuplot is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"gnuplot is missing",_RUNTIME_INIT_); //CO20200624
   } 
   if(!XHOST.is_command("latex")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"latex is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"latex is missing",_RUNTIME_INIT_); //CO20200624
   }
   if(!XHOST.is_command("pdflatex")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"pdflatex is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"pdflatex is missing",_RUNTIME_INIT_); //CO20200624
   }
   if(!XHOST.is_command("dvips")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"dvips is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"dvips is missing",_RUNTIME_INIT_); //CO20200624
   }
   if(!XHOST.is_command("dvipdf")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"dvipdf is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"dvipdf is missing",_RUNTIME_INIT_); //CO20200624
   }
   if(!XHOST.is_command("ps2pdf")) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ps2pdf is missing",_RUNTIME_INIT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ps2pdf is missing",_RUNTIME_INIT_); //CO20200624
   }
 
   // [OBSOLETE] XHOST.vflag_apennsy.clear();                                 // inside init::Init::InitMachine
@@ -318,7 +317,7 @@ int Apennsymain(vector<string> &argv,vector<string> &cmds) {
     if(aflags.vflag.flag("APENNSY::LOAD_LIB2PGM"))  params.LibLoadAlloysLIB2PGM(aflags);  // Load LIB2
     if(aflags.vflag.flag("APENNSY::LOAD_ALLOY"))     params.LibLoadAlloysALLOY(systemS,aflags); // Load ALLOY*
     if(params.alloys.size()==0) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No alloys to load",_INPUT_MISSING_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No alloys to load",_INPUT_MISSING_); //CO20200624
     }
     // Loaded now start
     cerr << params.alloysmesg.str();            // Done some verbose
@@ -557,7 +556,7 @@ int Apennsymain(vector<string> &argv,vector<string> &cmds) {
       if(vparams.at(k).PseudopotentialNoclean==TRUE) vparams.at(k).LibLoadAlloysALLOY(params.alloys.at(k),aflags);  // load the particular alloy
 
       if(vparams.at(k).alloys.size()==0) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No alloys to load",_INPUT_MISSING_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No alloys to load",_INPUT_MISSING_); //CO20200624
       }
       // Loaded now start
       cerr << vparams.at(k).alloysmesg.str();            // Done some verbose
@@ -2246,7 +2245,6 @@ string APENNSY_Parameters::APENNSY_ConvexHull(bool _verbose,_aflags &aflags,uint
 // APENNSY_Parameters::APENNSY_PS_EnergyList
 // **********************************************************************************************
 string APENNSY_Parameters::APENNSY_PS_EnergyList(_aflags &aflags) {
-  string soliloquy=XPID+"APENNSY_Parameters::APENNSY_PS_EnergyList():";
   stringstream oss;
   double dHf,dHfd;
   // ************************************************************************
@@ -2277,7 +2275,7 @@ string APENNSY_Parameters::APENNSY_PS_EnergyList(_aflags &aflags) {
     for(uint k=0;k<alloys.size();k++) {
       xvector<double> FindMinimun(ZConcentrations.at(k).size()-1);
       if(Alloy2MiscibilityHT.at(k)==MISCIBILITY_SYSTEM_MISCIBLE) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Compound forming alloy "+alloys.at(k),_VALUE_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Compound forming alloy "+alloys.at(k),_VALUE_ILLEGAL_); //CO20200624
       }
       { //find mimumum distance
         for(uint j=1;j<=ZConcentrations.at(k).size()-1;j++) {
@@ -3092,7 +3090,7 @@ string APENNSY_Parameters::APENNSY_Miscibility(_aflags &aflags) {
   // ************************************************************************
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   oss << "// Stefano Curtarolo - 2009 Duke" << endl;
@@ -3154,7 +3152,7 @@ string APENNSY_Parameters::APENNSY_Miscibility(_aflags &aflags) {
   oss << " " << endl;
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   // done
@@ -3171,7 +3169,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Experiments(_aflags &aflags) {
   // ************************************************************************
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   oss << "// Ohad Levy - 2009 Duke" << endl;
@@ -3215,7 +3213,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Experiments(_aflags &aflags) {
   oss << " " << endl;
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   // done
@@ -3232,7 +3230,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Miedema(_aflags &aflags) {
   // ************************************************************************
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   // HERE
@@ -3259,7 +3257,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_HumeRothery(_aflags &aflags) {
   // ************************************************************************
   oss << "// ***************************************************************************" << endl;
   oss << "// *                                                                         *" << endl;
-  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "// *                                                                         *" << endl;
   oss << "// ***************************************************************************" << endl;
   for(uint k=0;k<alloys.size();k++) {
@@ -3284,7 +3282,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Table(_aflags &aflags) {
   // ************************************************************************
   oss << "%% ***************************************************************************" << endl;
   oss << "%% *                                                                         *" << endl;
-  oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "%% *                                                                         *" << endl;
   oss << "%% ***************************************************************************" << endl;
   oss << "\\begin{table}[htb]" << endl;
@@ -3315,7 +3313,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Table(_aflags &aflags) {
   oss << "\\end{table} " << endl;
   oss << "%% ***************************************************************************" << endl;
   oss << "%% *                                                                         *" << endl;
-  oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   oss << "%% *                                                                         *" << endl;
   oss << "%% ***************************************************************************" << endl;
   // done
@@ -3334,7 +3332,7 @@ string APENNSY_Parameters::APENNSY_Miscibility_Statistics(_aflags &aflags) {
   // ************************************************************************
   // oss << "%% ***************************************************************************" << endl;
   // oss << "%% *                                                                         *" << endl;
-  // oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *" << endl;
+  // oss << "%% *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *" << endl;
   // oss << "%% *                                                                         *" << endl;
   // oss << "%% ***************************************************************************" << endl;
   //#define MISCIBILITY_SYSTEM_NOT_STUDIED
@@ -3656,6 +3654,6 @@ string APENNSY_Parameters::APENNSY_Miscibility_Statistics(_aflags &aflags) {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

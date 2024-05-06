@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo - 2007-2019
@@ -181,7 +181,7 @@ namespace xprototype {
     }
     // ********************************************************************************************************************************************************
     
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xprototype::xprototype():","Prototype does not exist: "+prototype,_FILE_NOT_FOUND_);
+    throw aurostd::xerror(__AFLOW_FILE__,"xprototype::xprototype():","Prototype does not exist: "+prototype,_FILE_NOT_FOUND_);
   }
 } // namespace xprototype
 
@@ -189,6 +189,6 @@ namespace xprototype {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

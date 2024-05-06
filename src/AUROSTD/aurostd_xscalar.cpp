@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -209,6 +209,7 @@ namespace aurostd {
   double sqrt(double x) { return (double) std::sqrt(x);}
   long int sqrt(long int x) { return (long int) std::sqrt((double) x);}
   long long int sqrt(long long int x) { return (long long int) std::sqrt((double) x);}
+  unsigned long int sqrt(unsigned long int x) { return (unsigned long int) std::sqrt((double) x);}
   unsigned long long int sqrt(unsigned long long int x) { return (unsigned long long int) std::sqrt((double) x);}
   long double sqrt(long double x) { return (long double) sqrtl(x);}
 #ifdef _AUROSTD_XCOMPLEX_
@@ -219,65 +220,88 @@ namespace aurostd {
 }
 
 // ----------------------------------------------------------------------------
+// exp  exp  exp  exp  exp
+namespace aurostd {
+  // namespace aurostd
+  // EXP(X)
+  char exp(char x) { return (char) std::exp((double) x);}
+  int exp(int x) { return (int) std::exp((double) x);}
+  uint exp(uint x) { return (uint) std::exp((double) x);}
+  float exp(float x) { return (float) expf(x);}
+  double exp(double x) { return (double) std::exp(x);}
+  long int exp(long int x) { return (long int) std::exp((double) x);}
+  long long int exp(long long int x) { return (long long int) std::exp((double) x);}
+  unsigned long int exp(unsigned long int x) { return (unsigned long int) std::exp((double) x);}
+  unsigned long long int exp(unsigned long long int x) { return (unsigned long long int) std::exp((double) x);}
+  long double exp(long double x) { return (long double) expl(x);}
+}
+
+// ----------------------------------------------------------------------------
+// pow  pow  pow  pow  pow
+namespace aurostd {
+  // namespace aurostd
+  // POW(X)
+  char pow(char x,char d) { return (char) std::pow((double) x,(double) d);}
+  int pow(int x,int d) { return (int) std::pow((double) x,(double) d);}
+  uint pow(uint x,uint d) { return (uint) std::pow((double) x,(double) d);}
+  float pow(float x,float d) { return (float) powf(x,d);}
+  double pow(double x,double d) { return (double) std::pow(x,d);}
+  long int pow(long int x,long int d) { return (long int) std::pow((double) x,(double) d);}
+  long long int pow(long long int x,long long int d) { return (long long int) std::pow((double) x,(double) d);}
+  unsigned long int pow(unsigned long int x,unsigned long int d) { return (unsigned long int) std::pow((double) x,(double) d);}
+  unsigned long long int pow(unsigned long long int x,unsigned long long int d) { return (unsigned long long int) std::pow((double) x,(double) d);}
+  long double pow(long double x,long double d) { return (long double) powl(x,d);}
+}
+
+// ----------------------------------------------------------------------------
 // round  floor ceil trunc
 namespace aurostd {  // namespace aurostd
-  // ROUND(X)
-  double round(double x) { //CO20210701 //std::round() only works in C++11
-    //algo inspired from here: http://www.cplusplus.com/forum/articles/3638/
-    //https://stackoverflow.com/questions/12696764/round-is-not-a-member-of-std - it's a gcc bug
-    //1.2   ->   1
-    //-1.2  ->  -1
-    //0.1   ->   0
-    //-0.1  ->  -0  //this is ok, (int)round(-0.1)=0
-    //2.5   ->   3
-    //-2.5  ->  -3
-    //2.7   ->   3
-    //-2.7  ->  -3
-    //2.1   ->   2
-    //-2.1  ->  -2
-    //10.7  ->   11
-    //-10.7 ->  -11
-    //[CO20210624 - does not work for negative numbers]return std::floor( x + 0.5 );
-#ifdef _XSCALAR_DEBUG_
-    bool LDEBUG=(FALSE || XHOST.DEBUG);
-#endif
-    double fracpart=0.0,intpart=0.0;
-    fracpart=modf(x,&intpart);
-#ifdef _XSCALAR_DEBUG_
-    if(LDEBUG){
-      string soliloquy="aurostd::round():";
-      cerr << soliloquy << " x=" << x << endl;
-      cerr << soliloquy << " fracpart=" << fracpart << endl;
-      cerr << soliloquy << " intpart=" << intpart << endl;
-      cerr << soliloquy << " floor(x)=" << std::floor(x) << endl;
-      cerr << soliloquy << " ceil(x)=" << std::ceil(x) << endl;
-    }
-#endif
-    if(abs(fracpart)>=.5){return x>=0?std::ceil(x):std::floor(x);}  //not sure why fracpart would ever be negative, but it is for negative inputs
-    else{return x<0?std::ceil(x):std::floor(x);}
+  /// @brief rounds a real number to arbitrary digits
+  ///
+  /// @param x real number
+  /// @param digits number of digits after the decimal point
+  ///
+  /// @return rounded number
+  ///
+  /// @authors
+  /// @mod{SD,20220603,created function}
+  ///
+  /// @note Uses the "round half away from zero" rounding strategy. This is the strategy employed by
+  /// Python (except for +-0.5) and Matlab
+  ///
+  /// @see
+  /// @xlink{https://en.wikipedia.org/wiki/Rounding}
+  double round(double x, uint digits) { //SD20220603
+    double mult = std::pow(10.0, (double) digits);
+    return -aurostd::sign(x) * std::ceil(-std::abs(x) * mult - 0.5) / mult;
   }
-  // [OBSOLETE]  float round(float x) { return (float) std::roundf(float(x));}
-  // [OBSOLETE]  long double round(long double x) { return (long double) std::roundl((long double) x);}
-  // [OBSOLETE]  int round(int x) { return (int) std::round(double(x));}
-  // [OBSOLETE]  long round(long x) { return (long) std::round(double(x));}
-  // [OBSOLETE]  // FLOOR(X)
-  // [OBSOLETE]  //  double floor(double x) { return (double) std::floor(double(x));}
-  // [OBSOLETE]  float floor(float x) { return (float) std::floorf(float(x));}
-  // [OBSOLETE]  long double floor(long double x) { return (long double) std::floorl((long double) x);}
-  // [OBSOLETE]  int floor(int x) { return (int) std::floor(double(x));}
-  // [OBSOLETE]  long floor(long x) { return (long) std::floor(double(x));}
-  // [OBSOLETE]  // CEIL(X)
-  // [OBSOLETE]  double ceil(double x) { return (double) std::ceil(double(x));}
-  // [OBSOLETE]  float ceil(float x) { return (float) std::ceilf(float(x));}
-  // [OBSOLETE]  long double ceil(long double x) { return (long double) std::ceill((long double) x);}
-  // [OBSOLETE]  int ceil(int x) { return (int) std::ceil(double(x));}
-  // [OBSOLETE]  long ceil(long x) { return (long) std::ceil(double(x));}
-  // [OBSOLETE]  // TRUNC(X)
-  // [OBSOLETE]  double trunc(double x) { return (double) std::trunc(double(x));}
-  // [OBSOLETE]  float trunc(float x) { return (float) std::truncf(float(x));}
-  // [OBSOLETE]  long double trunc(long double x) { return (long double) std::truncl((long double) x);}
-  // [OBSOLETE]  int trunc(int x) { return (int) std::trunc(double(x));}
-  // [OBSOLETE]  long trunc(long x) { return (long) std::trunc(double(x));}
+  
+  int roundDouble(double doub, int multiple, bool up) { //CO20220624 (moved from chull)
+    // rounds double to the nearest (multiple), choose round up or down
+    // http://stackoverflow.com/questions/3407012/c-rounding-up-to-the-nearest-multiple-of-a-number
+    // round up - round further from 0 if doub is positive, closer to 0 if doub is negative
+    // opposite for round down
+    // round up === MORE positive
+    // round down === MORE negative
+    // a little confusing, but a very powerful way to define for AXES MAX/MIN + INTERVALS
+    int numToRound = round(doub);
+    if(multiple == 0) {return numToRound;}
+    int remainder = abs(numToRound) % multiple;
+    if(remainder == 0) {return numToRound;}
+    if(up) {
+      if(numToRound < 0) {return -(abs(numToRound) - remainder);}
+      else {return numToRound + multiple - remainder;}
+    } else {  //down
+      if(numToRound < 0) {return -(abs(numToRound) + (multiple - remainder));}
+      else {return numToRound - remainder;}
+    }
+  }
+  bool greaterEqualZero(double val){return (val>=0.0);} //CO20220624 (moved from chull)
+  bool lessEqualZero(double val){return (val<=0.0);}  //CO20220624 (moved from chull)
+  bool notPositive(double val,bool soft_cutoff,double tol){return (soft_cutoff? val<=tol : lessEqualZero(val));}  //CO20220624 (moved from chull)
+  bool notNegative(double val,bool soft_cutoff,double tol){return (soft_cutoff? val>=-tol : greaterEqualZero(val));}  //CO20220624 (moved from chull)
+  bool zeroWithinTol(double val,double tol){return notPositive(abs(val),true,tol);} //CO20220624 (moved from chull)
+  bool nonZeroWithinTol(double val,double tol){return !zeroWithinTol(val,tol);} //CO20220624 (moved from chull)
 }
 
 namespace aurostd {
@@ -312,6 +336,10 @@ namespace aurostd {
     if(x<0) return (int) -1;
     return (int) 0;
   }
+  uint sign(uint x) {
+    if(x>0) return (uint) 1;
+    return (uint) 0;
+  }
   float sign(float x) {
     if(x>0) return (float) 1;
     if(x<0) return (float) -1;
@@ -331,6 +359,14 @@ namespace aurostd {
     if(x>0) return (long long int) 1;
     if(x<0) return (long long int) -1;
     return (long long int) 0;
+  }
+  unsigned long int sign(unsigned long int x) {
+    if(x>0) return (unsigned long int) 1;
+    return (unsigned long int) 0;
+  }
+  unsigned long long int sign(unsigned long long int x) {
+    if(x>0) return (unsigned long long int) 1;
+    return (unsigned long long int) 0;
   }
   long double sign(long double x) {
     if(x>0) return (long double) 1;
@@ -439,7 +475,7 @@ namespace aurostd {
   //note this implementation gives different results from matlab for gcd(1,1): either x or y can be 1, the other is zero
   template<class utype>
     void _GCD(utype a,utype b,utype& gcd,utype& x,utype& y){ //CO20180409
-      if(!a && !b){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","gcd(0,0) is undefined",_INPUT_ILLEGAL_);} //only special case needed, all other cases work perfectly
+      if(!a && !b){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","gcd(0,0) is undefined",_INPUT_ILLEGAL_);} //only special case needed, all other cases work perfectly
       if(false && isequal(a,(utype)1) && isequal(b,(utype)1)){gcd=1;x=0;y=1;return;} //matlab implementation, this algorithm gives x=1,y=0 which IS valid
       utype a_orig=a,b_orig=b;
       x=(utype)0;y=(utype)1;
@@ -456,12 +492,12 @@ namespace aurostd {
       }
       gcd=b;
       if(std::signbit(gcd)){gcd=-gcd;x=-x;y=-y;}  //GCD(a,-b)==GCD(a,b), so flip all the signs
-      if(!isequal(a_orig*x+b_orig*y,gcd)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","Bezout's identity not satisfied",_RUNTIME_ERROR_);}
+      if(!isequal(a_orig*x+b_orig*y,gcd)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","Bezout's identity not satisfied",_RUNTIME_ERROR_);}
     }
   template<class utype>
     void _GCD(utype a,utype b,utype& gcd){ //CO20180409  //keep this one too, fewer operations than if you need x and y too
       // added for safety, will always give nonzero result, important for division!
-      if(a==(utype)0 && b==(utype)0) {throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","gcd(0,0) is undefined",_INPUT_ILLEGAL_);}  //special case
+      if(a==(utype)0 && b==(utype)0) {throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","gcd(0,0) is undefined",_INPUT_ILLEGAL_);}  //special case
       else if(a==(utype)0) {gcd=b;return;} //special case
       else if(b==(utype)0) {gcd=a;return;} //special case
       // borrowed from KY aflow_contrib_kesong_pocc_basic.cpp
@@ -483,8 +519,8 @@ namespace aurostd {
   void GCD(unsigned long long int a,unsigned long long int b,unsigned long long int& gcd){return _GCD(a,b,gcd);}  //CO20191201
 
   void GCD(float a,float b,float& gcd,float& x,float& y,float tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0,ix=0,iy=0; //CO20191201 - long long int as SNF matrices can get big
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd,ix,iy);  //CO20191201 - long long int as SNF matrices can get big
     gcd=(float)igcd;
@@ -492,15 +528,15 @@ namespace aurostd {
     y=(float)iy;
   }
   void GCD(float a,float b,float& gcd,float tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0; //CO20191201 - long long int as SNF matrices can get big
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd);  //CO20191201 - long long int as SNF matrices can get big
     gcd=(float)igcd;
   }
   void GCD(double a,double b,double& gcd,double& x,double& y,double tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0,ix=0,iy=0; //CO20191201 - long long int as SNF matrices can get big
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd,ix,iy);  //CO20191201 - long long int as SNF matrices can get big
     gcd=(double)igcd;
@@ -508,15 +544,15 @@ namespace aurostd {
     y=(double)iy;
   }
   void GCD(double a,double b,double& gcd,double tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0; //CO20191201 - long long int as SNF matrices can get big
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd);  //CO20191201 - long long int as SNF matrices can get big
     gcd=(double)igcd;
   }
   void GCD(long double a,long double b,long double& gcd,long double& x,long double& y,long double tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0,ix=0,iy=0; //CO20191201 - long long int as SNF matrices can get big
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd,ix,iy);  //CO20191201 - long long int as SNF matrices can get big
     gcd=(long double)igcd;
@@ -524,8 +560,8 @@ namespace aurostd {
     y=(long double)iy;
   }
   void GCD(long double a,long double b,long double& gcd,long double tolerance){  //CO20191201
-    if(!isinteger(a,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
-    if(!isinteger(b,tolerance)){throw aurostd::xerror(_AFLOW_FILE_NAME_,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(a,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","a[="+aurostd::utype2string(a)+"] is not an integer",_INPUT_ILLEGAL_);}
+    if(!isinteger(b,tolerance)){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::GCD():","b[="+aurostd::utype2string(b)+"] is not an integer",_INPUT_ILLEGAL_);}
     long long int igcd=0;
     GCD((long long int)aurostd::nint(a),(long long int)aurostd::nint(b),igcd);
     gcd=(long double)igcd;
@@ -621,7 +657,7 @@ namespace aurostd {
   bool iszero(uint x,uint){return (bool) x==(uint)0;}  //CO20191201
   bool iszero(int x,int){return (bool) x==(int)0;}  //CO20191201
   bool iszero(long int x,long int){return (bool) x==(long int)0;}  //CO20191201
-  bool iszero(unsigned long int x,long int){return (bool) x==(unsigned long int)0;}  //CO20191201
+  bool iszero(unsigned long int x,unsigned long int){return (bool) x==(unsigned long int)0;}  //CO20191201
   bool iszero(long long int x,long long int){return (bool) x==(long long int)0;}  //CO20191201
   bool iszero(unsigned long long int x,unsigned long long int){return (bool) x==(unsigned long long int)0;}  //CO20191201
   bool iszero(float x,float tolerance){return _iszero(x,tolerance);}  //CO20191201
@@ -637,7 +673,7 @@ namespace aurostd {
   bool factorial(bool x) {
     if(_isfloat(x)) {
       string message = "factorial(bool) implemented only for bool !";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     return TRUE;
   }
@@ -720,14 +756,12 @@ namespace aurostd {
       return (utype)-INFINITY;
     }
     else if (std::isnan(y)) {
-      string soliloquy = XPID + "aurostd::mod_floored():";
       string message = "NAN value in divisor";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     else if (std::isnan(x)) {
-      string soliloquy = XPID + "aurostd::mod_floored():";
       string message = "NAN value in dividend";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     else {
       return x - y * std::floor((double)x/y);
@@ -762,7 +796,7 @@ namespace aurostd {
     bool _isodd(utype x) {
       if(_isfloat(x)) {
         string message = "_isodd implemented only for integers !";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
       }
       if(!mod(x,(utype) 2)) return FALSE;
       else return TRUE;
@@ -798,7 +832,7 @@ namespace aurostd {
     bool _iseven(utype x) {
       if(_isfloat(x)) {
         string message = "_iseven implemented only for integers !";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
       }
       if(mod(x,(utype) 2)) return FALSE;
       else return TRUE;
@@ -837,7 +871,6 @@ namespace aurostd {
 namespace aurostd {
   string dbl2frac(double a, bool sign_prefix) {
 
-    string soliloquy = "aurostd::dbl2frac()";
     stringstream message;
 
     string out = ""; //DX20200427 - missing initialization
@@ -897,7 +930,7 @@ namespace aurostd {
     } //DX20180726 - added
     else {
       //DX20200427 [should not throw if not found, just return decimal] message << "Could not find hard-coded fraction for the double " << a << ".";
-      //DX20200427 [should not throw if not found, just return decimal] throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+      //DX20200427 [should not throw if not found, just return decimal] throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
       out = aurostd::utype2string<double>(a);
     }
     if(sign_prefix){
@@ -958,7 +991,7 @@ namespace aurostd{
     }
     if(count==count_max){
       message << "The number of elements in the fraction sequence exceeded " << count_max << ". Increase the threshold or there is an issue with the while-loop.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message,_RUNTIME_ERROR_);
     }
     if(LDEBUG){ cerr << __AFLOW_FUNC__ << " fraction_sequence=" << aurostd::joinWDelimiter(fraction_sequence, ",") << endl; }
 
@@ -981,7 +1014,7 @@ namespace aurostd{
     }
     if(!aurostd::isequal(input_double,fraction2double,tol_diff)){
       message << "The fraction=" << numerator << "/" << denominator << " (=" << std::fixed << std::setprecision(15) << fraction2double << ") is not equal to the input_double=" << std::fixed << std::setprecision(15) << input_double << " (with tol_diff=" << std::fixed << std::setprecision(15) << tol_diff << ").";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message,_RUNTIME_ERROR_);
     }
   }
 }
@@ -1038,19 +1071,19 @@ namespace aurostd {
       }
       else{ //DX20200424
         stringstream message; message << "The input is not a numeric: str = " << str;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
     }
     else if(field_count != 2){
       stringstream message; message << "Expect two fields, i.e., numerator and denominator: str = " << str;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     // --------------------------------------------------------------------------
     // protect against non-numeric values //DX20200424
     if(!aurostd::isfloat(tokens[0]) || !aurostd::isfloat(tokens[1])){
       stringstream message; message << "The input is not a numeric: str = " << str;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     double numerator = aurostd::string2utype<double>(tokens[0]);
@@ -1060,7 +1093,7 @@ namespace aurostd {
     // protect against division by zero
     if(aurostd::isequal(denominator,_ZERO_TOL_)){
       stringstream message; message << "Denominator is zero: " << denominator;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     return numerator/denominator;
@@ -1093,18 +1126,30 @@ namespace aurostd {
 }
 
 // ----------------------------------------------------------------------------
-//--------------------------------------------------------------- extra_minmax min/max
+//--------------------------------------------------------------- isequal/isdifferent
 namespace aurostd {
   // with const utype&
   template<class utype> bool                             // is scalar == scalar ?
     identical(const utype& a,const utype& b,const utype& _tol_) {
-      if(abs(a-b)<=_tol_) return TRUE;
-      return FALSE;
+      if(abs(a-b)<=_tol_) return true;
+      return false;
     }
   template<class utype> bool                             // is scalar == scalar ?
     identical(const utype& a,const utype& b) {
       return (bool) identical(a,b,(utype) _AUROSTD_XSCALAR_TOLERANCE_IDENTITY_);
     } 
+  bool identical (const bool a,const bool b) { //SD20220705
+      if(a==b) return true;
+      return false;
+  }
+  bool identical (const char a,const char b) { //SD20220705
+      if(a==b) return true;
+      return false;
+  }
+  bool identical (const string& a,const string& b) { //SD20220705
+      if(a==b) return true;
+      return false;
+  }
   template<class utype> bool                             // is scalar != scalar ?
     isdifferent(const utype& a,const utype& b,const utype& _tol_) {
       return (bool) !identical(a,b,_tol_);
@@ -1113,6 +1158,15 @@ namespace aurostd {
     isdifferent(const utype& a,const utype& b) {
       return (bool) !identical(a,b,(utype) _AUROSTD_XSCALAR_TOLERANCE_IDENTITY_);
     }
+  bool isdifferent(const bool a,const bool b) { //SD20220705
+      return (bool) !identical(a,b);
+  }
+  bool isdifferent(const char a,const char b) { //SD20220705
+      return (bool) !identical(a,b);
+  }
+  bool isdifferent(const string& a,const string& b) { //SD20220705
+      return (bool) !identical(a,b);
+  }
   template<class utype> bool                             // is scalar == scalar ?
     isequal(const utype& a,const utype& b,const utype& _tol_) {
       return (bool) identical(a,b,_tol_);
@@ -1121,6 +1175,15 @@ namespace aurostd {
     isequal(const utype& a,const utype& b) {
       return (bool) identical(a,b,(utype) _AUROSTD_XSCALAR_TOLERANCE_IDENTITY_);
     }
+  bool isequal(const bool a,const bool b) { //SD20220705
+      return (bool) identical(a,b);
+  }
+  bool isequal(const char a,const char b) { //SD20220705
+      return (bool) identical(a,b);
+  }
+  bool isequal(const string& a,const string& b) { //SD20220705
+      return (bool) identical(a,b);
+  }
   //// with utype
   //template<class utype> bool                             // is scalar == scalar ?
   //identical(utype a,utype b,utype _tol_) {
@@ -1305,7 +1368,7 @@ namespace aurostd {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************
 

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************
@@ -133,7 +133,7 @@ namespace apl {
     string message = "";
     if (!_pc_set) {
       message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     // Set up phonon parameters
     nBranches = _pc->getNumberOfBranches();
@@ -141,7 +141,7 @@ namespace apl {
     aurostd::string2tokens(opts.getattachedscheme("THERMALGRID"), grid, " xX");
     if (grid.size() != 3) {
       message = "Wrong format for the q-point grid for thermal conductivity calculations.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
     }
     _pc->initialize_qmesh(grid, true, true);
     _qm->makeIrreducible();
@@ -155,11 +155,11 @@ namespace apl {
 
     if (tstart > tend) {
       message = "Tstart cannot be higher than Tend.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     if (tstep < _ZERO_TOL_) {
       message = "Tstep cannot be zero or negative.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     for (double t = tstart; t <= tend; t += tstep) temperatures.push_back(t);
 
@@ -172,7 +172,7 @@ namespace apl {
 
     // Frequencies and group velocities
     message = "Calculating frequencies and group velocities.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     gvel = _pc->calculateGroupVelocitiesOnMesh(freq, eigenvectors);
     _initialized = true;
   }
@@ -189,7 +189,7 @@ namespace apl {
   void TCONDCalculator::calculateThermalConductivity() {
     if (!_initialized) {
       string message = "Not initialized.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
 
     // Transition probabilities
@@ -260,11 +260,11 @@ namespace apl {
   void TCONDCalculator::calculateGrueneisenParameters() {
     if (!_initialized) {
       string message = "Not initialized.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     // Grueneisen parameters
     string message = "Calculating Grueneisen parameters.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
 
     vector<vector<vector<xcomplex<double> > > > phases = calculatePhases(false);  // false: not conjugate
     grueneisen_mode = calculateModeGrueneisen(phases);
@@ -365,7 +365,7 @@ namespace apl {
           if (g_mode.im > _FLOAT_TOL_) {  // _ZERO_TOL_ is too tight
             stringstream message;
             message << "Grueneisen parameter at mode " << iq << ", " << br << " is not real (" << g_mode.re << ", " << g_mode.im << ").";
-            pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS(), _LOGGER_WARNING_);
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS(), _LOGGER_WARNING_);
           }
           grueneisen[iq][br] = g_mode.re;
         } else {
@@ -410,7 +410,7 @@ namespace apl {
   // boundary scattering. Also calculates the scattering phase space.
   void TCONDCalculator::calculateTransitionProbabilities() {
     string message = "Calculating transition probabilities.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
 #ifdef AFLOW_MULTITHREADS_ENABLE
     xthread::xThread xt(_pc->getNCPUs());
 #endif
@@ -421,7 +421,7 @@ namespace apl {
 
     // Three-phonon transition probabilities
     message = "Calculating transition probabilities for 3-phonon scattering processes.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     message = "Transition Probabilities";
     processes.clear();
     processes.resize(nIQPs);
@@ -442,7 +442,7 @@ namespace apl {
 
     if (calc_isotope) {
       message = "Calculating isotope transition probabilities.";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
 
       // Test if isotope scattering is possible
       const xstructure& pcell = _pc->getInputCellStructure();
@@ -455,7 +455,7 @@ namespace apl {
       if (at == natoms) {
         calc_isotope = false;
         message = "There are no atoms with isotopes of different masses. Isotope scattering will be turned off.";
-        pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
       } else {
         processes_iso.resize(nIQPs);
         intr_trans_probs_iso.resize(nIQPs);
@@ -792,7 +792,7 @@ namespace apl {
 
     stringstream message;
     message << "Calculating grain boundary transition probabilities with a grain size of " << boundary_grain_size << " nm.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     for (iq = 0; iq < nIQPs; iq++) {
       for (br = 0; br < nBranches; br++) {
         q = _qm->getIbzqpts()[iq];
@@ -946,16 +946,16 @@ namespace apl {
       vector<vector<double> >& rates_anharm) {
     stringstream message;
     message << "Calculating thermal conductivity for " << T << " K.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     // Bose-Einstein distribution
     vector<vector<double> > occ = getOccupationNumbers(T);
 
     message << "Calculating scattering rates.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     rates_total = calculateTotalRates(occ, rates_anharm);
 
     message << "Calculating RTA";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     vector<vector<xvector<double> > > mfd = getMeanFreeDispRTA(rates_total);
     xmatrix<double> tcond = calcTCOND(T, occ, mfd); // RTA solution
 
@@ -965,7 +965,7 @@ namespace apl {
       int num_iter = 1;
       double norm = 0.0;
       message << "Begin SCF for the Boltzmann transport equation.";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
       ostream& oss = *_pc->getOSS();
       oss << std::setiosflags(std::ios::fixed | std::ios::right);
       oss << std::setw(15) << "Iteration";
@@ -989,7 +989,7 @@ namespace apl {
       if (num_iter > max_iter) {
         message << "Thermal conductivity did not converge within " << max_iter << " iterations ";
         message << "at " << T << " K.";
-        throw xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        throw xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
     }
     return tcond;
@@ -1238,7 +1238,7 @@ namespace apl {
     if (!aurostd::FileExist(filename)) {
       stringstream message;
       message << "Could not write file " << filename << ".";
-      throw xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -1267,7 +1267,7 @@ namespace apl {
     if (!aurostd::FileExist(filename)) {
       stringstream message;
       message << "Could not write file " << filename << ".";
-      throw xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -1413,7 +1413,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       string message = "Could not write thermal conductivities to file.";
-      throw xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -1421,7 +1421,7 @@ namespace apl {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************

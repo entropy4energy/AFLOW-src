@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Marco Esters
@@ -157,6 +157,7 @@
 #ifdef AFLOW_MULTITHREADS_ENABLE
 
 #include "aflow.h"
+#include "aflow_pocc.h"
 
 // Global mutex that prevents two xThread instances from checking the number
 // of available CPUs at the same time.
@@ -685,6 +686,15 @@ namespace xthread {
   >(int, std::function<void(int)>&
   );
 
+  //qca::QuasiChemApproxCalculator::calculateProbabilityCluster1D
+  //qca::QuasiChemApproxCalculator::calculateProbabilityClusterND
+  template void xThread::run<
+    std::function<void(int, const int&)>,
+    int
+  >(int, std::function<void(int, const int&)>&,
+    int&
+  );
+
   //lambda function inside aurostd::multithread_execute
   template void xThread::run<
     deque<string>,
@@ -728,6 +738,45 @@ namespace xthread {
     vector<xDOSCAR>&,
     std::mutex&
   );
+
+  //POccCalculator::calculatePOccSuperCellUFF
+  template void xThread::run<
+    std::function<void(int, vector<pocc::POccSuperCell>&, const vector<pocc::POccUFFEnergyAnalyzer>&, const vector<vector<vector<int>>>&, size_t&, std::mutex&, std::mutex&)>,
+    vector<pocc::POccSuperCell>,
+    vector<pocc::POccUFFEnergyAnalyzer>,
+    vector<vector<vector<int>>>,
+    size_t,
+    std::mutex,
+    std::mutex
+  >(int, std::function<void(int, vector<pocc::POccSuperCell>&, const vector<pocc::POccUFFEnergyAnalyzer>&, const vector<vector<vector<int>>>&, size_t&, std::mutex&, std::mutex&)>&,
+    vector<pocc::POccSuperCell>&,
+    vector<pocc::POccUFFEnergyAnalyzer>&,
+    vector<vector<vector<int>>>&,
+    size_t&,
+    std::mutex&,
+    std::mutex&
+  );
+
+  //POccCalculator::countUniquePOccSuperCellUFF
+  template void xThread::run<
+    std::function<void(int, std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>&, const vector<pocc::POccSuperCell>&, const vector<pocc::POccUFFEnergyAnalyzer>&, const vector<vector<vector<int>>>&, size_t&, std::mutex&, std::mutex&)>,
+    std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>,
+    vector<pocc::POccSuperCell>,
+    vector<pocc::POccUFFEnergyAnalyzer>,
+    vector<vector<vector<int>>>,
+    size_t,
+    std::mutex,
+    std::mutex
+  >(int, std::function<void(int, std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>&, const vector<pocc::POccSuperCell>&, const vector<pocc::POccUFFEnergyAnalyzer>&, const vector<vector<vector<int>>>&, size_t&, std::mutex&, std::mutex&)>&,
+    std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>&,
+    vector<pocc::POccSuperCell>&,
+    vector<pocc::POccUFFEnergyAnalyzer>&,
+    vector<vector<vector<int>>>&,
+    size_t&,
+    std::mutex&,
+    std::mutex&
+  );
+
 
   //apl::TCONDCalculator::calculateAnharmonicRates
   template void xThread::run<std::function<void(int, const vector<vector<double> >&, vector<vector<double> >&)>,
@@ -857,6 +906,33 @@ namespace xthread {
       std::mutex&
   );
 
+  //convexHull  //ME+CO20220630
+  template void xthread::xThread::run<
+    std::function<void (
+        uint,
+        const vector<string>&,
+        const aurostd::xoption&,
+        const _aflags&,
+        vector<uint>&,
+        std::ostream&
+        )>,
+    vector<string>,
+    aurostd::xoption,
+    _aflags,
+    vector<uint>,
+    std::ostream
+      >(uint,
+          std::function<void (
+            uint,
+            const vector<string>&,
+            const aurostd::xoption&,
+            const _aflags&,
+            vector<uint>&,
+            std::ostream&
+            )>&,
+          vector<string>&,
+          aurostd::xoption&, _aflags&, vector<uint>&, std::ostream&);
+
   // runPredistributed --------------------------------------------------------
 
   //XTalFinderCalculator::calculateSpaceGroups
@@ -923,6 +999,6 @@ namespace xthread {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

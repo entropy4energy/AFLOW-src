@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -228,7 +228,7 @@ namespace apl {
       message = "The supplied IFC has the wrong size: ";
       message += aurostd::utype2string(IFC.size()) + " instead of ";
       message += aurostd::utype2string(natoms);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
     }
     else {
       for (uint i=0; i<natoms; i++){
@@ -237,7 +237,7 @@ namespace apl {
           message += "] has the wrong size: ";
           message += aurostd::utype2string(IFC.size()) + " instead of ";
           message += aurostd::utype2string(natoms);
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
         }
 
         for (uint j=0; j<natoms; j++){
@@ -246,7 +246,7 @@ namespace apl {
             message += aurostd::utype2string(j)+"] has the wrong size: ";
             message += aurostd::utype2string(IFC[i][j].rows)+"x"+aurostd::utype2string(IFC[i][j].cols);
             message += " instead of 3x3";
-            throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+            throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
           }
         }
       }
@@ -260,7 +260,7 @@ namespace apl {
         message = "The supplied bornEffectiveChargeTensor has the wrong size: ";
         message += aurostd::utype2string(bornEffectiveChargeTensor.size()) + " instead of ";
         message += aurostd::utype2string(niatoms);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
       }
       else {
         for (uint i=0; i<niatoms; i++){
@@ -271,7 +271,7 @@ namespace apl {
             message += aurostd::utype2string(bornEffectiveChargeTensor[i].rows);
             message += "x"+aurostd::utype2string(bornEffectiveChargeTensor[i].cols);
             message += " instead of 3x3";
-            throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+            throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
           }
         }
       }
@@ -280,7 +280,7 @@ namespace apl {
         message = "The supplied dielectricTensor has the wrong size: ";
         message += aurostd::utype2string(dielectricTensor.rows)+"x"+aurostd::utype2string(dielectricTensor.cols);
         message += " instead of 3x3";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
       }
 
       _bornEffectiveChargeTensor = bornEffectiveChargeTensor;
@@ -315,7 +315,7 @@ namespace apl {
     //CO START
     if (!vlines.size()) {
       message = "Cannot open output file " + hibfile + "."; //ME20181226
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
 
     string line;
@@ -327,7 +327,7 @@ namespace apl {
     //getline(infile, line);
     if (line.find("xml") == string::npos) {
       string message = "Not an xml file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
     }
     //CO END
 
@@ -336,7 +336,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) {
         message = "The format for harmonic force constants has changed and is incomptable with the format found in this file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("aflow_version") != string::npos) break;
@@ -346,7 +346,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) { //CO
         message = "Cannot find <fcms> tag.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("fcms") != string::npos)
@@ -361,7 +361,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) { //CO
         message = "Incomplete <fcms> tag.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("</varray>") != string::npos) {
@@ -391,7 +391,7 @@ namespace apl {
     string message = "";
     if (!aurostd::EFileExist(hibfile)) {
       message = "Cannot find file " + hibfile + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
 
     vector<string> vlines;
@@ -400,7 +400,7 @@ namespace apl {
     //CO START
     if (!vlines.size()) {
       message = "Cannot open output file " + hibfile + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
 
     string line = "";
@@ -411,7 +411,7 @@ namespace apl {
     line = vlines[line_count++];
     if (line.find("xml") == string::npos) {
       message = "Not an xml file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
     }
 
     // Get Born effective charge tensors
@@ -419,7 +419,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) {
         message = "Cannot find <born> tag.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("born") != string::npos) break;
@@ -429,7 +429,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) { //CO
         message = "Incomplete <born> tag.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("</varray>") != string::npos) break;
@@ -450,7 +450,7 @@ namespace apl {
     while (true) {
       if (line_count == vlines.size()) {
         message = "Cannot find <epsilon> tag.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];  //CO
       if (line.find("epsilon") != string::npos) break;
@@ -488,7 +488,7 @@ namespace apl {
     string message = "";
     if (!aurostd::EFileExist(filename)) {
       message = "Could not open file " + filename + ". File not found.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
 
     vector<string> vlines;
@@ -496,7 +496,7 @@ namespace apl {
     uint nlines = vlines.size();
     if (nlines == 0) {
       message = "Cannot open file " + filename + ". File empty or corrupt.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
     }
 
     uint line_count = 0;
@@ -505,7 +505,7 @@ namespace apl {
     // Check that this is a valid xml file
     if (line.find("xml") == string::npos) {
       message = "File is not a valid xml file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
     }
 
     int t = 0;
@@ -516,7 +516,7 @@ namespace apl {
     while (true) {
       if (line_count == nlines) {
         message = "order tag not found.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];
       if (line.find("order") != string::npos) {
@@ -530,7 +530,7 @@ namespace apl {
     while (true) {
       if (line_count == nlines) {
         message = "force_constants tag not found.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];
       if (line.find("force_constants") != string::npos) break;
@@ -548,7 +548,7 @@ namespace apl {
     while (line.find("/force_constants") == string::npos) {
       if (line_count == nlines) {
         message = "force_constants tag incomplete.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
       line = vlines[line_count++];
       if (line.find("atoms") != string::npos) {
@@ -575,7 +575,7 @@ namespace apl {
 
     if (ifcs.size() != clst.size()) {
       message = "Number of IFCs is different from the number of clusters.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
     }
 
     // Populate
@@ -697,7 +697,7 @@ namespace apl {
         conversionFactor = 1000 * au2eV;
       } else {
         string message = "Not implemented conversion.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
       }
     }
 
@@ -712,14 +712,14 @@ namespace apl {
         conversionFactor = 1000 * PLANCKSCONSTANTEV_h * THz2Hz;
       } else {
         string message = "Not implemented conversion.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
       }
     }
 
     // Nothing suits?
     else {
       string message = "Not implemented conversion.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
 
     //
@@ -1237,12 +1237,12 @@ namespace apl {
     string message = "";
     if (!_supercell.isConstructed()) {
       message = "Supercell not constructed yet.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     int nQPs = (int) _qm.getnQPs();
     if (nQPs == 0) {
       message = "Mesh has no q-points.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
 
     freqs.clear();
@@ -1291,24 +1291,24 @@ namespace apl {
     // Consistency check
     if (gvel.size() != nQPs) {
       message = "Number of group velocities is not equal to the number of q-points.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
     }
     for (uint q = 0; q < nQPs; q++) {
       if (gvel[q].size() != nBranches) {
         message = "Number of group velocities for q-point " + aurostd::utype2string<uint>(q) + " is not equal to the number branches.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
       }
     }
 
     if (freqs.size() > 0) {
       if (freqs.size() != nQPs) {
         message = "Number of frequencies is not equal to the number of q-points.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
       }
       for (uint q = 0; q < nQPs; q++) {
         if (freqs[q].size() != nBranches) {
           message = "Number of frequencies for q-point " + aurostd::utype2string<uint>(q) + " is not equal to the number branches.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
         }
       }
     }
@@ -1386,7 +1386,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       message = "Could not write group velocities to file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -1394,6 +1394,6 @@ namespace apl {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

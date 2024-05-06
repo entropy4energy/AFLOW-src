@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *              Aflow COREY OSES - Duke University 2003-2021               *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Corey Oses 2020
@@ -107,8 +107,126 @@ namespace aurostd {
 //Moved from the AflowDB class
 
 namespace aurostd {
+  // JSON namespace for reading and writing //HE20221109
+  namespace JSON{
+    enum class object_types{ // order is important!
+      DICTIONARY,
+      LIST,
+      STRING,
+      FLOAT,
+      INTEGER,
+      T,
+      F,
+      NONE
+    };
+
+    struct object {
+      object_types type = object_types::NONE;
+      std::shared_ptr<void> obj = nullptr;
+
+      // operators
+      JSON::object &operator[](const size_t index) const;
+      JSON::object &operator[](const std::string key) const;
+      JSON::object &operator[](const char* key) const;
+      void operator= (const char* content); // for literal strings
+      void operator= (const std::string & content);
+      void operator= (bool content);
+      void operator= (std::nullptr_t content);
+      template<class utype> void operator=(const utype content);
+      template<class utype> void operator=(const xcomplex<utype> & content);
+      template<class utype> void operator=(const std::vector<utype> & content);
+      template<class utype> void operator=(const std::map<std::string, utype> & content);
+      template<class utype> void operator=(const xvector<utype> & content);
+      template<class utype> void operator=(const xmatrix<utype> & content);
+
+      // converting constructors
+      object(){};
+      object(const char* content);
+      object(const std::string & content);
+      object(bool content);
+      object(std::nullptr_t content);
+      object(object_types create_type);
+      template<typename utype> object(const utype content);
+      template<typename utype> object(const xcomplex<utype> &content);
+      template<typename utype> object(const vector<utype> & content);
+      template<typename utype> object(const std::map<std::string, utype> & content);
+      template<typename utype> object(const xvector<utype> & content);
+      template<typename utype> object(const xmatrix<utype> & content);
+
+      // conversion functions
+      explicit operator bool() const;
+      explicit operator std::string() const;
+      explicit operator double() const;
+      explicit operator float() const;
+      explicit operator long long() const;
+      explicit operator long() const;
+      explicit operator int() const;
+      explicit operator unsigned long long () const;
+      explicit operator unsigned long () const;
+      explicit operator unsigned int () const;
+      operator std::map<std::string, object> () const;
+      template<class utype> operator xcomplex<utype>() const;
+      template<class utype> operator std::vector<utype>() const;
+      template<class utype> operator std::map<std::string, utype>() const;
+      template<class utype> operator aurostd::xvector<utype>() const;
+      template<class utype> operator aurostd::xmatrix<utype>() const;
+      // type specific functions
+      void push_back(const JSON::object content);
+      size_t size();
+      bool empty();
+
+      // conversion helper
+      void fromString(const std::string & content);
+      template<class utype> void fromNumber(const utype content);
+      template<class utype> void fromComplex(const xcomplex<utype> content);
+      template<class utype> void fromVector(const vector<utype> & content);
+      template<class utype> void fromMap(const std::map<std::string, utype> & content);
+      template<class utype> void fromXvector(const xvector<utype> & content);
+      template<class utype> void fromXmatrix(const xmatrix<utype> & content);
+
+      std::string toString(const bool json_format=true, const bool escape_unicode=true) const;
+      void saveFile(const std::string & file_path, const bool escape_unicode=true) const;
+
+    };
+
+    typedef std::map<std::string, object> Dictionary; ///< shortcut for JSON::object_types::DICTIONARY
+    typedef std::vector<object> List;                 ///< shortcut for JSON::object_types::LIST
+
+    // unicode helper function
+    std::string unescape_unicode(const std::string & raw, size_t & pos);
+    std::string escape(const std::string & raw, const bool unicode=true);
+    std::string char32_to_string(const char32_t cp);
+    std::string char_escape(const char16_t c);
+
+    // basic functions
+    object loadFile(const std::string & file_path);
+    object loadString(const std::string & content);
+    void saveFile(const object & root, const std::string & file_path, const bool escape_unicode=true);
+    std::string toString(const object & root, const bool escape_unicode=false);
+
+    // navigation functions
+    std::pair<size_t, size_t> find_string(const std::string & raw_content, std::pair<size_t, size_t> border={0,0});
+    std::pair<size_t, size_t> find_bracket(const std::string & raw_content, char kind_open, std::pair<size_t, size_t> border={0,0});
+    std::pair<size_t, size_t> find_strip(const std::string & raw_content, std::pair<size_t, size_t> border={0,0});
+
+    // parser core
+    object parse(const std::string &raw_content, std::pair<size_t, size_t> border={0,0});
+    std::string parse_string(const std::string & raw_content, std::pair<size_t, size_t> border={0,0});
+
+  };
+
+  // insertion operator: enable easy interaction with cout
+  ostream& operator<<(ostream& os, const JSON::object& jo);
+}
+
+
+
+
+namespace aurostd {
   vector<string> extractJsonKeysAflow(const string& json);
   string extractJsonValueAflow(const string& json, string key);
+  vector<string> extractJsonVectorAflow(const string& json, string key); //SD20220504
+  vector<vector<string>> extractJsonMatrixAflow(const string& json, string key); //SD20220504
 }
 
 #endif // _AUROSTD_XPARSER_H_

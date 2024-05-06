@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Marco Esters, 2022
@@ -19,6 +19,7 @@
 using namespace std::placeholders;
 
 namespace unittest {
+  aurostd::JSON::object utd = aurostd::EmbData::get_unit_test();
 
   UnitTest::UnitTest(ostream& oss) : xStream(oss) {
     initialize();
@@ -97,6 +98,18 @@ namespace unittest {
     xchk.task_description = "aurostd_main functions";
     test_functions["aurostd_main"] = xchk;
 
+    xchk = initializeXCheck();
+    xchk.func = std::bind(&UnitTest::xparserTest, this, _1, _2, _3);
+    xchk.function_name = "xparserTest():";
+    xchk.task_description = "xparser functions";
+    test_functions["xparser"] = xchk;
+
+    xchk = initializeXCheck();
+    xchk.func = std::bind(&UnitTest::xfitTest, this, _1, _2, _3);
+    xchk.function_name = "xfitTest():";
+    xchk.task_description = "xfit functions";
+    test_functions["xfit"] = xchk;
+
     // database
     xchk = initializeXCheck();
     xchk.func = std::bind(&UnitTest::schemaTest, this, _1, _2, _3);
@@ -143,7 +156,6 @@ namespace unittest {
     xchk.task_description = "entryLoader functions";
     test_functions["entry_loader"] = xchk;
 
-
     // ovasp
     //Not working yet because we cannot load OUTCARs via the RestAPI
     //xchk = initializeXCheck();
@@ -183,7 +195,7 @@ namespace unittest {
   void UnitTest::initializeTestGroups() {
     test_groups.clear();
 
-    test_groups["aurostd"] = {"xscalar", "xvector", "xmatrix", "aurostd_main"};
+    test_groups["aurostd"] = {"xscalar", "xvector", "xmatrix", "xfit", "aurostd_main", "xparser"};
     test_groups["database"] = {"schema", "entry_loader"};
     test_groups["structure"] = {"atomic_environment", "xstructure", "xstructure_parser"};
     test_groups["structure_gen"] = {"ceramgen", "proto"};
@@ -241,7 +253,7 @@ namespace unittest {
         break;
       } else if (!isgroup && (test_functions.find(test) == test_functions.end())) {
         message << "Skipping unrecognized test name " << test << ".";
-        pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
       } else if (isgroup && !aurostd::WithinList(tasks, test)) {
         tasks.push_back(test);
         const vector<string>& members = test_groups[test];
@@ -256,7 +268,7 @@ namespace unittest {
     uint ntasks = tasks.size();
     if (ntasks == 0) {
       message << "No unit tests to run.";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
       return true;
     }
 
@@ -301,12 +313,12 @@ namespace unittest {
 
     if (nsuccess == ntasks) {
       message << "Unit tests passed successfully (passing " << ntasks << " task" + string((ntasks == 1)?"":"s") + ").";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_COMPLETE_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_COMPLETE_);
     } else {
       message << "Some unit tests failed (" << (ntasks - nsuccess) << " of " << ntasks << " failed).";
-      pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
     }
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, formatResultsTable(summary), aflags, *p_FileMESSAGE, *p_oss, _LOGGER_RAW_);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, formatResultsTable(summary), aflags, *p_FileMESSAGE, *p_oss, _LOGGER_RAW_);
     return (nsuccess == ntasks);
   }
 
@@ -348,10 +360,10 @@ namespace unittest {
         stringstream message;
         if (nsuccess == ntests_group) {
           message << "Unit tests of group " << group << " passed successfully (passing " << ntests_group << " test" << ((ntests_group == 1)?"":"s") << ").";
-          pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_COMPLETE_);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_COMPLETE_);
         } else {
           message << "Some unit tests of group " << group << " failed (" << (ntests_group - nsuccess) << " of " << ntests_group << " failed).";
-          pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
         }
         for (size_t t = 0; t < vtests_group.size(); t++) {
           displayResult(test_functions[vtests_group[t]]);
@@ -448,19 +460,19 @@ namespace unittest {
         // All attempted checks passed, but there were errors.
         // This happens when a prerequisite for a test fails (e.g. file loading).
         message << "FAIL " << xchk.task_description << " due to runtime errors" << std::endl;
-        pflow::logger(_AFLOW_FILE_NAME_,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_ERROR_);
+        pflow::logger(__AFLOW_FILE__,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_ERROR_);
       } else {
         message << "SUCCESS " << xchk.task_description << " (passing " << check_num << " check" << ((check_num == 1)?"":"s") << ")" << std::endl;
-        pflow::logger(_AFLOW_FILE_NAME_,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_COMPLETE_);
+        pflow::logger(__AFLOW_FILE__,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_COMPLETE_);
       }
     } else {
       message << "FAIL " << xchk.task_description << " (" << (check_num - xchk.passed_checks) << " of " << check_num << " checks failed)" << std::endl;
-      pflow::logger(_AFLOW_FILE_NAME_,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_ERROR_);
+      pflow::logger(__AFLOW_FILE__,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_ERROR_);
     }
-    pflow::logger(_AFLOW_FILE_NAME_,xchk.function_name,formatResultsTable(xchk.results),aflags,*p_FileMESSAGE,*p_oss,_LOGGER_RAW_);
+    pflow::logger(__AFLOW_FILE__,xchk.function_name,formatResultsTable(xchk.results),aflags,*p_FileMESSAGE,*p_oss,_LOGGER_RAW_);
     if (xchk.errors.size() > 0) {
       message << "\nAdditional error messages:\n" << aurostd::joinWDelimiter(xchk.errors, "\n");
-      pflow::logger(_AFLOW_FILE_NAME_,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_RAW_);
+      pflow::logger(__AFLOW_FILE__,xchk.function_name,message,aflags,*p_FileMESSAGE,*p_oss,_LOGGER_RAW_);
     }
   }
 }
@@ -476,28 +488,16 @@ namespace unittest {
       }
       check(passed, calculated, expected, check_function, check_description, passed_checks, results);
     }
-  void UnitTest::checkEqual(const vector<string>& calculated, const vector<string>& expected, const string& check_function,
+  template <typename utype>
+
+  void UnitTest::checkEqual(const utype& calculated, const utype& expected, const string& check_function,
       const string& check_description, uint& passed_checks, vector<vector<string> >& results) {
-    bool passed = (calculated.size() == expected.size());
-    for (size_t i = 0; i < calculated.size() && passed; i++) {
-      passed = (calculated[i] == expected[i]);
-    }
+    bool passed = (aurostd::isequal(calculated, expected));
     check(passed, calculated, expected, check_function, check_description, passed_checks, results);
   }
 
-  template <typename utype>
-    void UnitTest::checkEqual(const utype& calculated, const utype& expected, const string& check_function,
-        const string& check_description, uint& passed_checks, vector<vector<string> >& results) {
-      bool passed = (aurostd::isequal(calculated, expected));
-      check(passed, calculated, expected, check_function, check_description, passed_checks, results);
-    }
   void UnitTest::checkEqual(const string& calculated, const string& expected, const string& check_function,
-      const string& check_description, uint & passed_checks, vector<vector<string> >& results) {
-    bool passed = (calculated == expected);
-    check(passed, calculated, expected, check_function, check_description, passed_checks, results);
-  }
-  void UnitTest::checkEqual(const bool calculated, const bool expected, const string& check_function,
-      const string& check_description, uint& passed_checks, vector<vector<string> >& results) {
+                            const string& check_description, uint & passed_checks, vector<vector<string> >& results) {
     bool passed = (calculated == expected);
     check(passed, calculated, expected, check_function, check_description, passed_checks, results);
   }
@@ -667,6 +667,7 @@ namespace unittest {
 
     //HE20210511
     double expected_dbl = 0.0, calculated_dbl = 0.0;
+    xvector<double> calculated_xvecdbl, expected_xvecdbl;
     int expected_int = 0;
     string expected_str = "";
     vector <xvector<double>> points;
@@ -886,7 +887,68 @@ namespace unittest {
 
     calculated_dbl = aurostd::areaPointsOnPlane(ipoints);
     checkEqual(calculated_dbl, expected_dbl, check_function, check_description, passed_checks, results);
-  }
+
+    // ---------------------------------------------------------------------------
+    // Check | linspace //SD20220324
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::linspace()";
+    check_description = "generate n linearly spaced points";
+    expected_xvecdbl = {1.0, 1.375, 1.75, 2.125, 2.5};
+    calculated_xvecdbl = aurostd::linspace(1.0, 2.5, 5);
+    checkEqual(calculated_xvecdbl, expected_xvecdbl, check_function, check_description, passed_checks, results);
+    {
+        // ---------------------------------------------------------------------------
+        // Check | histogram edges (manual bins) //AZ20230213
+        // ---------------------------------------------------------------------------
+        check_function = "aurostd::histogram()";
+        check_description = "edges of histogram bins (manual bins)";
+        expected_xvecdbl = {0., 1.8, 3.6, 5.4, 7.2, 9.};
+        vector<xvector<double> > vec_xvecdbls;
+        xvector<double> in_xvecdbl = {1.,3.,9.,8.,4.,7.,0.,2.,1.,9.,8.,3.,7.,4.,1.,0.,2.,8.,9.,7.,3.,4.,0.,1.,7.,8.,7.,6.,4.,3.,8.,7.,1.,2.,6.,4.,8.,1.,2.,0.,9.,3.,4.,8.,8.,7.,8.,1.,5.,3.,8.,3.,7.,4.,6.,1.,2.,8.,3.,4.,1.,9.,8.,3.,6.,4.,8.,7.,1.,6.,2.,4.,3.,0.,9.,7.,1.,2.,3.,4.};
+        vec_xvecdbls = aurostd::histogram(in_xvecdbl, 5);
+        checkEqual(vec_xvecdbls[1], expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+        // ---------------------------------------------------------------------------
+        // Check | histogram bins //AZ20230213
+        // ---------------------------------------------------------------------------
+        check_description = "counts of histogram bins (manual bins)";
+        expected_xvecdbl= {16., 18., 12., 15., 19.};
+        checkEqual(vec_xvecdbls[0], expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+        // ---------------------------------------------------------------------------
+        // Check | auto histogram edges (full vector) //AZ20230213
+        // ---------------------------------------------------------------------------
+        vec_xvecdbls = aurostd::histogram(in_xvecdbl, 5, 1);
+        check_description = "automatic histogram bins (large vector)";
+        expected_xvecdbl =  {5.,11.,7.,11.,11.,1.,5.,10.,19.};
+        checkEqual(vec_xvecdbls[0], expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+        // ---------------------------------------------------------------------------
+        // Check | auto histogram edges (full vector) //AZ20230213
+        // ---------------------------------------------------------------------------
+        vec_xvecdbls = aurostd::histogram(in_xvecdbl, 5, 1);
+        check_function = "aurostd::histogram()";
+        check_description = "automatic histogram edges (large vector)";
+        expected_xvecdbl =  {0.,1.,2.,3.,4.,5.,6.,7.,8.,9.};
+        checkEqual(vec_xvecdbls[1], expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+        // ---------------------------------------------------------------------------
+        // Check | auto histogram bins //AZ20230213
+        // ---------------------------------------------------------------------------
+        in_xvecdbl = {1.,3.,9.,8.,4.,7.,0.,2.,1.,9.,8.,3.,7.,4.,1.,0.,2.};
+        vec_xvecdbls = aurostd::histogram(in_xvecdbl, 5, 1);
+        check_function = "aurostd::histogram()";
+        check_description = "automatic histogram bins (small vector)";
+        expected_xvecdbl =  {5.,4.,2.,2.,4.};
+        checkEqual(vec_xvecdbls[0], expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+        check_function = "aurostd::histogram()";
+        check_description = "automatic histogram edges (small vector)";
+        expected_xvecdbl =  {0., 1.8, 3.6, 5.4, 7.2, 9.};
+        checkEqual(vec_xvecdbls[1], expected_xvecdbl, check_function, check_description, passed_checks, results);
+    }
+
+}
 
   void UnitTest::xmatrixTest(uint &passed_checks, vector <vector<string>> &results, vector <string> &errors) {
     (void) errors;  // Suppress compiler warnings
@@ -894,62 +956,48 @@ namespace unittest {
     string check_function = "", check_description = "";
 
     xmatrix<int> calculated_xmatint, expected_xmatint;
+    bool calculated_bool = false, expected_bool = false;
+    {
+        // ---------------------------------------------------------------------------
+        // Check convert to xvector //AZ20220627
+        // ---------------------------------------------------------------------------
+        check_function = "aurostd::getxvec()";
+        xmatrix<int> full_xmatint, xmatint;
+        // need this matrix to test slicing
+        full_xmatint = xmatrix<int>(3,4);
+        full_xmatint = {{1,2,3,4},
+          {5,6,7,8},
+          {9,10,11,12}};
+        check_description = "getxvec() test for type conversion";
+        xvector<int> expected_xvecint(3);
+        xvector<int> calculated_xvecint(3);
+        expected_xvecint = {1,5,9};
+        calculated_xvecint = full_xmatint.getxmat(1,3,1,1).getxvec();
+        checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
 
-    // ---------------------------------------------------------------------------
-    // Check | reshape //SD20220319
-    // ---------------------------------------------------------------------------
-    check_function = "aurostd::reshape()";
-    check_description = "reshape a rectangular matrix";
-    expected_xmatint = {{1,2,3,4},
-      {5,6,7,8},
-      {9,10,11,12}};
-    calculated_xmatint = {{1,2,3},
-      {4,5,6},
-      {7,8,9},
-      {10,11,12}};
-    calculated_xmatint = aurostd::reshape(calculated_xmatint ,3,4);
-    checkEqual(calculated_xmatint, expected_xmatint, check_function, check_description, passed_checks, results);
+        // ---------------------------------------------------------------------------
+        // Check | column xvector //AZ20220627
+        // ---------------------------------------------------------------------------
+        check_description = "get column xvector from xmatrix";
+        calculated_xvecint = full_xmatint.getxvec(1,3,1,1);
+        checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
 
-    // ---------------------------------------------------------------------------
-    // Check convert to xvector //AZ20220627
-    // ---------------------------------------------------------------------------
-    check_function = "aurostd::getxvec()";
-    xmatrix<int> full_xmatint, xmatint;
-    // need this matrix to test slicing
-    full_xmatint = xmatrix<int>(3,4);
-    full_xmatint = {{1,2,3,4},
-      {5,6,7,8},
-      {9,10,11,12}};
-    check_description = "getxvec() test for type conversion";
-    xvector<int> expected_xvecint(3);
-    xvector<int> calculated_xvecint(3);
-    expected_xvecint = {1,5,9};
-    calculated_xvecint = full_xmatint.getxmat(1,3,1,1).getxvec();
-    checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
+        // ---------------------------------------------------------------------------
+        // Check | row xvector //AZ20220627
+        // ---------------------------------------------------------------------------
+        check_description = "get row xvector from xmatrix";
+        expected_xvecint = {1,2,3};
+        calculated_xvecint = full_xmatint.getxvec(1,1,1,3);
+        checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
 
-    // ---------------------------------------------------------------------------
-    // Check | column xvector //AZ20220627
-    // ---------------------------------------------------------------------------
-    check_description = "get column xvector from xmatrix";
-    calculated_xvecint = full_xmatint.getxvec(1,3,1,1);
-    checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
-
-    // ---------------------------------------------------------------------------
-    // Check | row xvector //AZ20220627
-    // ---------------------------------------------------------------------------
-    check_description = "get row xvector from xmatrix";
-    expected_xvecint = {1,2,3};
-    calculated_xvecint = full_xmatint.getxvec(1,1,1,3);
-    checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
-
-    // ---------------------------------------------------------------------------
-    // Check | 1x1 xvector //AZ20220627
-    // ---------------------------------------------------------------------------
-    check_description = "get a 1x1 vector from xmatrix";
-    expected_xvecint = {12};
-    calculated_xvecint = full_xmatint.getxvec(3,3,4,4);
-    checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
-
+        // ---------------------------------------------------------------------------
+        // Check | 1x1 xvector //AZ20220627
+        // ---------------------------------------------------------------------------
+        check_description = "get a 1x1 vector from xmatrix";
+        expected_xvecint = {12};
+        calculated_xvecint = full_xmatint.getxvec(3,3,4,4);
+        checkEqual(calculated_xvecint, expected_xvecint, check_function, check_description, passed_checks, results);
+    }
     // ---------------------------------------------------------------------------
     // Check | ehermite //CO20190520
     // ---------------------------------------------------------------------------
@@ -959,6 +1007,155 @@ namespace unittest {
     calculated_xmatint = xmatrix<int>(2, 2);
     aurostd::getEHermite(5, 12, calculated_xmatint);
     checkEqual(calculated_xmatint, expected_xmatint, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | equilibrateMatrix //SD20220505
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::equilibrateMatrix()";
+    check_description = "pre-condition a Hilbert matrix, lowers the condition number";
+    xmatrix<double> icm(10, 10);
+    // define a Hilbert matrix
+    for (int i = 1; i <= icm.rows; i++) {
+      for (int j = 1; j <= icm.cols; j++) {
+        icm(i, j) = 1.0 / (i + j - 1.0);
+      }
+    }
+    xmatrix<double> em, rm, cm;
+    aurostd::equilibrateMatrix(icm, em, rm, cm);
+    expected_bool = true;
+    calculated_bool = aurostd::isequal(1.0, aurostd::sign(aurostd::condition_number(icm) - aurostd::condition_number(em)));
+    checkEqual(calculated_bool, expected_bool, check_function, check_description, passed_checks, results);
+    check_description = "pre-condition a Hilbert matrix, finds the inverse";
+    checkEqual(icm, aurostd::inverse(rm) * em * aurostd::inverse(cm), check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | solve a linear system //HE20220912
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::inverse(xmatrix) * xvector";
+      check_description = "solve a simple linear system with shifted matrices ";
+      xvector<double> expected_xvecdouble = {5.0, 3.0, -2.0};
+      xvector<double> calculated_xvecdouble;
+      xvector<double> b = {6.0, -4, 27};
+      xmatrix<double> A = {{1.0, 1.0, 1.0}, {0.0,2.0,5.0}, {2.0,5.0,-1.0}};
+      bool shift_check = true;
+      // inv(A)*b should be solvable even when the xmatrix and xvector have different index boundaries
+      for (int shift_row: {-2,-1,0,1,2}){
+        for (int shift_col: {-2,-1,0,1,2}) {
+          A.shift(shift_row, shift_col);
+          calculated_xvecdouble = aurostd::inverse(A) * b;
+          if (not aurostd::isequal(expected_xvecdouble, calculated_xvecdouble)) {
+            shift_check=false;
+            break;
+          }
+        }
+      }
+      check(shift_check, calculated_xvecdouble, expected_xvecdouble, check_function, check_description, passed_checks, results);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Check | shifting xmatrix
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::xmatrix.shift()";
+      check_description = "shift the lower bounds of an xmatrix to new values";
+      bool overall_check = true;
+      xmatrix<double> A = {{1.0, 2.0, 3.0},
+                           {4.0, 5.0, 6.0},
+                           {7.0, 8.0, 9.0}};
+      xmatrix<double> B = A;
+
+      for (std::pair<int, int> p : vector<std::pair<int, int>>({{-2,-4}, {0,3}, {5461, 8461}})){
+        A.shift(p.first, p.second);
+        for (std::pair<int, int> t : vector<std::pair<int, int>>({{1,1}, {2,2}, {3,2}})) {
+          overall_check = overall_check && (A[p.first+t.first-1][p.second+t.second-1] == B[t.first][t.second]);
+          if (!overall_check){
+            check(overall_check,A[p.first+t.first-1][p.second+t.second-1] , B[t.first][t.second], check_function, check_description, passed_checks, results);
+            break;
+          }
+          if (!overall_check) break;
+        }
+      }
+      if (overall_check){
+        check(overall_check, "", "", check_function, check_description, passed_checks, results);
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Check | reshaping xmatrix
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::xmatrix.reshape()";
+      check_description = "reshaping a xmatrix";
+      bool overall_check = true;
+      vector<int> B = {1,2,3,4,5,6,7,8,9,10,11,12};
+      xmatrix<int> A = {{1,2,3,4,5,6,7,8,9,10,11,12}};
+      int c, r;
+      for (const std::pair<int, int> &p : vector<std::pair<int, int>>({{4,3}, {2,6}, {3, 4}})){
+        A.reshape(p.first, p.second);
+        for (const int t : B) {
+          r = (t-1)/p.second+1;
+          c = t-(r-1)*(p.second);
+          overall_check = overall_check && (A[r][c] == t);
+          if (!overall_check) {
+            check(overall_check, A[r][c], t,  check_function, check_description, passed_checks, results);
+            break;
+          }
+        }
+        if (!overall_check) break;
+      }
+      if (overall_check){
+        check(overall_check, "", "", check_function, check_description, passed_checks, results);
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Check | reshaping xvector
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::reshape()";
+      check_description = "reshaping xvectors";
+      bool overall_check = true;
+      vector<int> B = {1,2,3,4,5,6,7,8,9,10,11,12};
+      xvector<int> xv = aurostd::vector2xvector(B);
+      aurostd::xmatrix<int> A;
+      int c, r;
+      for (const std::pair<int, int> &p : vector<std::pair<int, int>>({{4,3}, {2,6}, {3, 4}})){
+        A = aurostd::reshape(xv, p.first, p.second);
+        for (const int t : B) {
+          r = (t-1)/p.second+1;
+          c = t-(r-1)*(p.second);
+          overall_check = overall_check && (A[r][c] == t);
+          if (!overall_check) {
+            check(overall_check, A[r][c], t,  check_function, check_description, passed_checks, results);
+            break;
+          }
+        }
+        if (!overall_check) break;
+      }
+      if (overall_check){
+        check(overall_check, "", "", check_function, check_description, passed_checks, results);
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Check | stacking xvector
+    // ---------------------------------------------------------------------------
+    {
+      xvector<int> xv = {1, 2, 3, 4};
+      xmatrix<int> smat;
+      xmatrix<int> vsmat = {{1, 1, 1}, {2, 2, 2}, {3, 3, 3}, {4, 4, 4}};
+      xmatrix<int> hsmat = {{1, 2, 3, 4}, {1, 2, 3, 4}, {1, 2, 3, 4}};
+      check_function = "aurostd::vstack()";
+      check_description = "stack xvectors vertically into a xmatrix";
+      smat = aurostd::vstack(vector<xvector<int>>({xv, xv, xv}));
+      checkEqual(smat, vsmat, check_function, check_description, passed_checks, results);
+      check_function = "aurostd::hstack()";
+      check_description = "stack xvectors horizontal into a xmatrix";
+      smat = aurostd::hstack(vector<xvector<int>>({xv, xv, xv}));
+      checkEqual(smat, hsmat, check_function, check_description, passed_checks, results);
+    }
+
   }
 
   void UnitTest::aurostdMainTest(uint &passed_checks, vector <vector<string>> &results, vector <string> &errors) {
@@ -1026,103 +1223,690 @@ namespace unittest {
     // ---------------------------------------------------------------------------
     // Check | substring2string //SD20220525
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::substring2string()";
-    check_description = "return the third match of the substring";
-    string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
-    calculated_string = aurostd::substring2string(test_string, "ALGO", 3);
-    expected_string = "==49";
-
-    checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    {
+      check_function = "aurostd::substring2string()";
+      check_description = "return the third match of the substring";
+      string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
+      string calculated_string = aurostd::substring2string(test_string, "ALGO", 3);
+      string expected_string = "==49";
+      checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    }
 
     // ---------------------------------------------------------------------------
     // Check | kvpair2string //SD20220525
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::kvpair2string()";
-    check_description = "return the second match of the kvpair";
-    calculated_string = aurostd::kvpair2string(test_string, "ALGO", "==", 2);
-    expected_string = "MEDIUM";
-
-    checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    {
+      check_function = "aurostd::kvpair2string()";
+      check_description = "return the second match of the kvpair";
+      string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
+      string calculated_string = aurostd::kvpair2string(test_string, "ALGO", "==", 2);
+      string expected_string = "MEDIUM";
+      checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    }
 
     // ---------------------------------------------------------------------------
     // Check | substring2string //SD20220525
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::substring2string()";
-    check_description = "return the last match of the substring";
-    calculated_string = aurostd::substring2string(test_string, "ALGO", -1);
-    expected_string = "==SLOW";
+    {
+      check_function = "aurostd::substring2string()";
+      check_description = "return the last match of the substring";
+      string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
+      string calculated_string = aurostd::substring2string(test_string, "ALGO", -1);
+      string expected_string = "==SLOW";
+      checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    }
 
-    checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    // ---------------------------------------------------------------------------
+    // Check | substring2strings //SD20230322
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::substring2strings()";
+      check_description = "return all the matches as vector of strings";
+      string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
+      vector<string> calculated_vstring;
+      aurostd::substring2strings(test_string, calculated_vstring, "IALGO");
+      vector<string> expected_vstring = {"==48", "==49", "==50"};
+      checkEqual(calculated_vstring, expected_vstring, check_function, check_description, passed_checks, results);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Check | substring2strings //CO20230502
+    // ---------------------------------------------------------------------------
+    {
+      check_function = "aurostd::substring2strings()";
+      check_description = "return all the matches as vector of strings";
+      string test_string = "[START]1234\n 4321[STOP] 456[START] 789 \n 987 [STOP]\n[START]4321 [STOP]654[START]987[STOP]";
+      vector<string> calculated_vstring;
+      aurostd::substring2strings(test_string, calculated_vstring, string("[START]"), string("[STOP]")); //CO20230502 - without string(), compiler picks the wrong overload...
+      vector<string> expected_vstring = {"1234\n 4321"," 789 \n 987 ","4321 ","987"};
+      checkEqual(calculated_vstring, expected_vstring, check_function, check_description, passed_checks, results);
+    }
 
     // ---------------------------------------------------------------------------
     // Check | kvpair2string //SD20220525
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::kvpair2string()";
-    check_description = "return the last match of the kvpair";
-    calculated_string = aurostd::kvpair2string(test_string, "ALGO", "==", -1);
-    expected_string = "SLOW";
-
-    checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    {
+      check_function = "aurostd::kvpair2string()";
+      check_description = "return the last match of the kvpair";
+      string test_string = "_FILE_START_\nIALGO==48\nALGO==FAST\nIALGO==49\nALGO==MEDIUM\nIALGO==50\nALGO==SLOW\n_FILE_END_";
+      string calculated_string = aurostd::kvpair2string(test_string, "ALGO", "==", -1);
+      string expected_string = "SLOW";
+      checkEqual(calculated_string, expected_string, check_function, check_description, passed_checks, results);
+    }
 
     // ---------------------------------------------------------------------------
     // Check | string2utype //HE20220324
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::string2utype()";
-    check_description = "int - bases 16, 10, 8, 5, 2";
-    multi_check = true;
-    multi_check = (multi_check && (aurostd::string2utype<int>("-420") == -420));
-    multi_check = (multi_check && (aurostd::string2utype<int>("-420", 16)) == -1056);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-0x420", 16)) == -1056);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-0X420", 16)) == -1056);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-420", 16)) == -1056);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-420", 8)) == -272);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-0420", 8)) == -272);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-420", 5)) == -110);
-    multi_check = (multi_check && (aurostd::string2utype<int>("-110100100", 2)) == -420);
-    checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
-    check_description = "float - bases 16, 10, 8, 5, 2";
-    multi_check = true;
-    multi_check = (multi_check && (aurostd::string2utype<float>("-4.20") == -4.20f));
-    multi_check = (multi_check && (aurostd::string2utype<float>("-420", 16)) == -1056.0f);
-    multi_check = (multi_check && (aurostd::string2utype<float>("-420", 8)) == -272.0f);
-    multi_check = (multi_check && (aurostd::string2utype<float>("-420", 5)) == -110.0f);
-    multi_check = (multi_check && (aurostd::string2utype<float>("-110100100", 2)) == -420.0f);
-    checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
+    {
+      check_function = "aurostd::string2utype()";
+      check_description = "int - bases 16, 10, 8, 5, 2";
+      multi_check = true;
+      multi_check = (multi_check && (aurostd::string2utype<int>("-420") == -420));
+      multi_check = (multi_check && (aurostd::string2utype<int>("-420", 16)) == -1056);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-0x420", 16)) == -1056);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-0X420", 16)) == -1056);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-420", 16)) == -1056);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-420", 8)) == -272);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-0420", 8)) == -272);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-420", 5)) == -110);
+      multi_check = (multi_check && (aurostd::string2utype<int>("-110100100", 2)) == -420);
+      checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
+      check_description = "float - bases 16, 10, 8, 5, 2";
+      multi_check = true;
+      multi_check = (multi_check && (aurostd::string2utype<float>("-4.20") == -4.20f));
+      multi_check = (multi_check && (aurostd::string2utype<float>("-420", 16)) == -1056.0f);
+      multi_check = (multi_check && (aurostd::string2utype<float>("-420", 8)) == -272.0f);
+      multi_check = (multi_check && (aurostd::string2utype<float>("-420", 5)) == -110.0f);
+      multi_check = (multi_check && (aurostd::string2utype<float>("-110100100", 2)) == -420.0f);
+      checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
 
-    check_description = "double - bases 16, 10, 8, 5, 2";
-    multi_check = true;
-    multi_check = (multi_check && (aurostd::string2utype<double>("-4.20") == -4.20));
-    multi_check = (multi_check && (aurostd::string2utype<double>("-420", 16)) == -1056.0);
-    multi_check = (multi_check && (aurostd::string2utype<double>("-420", 8)) == -272.0);
-    multi_check = (multi_check && (aurostd::string2utype<double>("-420", 5)) == -110.0);
-    multi_check = (multi_check && (aurostd::string2utype<double>("-110100100", 2)) == -420.0);
-    checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
+      check_description = "double - bases 16, 10, 8, 5, 2";
+      multi_check = true;
+      multi_check = (multi_check && (aurostd::string2utype<double>("-4.20") == -4.20));
+      multi_check = (multi_check && (aurostd::string2utype<double>("-420", 16)) == -1056.0);
+      multi_check = (multi_check && (aurostd::string2utype<double>("-420", 8)) == -272.0);
+      multi_check = (multi_check && (aurostd::string2utype<double>("-420", 5)) == -110.0);
+      multi_check = (multi_check && (aurostd::string2utype<double>("-110100100", 2)) == -420.0);
+      checkEqual(multi_check, true, check_function, check_description, passed_checks, results);
+    }
 
     // ---------------------------------------------------------------------------
     // Check | crc64 //HE20220404
     // ---------------------------------------------------------------------------
-    check_function = "aurostd::crc64()";
-    check_description = "runtime hashing";
-    expected_uint64 = 15013402708409085989UL;
-    calculated_uint64 = aurostd::crc64("aflowlib_date");
-    checkEqual(calculated_uint64, expected_uint64, check_function, check_description, passed_checks, results);
+    {
+      check_function = "aurostd::crc64()";
+      check_description = "runtime hashing";
+      expected_uint64 = 15013402708409085989UL;
+      calculated_uint64 = aurostd::crc64("aflowlib_date");
+      checkEqual(calculated_uint64, expected_uint64, check_function, check_description, passed_checks, results);
 
-    check_function = "aurostd::ctcrc64()";
-    check_description = "compiler hashing (constexpr)";
-    static constexpr uint64_t
-      calculated_const_uint64 = aurostd::ctcrc64("aflowlib_date");
-    checkEqual(calculated_const_uint64, expected_uint64, check_function, check_description, passed_checks, results);
+      check_function = "aurostd::ctcrc64()";
+      check_description = "compiler hashing (constexpr)";
+      static constexpr uint64_t
+        calculated_const_uint64 = aurostd::ctcrc64("aflowlib_date");
+      checkEqual(calculated_const_uint64, expected_uint64, check_function, check_description, passed_checks, results);
+    }
+
+
+    // ---------------------------------------------------------------------------
+    // Check | crc2human //HE20230221
+    // ---------------------------------------------------------------------------
+
+    {
+      check_function = "aurostd::crc2human()";
+      check_description = "create human readable hash";
+      std::string expected = "NEPPW041L8FJ2";
+      std::string result = aurostd::crc2human("Hello World!");
+      checkEqual(result, expected, check_function, check_description, passed_checks, results);
+
+      check_description = "create truncated human readable hash";
+      expected = "NEPPW0";
+      result = aurostd::crc2human("Hello World!", 6);
+      checkEqual(result, expected, check_function, check_description, passed_checks, results);
+
+      check_description = "check padding";
+      expected = "2ZP300";
+      result = aurostd::crc2human(145624, 6);
+      checkEqual(result, expected, check_function, check_description, passed_checks, results);
+    }
+
+  }
+
+
+
+  void UnitTest::xparserTest(uint &passed_checks, vector <vector<string>> &results, vector <string> &errors) {
+    (void) errors; // Suppress compiler warnings
+
+
+    string task_description = "Test xparsers";
+    stringstream result;
+    string check_description="";
+    string check_function="";
+
+    // ---------------------------------------------------------------------------
+    // Check | aurostd::JSON
+    // ---------------------------------------------------------------------------
+
+    // read strings
+    // tests based on https://seriot.ch/projects/parsing_json.html
+    {
+      check_function = "JSON";
+      check_description = "test string parsing";
+      std::string string_json = string(utd["xparser"]["string_json"]);
+
+      std::map < string, string > string_results({{"1_2_3_bytes_UTF-8_sequences", "\u0060\u012a\u12AB"},
+                                                  {"allowed_escapes", "\"\\/\b\f\n\r\t"}, {"pi", "π"}, {"escaped_noncharacter", "\uFFFF"},
+                                                  {"last_surrogates_1_and_2", "􏿿"}, {"accepted_surrogate_pair", "𐐷"},
+                                                  {"unicode", "\uA66D"}, {"unicode_U+1FFFE_nonchar", "🿾"}, {"backslash_and_u_escaped_zero", "\\u0000"},
+                                                  {"three-byte-utf-8", "\u0821"}, {"backslash_doublequotes", "\""}, {"uescaped_newline", "new\u000Aline"},
+                                                  {"unicode_escaped_double_quote", "\u0022"}, {"double_escape_a", "\\a"}, {"comments", "a/*b*/c/*d//e"},
+                                                  {"space", " "}, {"uEscape", "\u0061\u30af\u30EA\u30b9"}, {"unicode_U+200B_ZERO_WIDTH_SPACE", "\u200B"},
+                                                  {"u+2028_line_sep", " "}, {"two-byte-utf-8", "\u0123"}, {"unicodeEscapedBackslash", "\u005C"},
+                                                  {"unicode_U+2064_invisible_plus", "\u2064"}, {"escaped_control_character", "\u0012"}, {"simple_ascii", "asd "},
+                                                  {"unicode_U+10FFFE_nonchar", "􏿾"}, {"utf8", "€𝄞"}, {"unescaped_char_delete", ""},
+                                                  {"surrogates_U+1D11E_MUSICAL_SYMBOL_G_CLEF", "𝄞"}, {"double_escape_n", "\\n"},
+                                                  {"with_del_character", "aa"}, {"nonCharacterInUTF-8_U+FFFF", "￿"},
+                                                  {"accepted_surrogate_pairs", "😹💍"}, {"in_array_with_leading_space", "asd"},
+                                                  {"nonCharacterInUTF-8_U+10FFFF", "􏿿"}, {"one-byte-utf-8", "\u002c"}, {"unicode_2", "⍂㈴⍂"},
+                                                  {"unicode_U+FDD0_nonchar", "\uFDD0"}, {"nbsp_uescaped", "new\u00A0line"}, {"unicode_U+FFFE_nonchar", "\uFFFE"},
+                                                  {"reservedCharacterInUTF-8_U+1BFFF", "𛿿"}, {"u+2029_par_sep", " "}});
+
+      std::map<string,string> escaped_results ({{"1_2_3_bytes_UTF-8_sequences","`\\u012a\\u12ab"},{"accepted_surrogate_pair","\\ud801\\udc37"},
+                                                {"accepted_surrogate_pairs","\\ud83d\\ude39\\ud83d\\udc8d"},{"allowed_escapes","\\\"\\\\\\/\\b\\f\\n\\r\\t"},
+                                                {"backslash_and_u_escaped_zero","\\\\u0000"},{"backslash_doublequotes","\\\""},{"comments","a\\/*b*\\/c\\/*d\\/\\/e"},
+                                                {"double_escape_a","\\\\a"},{"double_escape_n","\\\\n"},{"escaped_control_character",""},{"escaped_noncharacter","\\uffff"},
+                                                {"in_array_with_leading_space","asd"},{"last_surrogates_1_and_2","\\udbff\\udfff"},{"nbsp_uescaped","new\\u00a0line"},
+                                                {"nonCharacterInUTF-8_U+10FFFF","\\udbff\\udfff"},{"nonCharacterInUTF-8_U+FFFF","\\uffff"},{"one-byte-utf-8",","},
+                                                {"pi","\\u03c0"},{"reservedCharacterInUTF-8_U+1BFFF","\\ud82f\\udfff"},{"simple_ascii","asd "},{"space"," "},
+                                                {"surrogates_U+1D11E_MUSICAL_SYMBOL_G_CLEF","\\ud834\\udd1e"},{"three-byte-utf-8","\\u0821"},{"two-byte-utf-8","\\u0123"},
+                                                {"u+2028_line_sep","\\u2028"},{"u+2029_par_sep","\\u2029"},{"uEscape","a\\u30af\\u30ea\\u30b9"},
+                                                {"uescaped_newline","new\\nline"},{"unescaped_char_delete",""},{"unicode","\\ua66d"},{"unicodeEscapedBackslash","\\\\"},
+                                                {"unicode_2","\\u2342\\u3234\\u2342"},{"unicode_U+10FFFE_nonchar","\\udbff\\udffe"},{"unicode_U+1FFFE_nonchar","\\ud83f\\udffe"},
+                                                {"unicode_U+200B_ZERO_WIDTH_SPACE","\\u200b"},{"unicode_U+2064_invisible_plus","\\u2064"},
+                                                {"unicode_U+FDD0_nonchar","\\ufdd0"},{"unicode_U+FFFE_nonchar","\\ufffe"},{"unicode_escaped_double_quote","\\\""},
+                                                {"utf8","\\u20ac\\ud834\\udd1e"},{"with_del_character","aa"}});
+
+      aurostd::JSON::object jo = aurostd::JSON::loadString(string_json);
+      bool overall_test = true;
+      for (const auto &entry: string_results) {
+        if ((string) jo[entry.first] != entry.second) {
+          check_description += "(at " + entry.first + " subtest)";
+          check(false, (string) jo[entry.first], entry.second, check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      if (overall_test) check(overall_test, 0, 0, check_function, check_description, passed_checks, results);
+
+      check_description = "test string conversion to JSON";
+      overall_test = true;
+      for (const auto &entry: escaped_results) {
+        if (jo[entry.first].toString(true, true) != "\""+entry.second+"\"") {
+          check_description += "(at " + entry.first + " subtest)";
+          check(false, (string) jo[entry.first], "\""+entry.second+"\"", check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      if (overall_test) check(overall_test, 0, 0, check_function, check_description, passed_checks, results);
+    }
+
+    // read single numbers
+    // tests based on https://seriot.ch/projects/parsing_json.html
+    {
+      check_function = "JSON";
+      check_description = "test number parsing (double, long long)";
+      std::string number_json = string(utd["xparser"]["number_json"]);
+
+      aurostd::JSON::object jo = aurostd::JSON::loadString(number_json);
+
+      std::map < string, double > double_results( {{"0e+1", 0},  {"0e1", 0},  {"after_space", 4},  {"double_close_to_zero", -1e-78},
+                                                   {"double__too_close_to_zero", NAN},  {"int_with_exp", 200},  {"minus_zero", -0},
+                                                   {"negative_int", -123},  {"negative_one", -1},  {"real_capital_e", 1e+22},
+                                                   {"real_capital_e_neg_exp", 0.01},  {"real_capital_e_pos_exp", 100},  {"real_exponent", 1.23e+47},
+                                                   {"real_fraction_exponent", 123.456e78},  {"real_neg_exp", 0.01},  {"real_pos_exponent", 100},
+                                                   {"simple_int", 123},  {"simple_real", 123.456789},  {"number", 1.23e+67},
+                                                   {"true", 1.0}, {"false", 0.0}, {"null", NAN}});
+      std::map <string,long long> ll_results({{"0e+1", 0}, {"0e1", 0}, {"after_space", 4}, {"double_close_to_zero", 0},
+                                              {"int_with_exp", 200}, {"minus_zero", 0}, {"negative_int", -123}, {"negative_one", -1},
+                                              {"real_capital_e", std::numeric_limits<long long>::max()}, {"real_capital_e_neg_exp", 0},
+                                              {"real_capital_e_pos_exp", 100}, {"real_exponent", std::numeric_limits<long long>::max()},
+                                              {"real_fraction_exponent", std::numeric_limits<long long>::max()}, {"real_neg_exp", 0},
+                                              {"real_pos_exponent", 100}, {"simple_int", 123}, {"simple_real", 123},
+                                              {"number", std::numeric_limits<long long>::max()}, {"true", 1}, {"false", 0}});
+
+      bool overall_test = true;
+      for (const auto &entry: double_results) {
+        if ((double) jo[entry.first] != entry.second) {
+          if (std::isnan((double)jo[entry.first]) && std::isnan(entry.second)) continue;
+          check_description += "(at " + entry.first + " subtest)";
+              check(false, (double) jo[entry.first], entry.second, check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      for (const auto &entry: ll_results) {
+        if ((long long) jo[entry.first] != entry.second) {
+          check_description += "(at " + entry.first + " subtest)";
+          check(false, (long long) jo[entry.first], entry.second, check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      if (overall_test) check(overall_test, 0, 0, check_function, check_description, passed_checks, results);
+
+    }
+
+    // read xvectors
+    {
+      check_function = "JSON";
+      check_description = "test parsing xvector<";
+      std::string number_json = string(utd["xparser"]["vector_number_json"]);
+
+      aurostd::JSON::object jo = aurostd::JSON::loadString(number_json);
+
+      xvector<double> xvd_res = jo["xvector_double"];
+      xvector<double> xvd_exp = {923.49445786, -441.74004105, 465.49355057, 96.15610686, 557.6834903 , 147.6777196 , 871.81485459, 287.89958188, 863.66132302, 876.36635155};
+      checkEqual( xvd_res, xvd_exp, check_function, check_description + "double>", passed_checks, results);
+
+
+      xvd_res = jo["xvector_nan"];
+      xvd_exp = {449644208, -441.74004105, NAN, 725767871, 1.0, 946128279, 65015635, 287.89958188, 863.66132302, 762013152};
+      checkEqual( xvd_res, xvd_exp, check_function, check_description + "double> mixed + NAN", passed_checks, results);
+
+      xvector<float> xvf_res = jo["xvector_nan"];
+      xvector<float> xvf_exp = {449644224, -441.74004105, NAN, 725767872, 1.0, 946128256, 65015636, 287.89958188, 863.66132302, 762013184}; // values different from double -> narrowing
+      checkEqual( xvf_res, xvf_exp, check_function, check_description + "float> mixed + NAN", passed_checks, results);
+
+      xvector<long long> xvll_res = jo["xvector_ll"];
+      xvector<long long> xvll_exp = {449644208, -252515403, 601496576, 725767871, 502088591, 946128279, 65015635, 352203056, 717938486, 762013152};
+      checkEqual( xvll_res, xvll_exp, check_function, check_description + "long long>", passed_checks, results);
+
+      xvector<unsigned long long> xvull_res = jo["xvector_ull"];
+      xvector<unsigned long long> xvull_exp = {449644208, 252515403, 601496576, 725767871, 502088591, 946128279, 65015635, 352203056, 717938486, 762013152};
+      checkEqual( xvull_res, xvull_exp, check_function, check_description + "unsigned long long>", passed_checks, results);
+
+
+      xvll_res = jo["xvector_mixed"];
+      xvll_exp = {449644208, -441, 465, 725767871, 1, 946128279, 65015635, 287, 863, 762013152};
+      checkEqual( xvll_res, xvll_exp, check_function, check_description + "long long> mixed", passed_checks, results);
+
+      xvector<int> xvi_res = jo["xvector_mixed"];
+      xvector<int> xvi_exp = {449644208, -441, 465, 725767871, 1, 946128279, 65015635, 287, 863, 762013152};
+      checkEqual( xvi_res, xvi_exp, check_function, check_description + "int> mixed", passed_checks, results);
+
+      // <uint> would fail as operator << xvector<uint> does not exist yet
+    }
+
+    // read xmatrix
+    {
+      check_function = "JSON";
+      check_description = "test parsing xmatrix<";
+
+      std::string matrix_json = string(utd["xparser"]["matrix_json"]);
+      aurostd::JSON::object jo = aurostd::JSON::loadString(matrix_json);
+
+      xmatrix<double> xmd_exp = {{ 2.85899214e+07, 2.70836286e+04,              82,  7.47207733e+08,  4.67299748e+04, -6.25361399e+09, 8.00388892e+08},
+                                {-2.50841390e+04, 1.86048071e+07,  7.18691607e+04, -7.18492121e+00,  5.11971140e+02,  8.97364584e+06, 1.68446225e+02},
+                                { 4.94590604e+08, 1.89067109e+09,  4.64803095e+00,  7.74359909e+00,            5465,  1.37944663e+02, 1.37565108e+08},
+                                {           8499, 1.73734230e+03,  3.28957479e+08, -5.41490015e+03,  5.52617678e+00,  2.64034084e+09, 4.76561709e+01},
+                                { 3.31904798e+04,     2288175298, -2.96213531e+07,  1.22631199e+02, -8.83941811e+00, -2.17327450e+04, 3.77389069e+03},
+                                {-2.98263326e+04, 5.39915781e+05,  1.28198687e+09,  2.69529424e+07,  7.47855186e+01,      1538912783, 2.55027330e+02}};
+      xmatrix<double> xmd_res = jo["xmatrix_double_mix"];
+      checkEqual( xmd_res, xmd_exp, check_function, check_description + "double> mixed", passed_checks, results);
+
+
+      xmatrix<int> xmll_exp = {{  28589921,       27083,         82, 747207733, 46729, -1958646694, 800388892},
+                               {    -25084,    18604807,      71869,        -7,   511,     8973645,       168},
+                               { 494590604,  1890671090,          4,         7,  5465,         137, 137565108},
+                               {      8499,        1737,  328957479,     -5414,     5, -1654626456,        47},
+                               {     33190, -2006791998,  -29621353,       122,    -8,      -21732,      3773},
+                               {    -29826,      539915, 1281986870,  26952942,    74,  1538912783,       255}};
+      xmatrix<int> xmll_res = jo["xmatrix_double_mix"];
+      checkEqual( xmll_res, xmll_exp, check_function, check_description + "int> mixed", passed_checks, results);
+    }
+
+    // read std::map
+    {
+      check_function = "JSON";
+      check_description = "test parsing std:map<string,";
+      std::string map_json = string(utd["xparser"]["map_json"]);
+
+      std::map<string, double> md_exp = {{"VNZPC", 2},
+                                         {"HQPZP", -2472285305.2312846},
+                                         {"DUKPG", 24171},
+                                         {"NUJYO", -108940230},
+                                         {"MDPSG", 15011078.748e-5},
+                                         {"UKYVK", 1072982.12214322},
+                                         {"UCZSX", 825.8070164E2},
+                                         {"SQBER", -2056},
+                                         {"XGPXD", 853427.8245249396},
+                                         {"UASBY", 4474520688}};
+      aurostd::JSON::object jo = aurostd::JSON::loadString(map_json);
+      std::map<string, double> md_res = jo["map"];
+      bool overall_test = true;
+      for (const std::pair<string, double> entry: md_exp){
+        if (entry.second != md_res[entry.first]) {
+          check_description += "double> (at " + entry.first + " subtest key)";
+          check(false, md_res[entry.first], entry.second, check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      if (overall_test) check(overall_test, 0, 0, check_function, check_description+ "double>)", passed_checks, results);
+
+      std::map<string, long long> mll_exp = {{"VNZPC", 2},
+                                             {"HQPZP", -2472285305},
+                                             {"DUKPG", 24171},
+                                             {"NUJYO", -108940230},
+                                             {"MDPSG", 150},
+                                             {"UKYVK", 1072982},
+                                             {"UCZSX", 82580},
+                                             {"SQBER", -2056},
+                                             {"XGPXD", 853427},
+                                             {"UASBY", 4474520688}};
+      std::map<string, long long> mll_res = jo["map"];
+      overall_test = true;
+      for (const std::pair<string, long long> entry: mll_exp){
+        if (entry.second != mll_res[entry.first]) {
+          check_description += "long long> (at subtest key " + entry.first + ")";
+          check(false, mll_res[entry.first], entry.second, check_function, check_description, passed_checks,results);
+          overall_test = false;
+          break;
+        }
+      }
+      if (overall_test) check(overall_test, 0, 0, check_function, check_description+ "long long>)", passed_checks, results);
+
+    }
+
+    // read std::vector
+    {
+      check_function = "JSON";
+      check_description = "test parsing vector<";
+
+      std::string vector_json = string(utd["xparser"]["vector_mixed_json"]);
+
+      aurostd::JSON::object jo = aurostd::JSON::loadString(vector_json);
+      std::vector<std::string> vs_res = jo["string_vector"];
+      std::vector<std::string> vs_exp = {"First w\"ord", "Second word", "Last word"};
+      checkEqual( vs_res, vs_exp, check_function, check_description + "string>", passed_checks, results);
+
+      vs_res = jo["mixed_vector"];
+      vs_exp = {"{\"DUKPG\":24171,\"HQPZP\":-2.47229e+09,\"VNZPC\":2}", "5.68e-06", "152.324", "784", "A string", "true", "false", "null", "[\"A\",\"nested\",\"list\"]"};
+      checkEqual( vs_res, vs_exp, check_function, check_description + "string> mixed", passed_checks, results);
+
+      std::vector<double> vd_res = jo["number_vector"];
+      std::vector<double> vd_exp = {449644208, 441.74004105, 465.49355057, 725767871, 1.0, 946128279, 65015635, 287.89958188, 863.66132302, 762013152};
+      checkEqual( vd_res, vd_exp, check_function, check_description + "double> mixed", passed_checks, results);
+
+      std::vector<int> vll_res = jo["number_vector"];
+      std::vector<int> vll_exp = {449644208, 441, 465, 725767871, 1, 946128279, 65015635, 287, 863, 762013152};
+      checkEqual( vll_res, vll_exp, check_function, check_description + "int> mixed", passed_checks, results);
+
+      for (string key: {"bool>", "bool> mixed"}) {// aurostd::joinWDelimiter does not work for bool
+        std::vector<bool> vb_res = jo[key];
+        std::vector<bool> vb_exp = {true, false, false, false, true};
+        bool overall_test = true;
+        for (size_t idx = 0; idx < vb_exp.size(); idx++) {
+          if (vb_res[idx] != vb_exp[idx]) {
+            check_description += key;
+            check(false, vb_res[idx], vb_exp[idx], check_function, check_description, passed_checks, results);
+            overall_test = false;
+            break;
+          }
+        }
+        if (overall_test)
+          check(overall_test, 0, 0, check_function, check_description + "bool>", passed_checks, results);
+      }
+    }
+
+    // create JSON storage objects
+    {
+      check_function = "JSON";
+      check_description = "test converting ";
+      aurostd::JSON::object so;
+      {
+        int exp = 4652;
+        so = exp;
+        checkEqual((int)so, exp, check_function, check_description + "int", passed_checks, results);
+      }
+      {
+        so = "Hello World";
+        checkEqual((std::string) so, "Hello World", check_function, check_description + "std::string", passed_checks, results);
+      }
+      {
+        so = nullptr;
+        checkEqual((std::string)so, "null", check_function, check_description + "nullptr", passed_checks, results);
+      }
+      {
+        xcomplex<double> exp(51.25,0.3485);
+        so = exp;
+        checkEqual((xcomplex<double>)so, exp, check_function, check_description + "xcomplex<double>", passed_checks, results);
+      }
+      {
+        xcomplex<float> exp(51.25,0.3485);
+        so = exp;
+        checkEqual((xcomplex<float>)so, exp, check_function, check_description + "xcomplex<float>", passed_checks, results);
+      }
+      {
+        vector<float> exp = {12.33,20.7,34.23454};
+        so = exp;
+        checkEqual((std::string)so, "[12.33,20.7,34.2345]", check_function, check_description + "vector<float>", passed_checks, results);
+      }
+      {
+        xvector<uint> exp = {3,7,10};
+        so = exp;
+        checkEqual((std::string)so, "[3,7,10]", check_function, check_description + "xvector<uint>", passed_checks, results);
+      }
+      {
+        xmatrix<float> exp = {{1.0,2.0,3.0,4.0},{5,6,7,8},{9,10,11,12},{13,14,15,16}};
+        so = exp;
+        checkEqual((std::string)so, "[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]", check_function, check_description + "xmatrix<float>", passed_checks, results);
+      }
+      {
+        xmatrix<xcomplex<float>> exp(3,3,1,1);
+        exp(1,1) = {1.1, 1.11}; exp(1,2) = {1.2, 1.22}; exp(1,3) = {1.3, 1.33};
+        exp(2,1) = {2.1, 2.11}; exp(2,2) = {2.2, 2.22}; exp(2,3) = {2.3, 2.33};
+        exp(3,1) = {3.1, 3.11}; exp(3,2) = {3.2, 3.22}; exp(3,3) = {3.3, 3.33};
+        so = exp;
+        checkEqual((string)so, "[[{\"imag\":1.11,\"real\":1.1},{\"imag\":1.22,\"real\":1.2},{\"imag\":1.33,\"real\":1.3}],[{\"imag\":2.11,\"real\":2.1},{\"imag\":2.22,\"real\":2.2},{\"imag\":2.33,\"real\":2.3}],[{\"imag\":3.11,\"real\":3.1},{\"imag\":3.22,\"real\":3.2},{\"imag\":3.33,\"real\":3.3}]]", check_function, check_description + "xmatrix<xcomplex<float>>", passed_checks, results);
+      }
+      {
+        std::vector<std::vector<std::string>> exp = {{"Hello", "World"}, {"Hello2", "World2"}};
+        so = exp;
+        checkEqual((std::string)so, "[[\"Hello\",\"World\"],[\"Hello2\",\"World2\"]]", check_function, check_description + "vector<vector<string>>", passed_checks, results);
+      }
+      {
+        vector<float> a = {12.33,20.7,34.23454};
+        vector<float> b = {89.6,2.243,76.432};
+        std::map<std::string, std::vector<float>> exp;
+        exp.insert({"Hello1", a});
+        exp.insert({"Hello2", b});
+        so = exp;
+        checkEqual((std::string)so, "{\"Hello1\":[12.33,20.7,34.2345],\"Hello2\":[89.6,2.243,76.432]}", check_function, check_description + "vector<vector<string>>", passed_checks, results);
+      }
+    }
+
+    // check type specific functions
+    {
+      check_function = "JSON";
+      check_description = "type specific function ";
+      aurostd::JSON::object so;
+      size_t expected = 11;
+      so = "Hello World";
+      checkEqual(so.size(), expected, check_function, check_description + "size for string", passed_checks, results);
+      checkEqual(so.empty(), false, check_function, check_description + "empty for string", passed_checks, results);
+      so = vector<int>({1,2,3,4,5,6,7,8,9,10,11});
+      checkEqual(so.size(), expected, check_function, check_description + "size for list", passed_checks, results);
+      checkEqual(so.empty(), false, check_function, check_description + "empty for list", passed_checks, results);
+      so = std::map<string,int>({{"eins",1}, {"zwei", 2}, {"drei", 3}});
+      expected = 3;
+      checkEqual(so.size(), expected, check_function, check_description + "size for dictionary", passed_checks, results);
+      checkEqual(so.empty(), false, check_function, check_description + "empty for dictionary", passed_checks, results);
+
+
+
+    }
+
   }
 }
 
 namespace unittest {
+
+  void UnitTest::xfitTest(uint& passed_checks, vector<vector<string> >& results, vector<string>& errors) {
+    (void) errors;  // Suppress compiler warnings
+    // setup test environment
+    string check_function = "", check_description = "";
+
+    bool calculated_bool, expected_bool;
+    double calculated_dbl, expected_dbl;
+    xvector<double> calculated_xvecdbl, expected_xvecdbl;
+    xvector<double> calculated_xvecdbl_r, expected_xvecdbl_r;
+    xvector<double> calculated_xvecdbl_i, expected_xvecdbl_i;
+    xmatrix<double> calculated_xmatdbl, expected_xmatdbl;
+
+    // ---------------------------------------------------------------------------
+    // Check | companion matrix //SD20220318
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::companion_matrix()";
+    check_description = "calculate the companion matrix of a univariate polynomial";
+    xvector<double> pc = {6.0, -5.0, -2.0, 3.0};
+    expected_xmatdbl = {{0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, {-6.0 / 3.0, 5.0 / 3.0, 2.0 / 3.0}};
+    calculated_xmatdbl = aurostd::companion_matrix(pc);
+    checkEqual(calculated_xmatdbl, expected_xmatdbl, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | polynomialFindRoots //SD20220318
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::polynomialFindRoots()";
+    expected_xvecdbl_r = {1.05576592536838, 1.05576592536838, -1.44486518407010};
+    expected_xvecdbl_i = {-0.519201791550296, 0.519201791550296, 0.0};
+    calculated_xvecdbl_r = xvector<double>(3), calculated_xvecdbl_i = xvector<double>(3);
+    aurostd::polynomialFindRoots(pc, calculated_xvecdbl_r, calculated_xvecdbl_i);
+    check_description = "calculate the roots of a univariate polynomial (real part)";
+    checkEqual(calculated_xvecdbl_r, expected_xvecdbl_r, check_function, check_description, passed_checks, results);
+    check_description = "calculate the roots of a univariate polynomial (imag part)";
+    checkEqual(calculated_xvecdbl_i, expected_xvecdbl_i, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | polynomialCurveFit //SD20220422
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::polynomialCurveFit()";
+    check_description = "calculate the coefficients for a quintic polynomial that fits the data";
+    xvector<double> xdata = {0.551878738140095, 0.815194385592879, -1.436650500869055, 0.837122604741089, 0.024588378708606,
+                             -1.521792147897101, -0.998568921765830, -0.222562772922286, 0.964723358008907, 0.986066878262693};
+    xvector<double> ydata = {-1.895746346279865, -2.426516802630079, -0.329326356733414, -2.476265605752963, -1.148143476025739,
+                             -0.304622388440250, -0.471352985639471, -0.911928012994989, -2.783990433247946, -2.838593165314427};
+    xvector<double> wdata = {0.757740130578333, 0.743132468124916, 0.392227019534168, 0.655477890177557, 0.171186687811562,
+                             0.706046088019609, 0.031832846377421, 0.276922984960890, 0.046171390631154, 0.097131781235848};
+    expected_xvecdbl = {-1.121837858162905, -1.056905122203599, -0.543168130435282, -0.145858244844311, -0.007682867520147, 0.000748981621075};
+    calculated_xvecdbl = aurostd::polynomialCurveFit(xdata, ydata, 5, wdata);
+    checkEqual(expected_xvecdbl, calculated_xvecdbl, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | findZeroBrent //SD20220517
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::findZeroBrent()";
+    check_description = "find the zero of a univariate function";
+    std::function<double(double)> func = [](double x) {return std::pow(x, 2.0) - 3.0;};
+    expected_dbl = 1.732050807568877;
+    aurostd::findZeroBrent(0.0, 10.0, func, calculated_dbl);
+    checkEqual(calculated_dbl, expected_dbl, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | checkDerivatives //SD20220622
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::checkDerivatives()";
+    check_description = "check that the analytical derivatives of a 2D function are correct";
+    xvector<double> x0 = {aurostd::ran2(), aurostd::ran2()};
+    std::function<double(xvector<double>)> testf = [](xvector<double> x) {return std::sin(x(1)) + std::cos(x(2));};
+    vector<std::function<double(xvector<double>)>> testdf;
+    testdf.push_back([](xvector<double> x) {return std::cos(x(1));});
+    testdf.push_back([](xvector<double> x) {return -1.0 * std::sin(x(2));});
+    expected_bool = true;
+    calculated_bool = checkDerivatives(x0, testf, testdf);
+    checkEqual(calculated_bool, expected_bool, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | calcNumericalJacobian //SD20220624
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::calcNumericalJacobian()";
+    check_description = "calculate the numerical Jacobian of a 3D rectangular system";
+    xvector<double> dx = 10.0 * _AUROSTD_XSCALAR_TOLERANCE_IDENTITY_ * aurostd::ones_xv<double>(3);
+    x0 = {aurostd::ran2(), aurostd::ran2(), aurostd::ran2()};
+    vector<std::function<double(xvector<double>)>> vfunc, vdfunc;
+    vector<vector<std::function<double(xvector<double>)>>> jac;
+    vfunc.push_back([](xvector<double> x) {return std::exp(1.0 * x(1) + 2.0 * x(2) + 3.0 * x(3));});
+    vfunc.push_back([](xvector<double> x) {return std::cos(1.0 * x(1) + 2.0 * x(2) + 3.0 * x(3));});
+    for (int i = 1; i <= 3; i++) {vdfunc.push_back([i](xvector<double> x) {return (double)i * std::exp(1.0 * x(1) + 2.0 * x(2) + 3.0 * x(3));});}
+    jac.push_back(vdfunc);
+    vdfunc.clear();
+    for (int i = 1; i <= 3; i++) {vdfunc.push_back([i](xvector<double> x) {return -1.0 * (double)i * std::sin(1.0 * x(1) + 2.0 * x(2) + 3.0 * x(3));});}
+    jac.push_back(vdfunc);
+    expected_bool = true;
+    calculated_bool = true;
+    vector<vector<std::function<double(xvector<double>)>>> testjac = aurostd::calcNumericalJacobian(vfunc, dx);
+    for (uint i = 0; i < jac.size(); i++) {
+      for (uint j = 0; j < jac[0].size(); j++) {
+        calculated_bool = calculated_bool && aurostd::isequal(jac[i][j](x0), testjac[i][j](x0));
+      }
+    }
+    checkEqual(calculated_bool, expected_bool, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | findZeroNewtonRaphson //SD20220616
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::findZeroNewtonRaphson()";
+    check_description = "find the zeros of a 2D nonlinear square system";
+    x0 = {aurostd::ran2(), aurostd::ran2()};
+    vfunc.clear();
+    vdfunc.clear();
+    jac.clear();
+    vfunc.push_back([](xvector<double> x) {return std::exp(-std::exp(-(x(1) + x(2)))) - x(2) * (1.0 + std::pow(x(1), 2.0));});
+    vfunc.push_back([](xvector<double> x) {return x(1) * std::cos(x(2)) + x(2) * std::sin(x(1)) - 0.5;});
+    vdfunc.push_back([](xvector<double> x) {return std::exp(-std::exp(-(x(1) - x(2))) - x(1) - x(2)) - 2 * x(1) * x(2);});
+    vdfunc.push_back([](xvector<double> x) {return std::exp(-std::exp(-(x(1) - x(2))) - x(1) - x(2)) - (1.0 + std::pow(x(1), 2.0));});
+    jac.push_back(vdfunc);
+    vdfunc.clear();
+    vdfunc.push_back([](xvector<double> x) {return x(2) * std::cos(x(1)) + std::cos(x(2));});
+    vdfunc.push_back([](xvector<double> x) {return std::sin(x(1)) - x(1) * std::sin(x(2));});
+    jac.push_back(vdfunc);
+    expected_xvecdbl = {0.353246561918931, 0.606082026502552};
+    aurostd::findZeroNewtonRaphson(x0, vfunc, jac, calculated_xvecdbl);
+    checkEqual(calculated_xvecdbl, expected_xvecdbl, check_function, check_description, passed_checks, results);
+
+    // ---------------------------------------------------------------------------
+    // Check | findZeroDeflation //SD20220616
+    // ---------------------------------------------------------------------------
+    check_function = "aurostd::findZeroDeflation()";
+    check_description = "find multiple zeros of a 2D nonlinear square system";
+    vfunc.clear();
+    vdfunc.clear();
+    jac.clear();
+    vfunc.push_back([](xvector<double> x) {return x(1) * x(2) - 1.0;});
+    vfunc.push_back([](xvector<double> x) {return std::pow(x(1), 2.0) + std::pow(x(2), 2.0) - 4.0;});
+    vdfunc.push_back([](xvector<double> x) {return x(2);});
+    vdfunc.push_back([](xvector<double> x) {return x(1);});
+    jac.push_back(vdfunc);
+    vdfunc.clear();
+    vdfunc.push_back([](xvector<double> x) {return 2.0 * x(1);});
+    vdfunc.push_back([](xvector<double> x) {return 2.0 * x(2);});
+    jac.push_back(vdfunc);
+    expected_xmatdbl = {{0.517638090205041, 1.93185165257813, -1.93185165257813}, {1.93185165257813, 0.517638090205041, -0.517638090205041}};
+    aurostd::findZeroDeflation(aurostd::vector2xvector<double>({0.0, 1.0}), vfunc, jac, calculated_xmatdbl);
+    checkEqual(calculated_xmatdbl, expected_xmatdbl, check_function, check_description, passed_checks, results);
+  }
+}
+
+namespace unittest {
+
   void UnitTest::entryLoaderTest(uint &passed_checks, vector <vector<string>> &results, vector <string> &errors) {
     (void) errors;  // Suppress compiler warnings
 
     // setup test environment
     string task_description = "Testing EntryLoader";
     stringstream result;
-    string check_description;
+    string check_description = "";
     stringstream check_description_helper;
     string check_function = "";
 
@@ -1302,7 +2086,7 @@ namespace unittest {
         }
       }
     }
-    checkEqual(ninconsistent, 0, check_function, check_description, passed_checks, results);
+    checkEqual(ninconsistent, (uint)0, check_function, check_description, passed_checks, results);
 
     // ---------------------------------------------------------------------------
     // Check | consistency between _aflowlib_entry and schema
@@ -1323,7 +2107,7 @@ namespace unittest {
         if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " " << key << " not found in schema." << std::endl;
       }
     }
-    checkEqual(ninconsistent, 0, check_function, check_description, passed_checks, results);
+    checkEqual(ninconsistent, (uint)0, check_function, check_description, passed_checks, results);
   }
 
 }
@@ -1453,96 +2237,37 @@ namespace unittest {
     // ---------------------------------------------------------------------------
     // Test 1: parse structure with known settings
     // ---------------------------------------------------------------------------
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " Test 1: parse structure with known settings" << std::endl;
 
     // CrO3 was a problematic structure in the past
-    str_cif =
-      "data_Cr4O12\n"
-      "_pd_phase_name Cr4O12\n"
-      "_cell_length_a 5.743\n"
-      "_cell_length_b 8.557\n"
-      "_cell_length_c 4.789\n"
-      "_cell_angle_alpha 90.\n"
-      "_cell_angle_beta 90.\n"
-      "_cell_angle_gamma 90.\n"
-      "_cell_volume 235.35\n"
-      "_cell_formula_units_Z 4\n"
-      "_space_group_name_H-M_alt 'A m a 2'\n"
-      "_space_group_IT_number 40\n"
-      "loop_\n"
-      "_space_group_symop_id\n"
-      "_space_group_symop_operation_xyz\n"
-      "1 'x+1/2,-y,z'\n"
-      "2 '-x+1/2,y,z'\n"
-      "3 '-x,-y,z'\n"
-      "4 'x,y,z'\n"
-      "5 'x+1/2,-y+1/2,z+1/2'\n"
-      "6 '-x+1/2,y+1/2,z+1/2'\n"
-      "7 '-x,-y+1/2,z+1/2'\n"
-      "8 'x,y+1/2,z+1/2'\n"
-      "loop_\n"
-      "_atom_type_symbol\n"
-      "_atom_type_oxidation_number\n"
-      "Cr6+ 6\n"
-      "O2- -2\n"
-      "loop_\n"
-      "_atom_site_label\n"
-      "_atom_site_type_symbol\n"
-      "_atom_site_symmetry_multiplicity\n"
-      "_atom_site_Wyckoff_symbol\n"
-      "_atom_site_fract_x\n"
-      "_atom_site_fract_y\n"
-      "_atom_site_fract_z\n"
-      "_atom_site_B_iso_or_equiv\n"
-      "_atom_site_occupancy\n"
-      "Cr1 Cr6+ 4 b 0.25 0.09676 0.5 . 1.\n"
-      "O1 O2- 4 a 0. 0. 0.3841 . 1.\n"
-      "O2 O2- 4 b 0.25 0.2677 0.3755 . 1.\n"
-      "O3 O2- 4 b 0.25 0.6078 0.3284 . 1.\n";
-
-    str_poscar =
-      "Cr4O12\n"
-      "1.000000\n"
-      "   5.74300000000000   0.00000000000000   0.00000000000000\n"
-      "   0.00000000000000   8.55700000000000   0.00000000000000\n"
-      "   0.00000000000000   0.00000000000000   4.78900000000000\n"
-      "4 12\n"
-      "Direct(16) [A4B12]\n"
-      "   0.25000000000000   0.09676000000000   0.50000000000000  Cr\n"
-      "   0.75000000000000   0.90324000000000   0.50000000000000  Cr\n"
-      "   0.25000000000000   0.59676000000000   0.00000000000000  Cr\n"
-      "   0.75000000000000   0.40324000000000   0.00000000000000  Cr\n"
-      "   0.00000000000000   0.00000000000000   0.38410000000000  O \n"
-      "   0.50000000000000   0.00000000000000   0.38410000000000  O \n"
-      "   0.00000000000000   0.50000000000000   0.88410000000000  O \n"
-      "   0.50000000000000   0.50000000000000   0.88410000000000  O \n"
-      "   0.25000000000000   0.26770000000000   0.37550000000000  O \n"
-      "   0.75000000000000   0.73230000000000   0.37550000000000  O \n"
-      "   0.25000000000000   0.76770000000000   0.87550000000000  O \n"
-      "   0.75000000000000   0.23230000000000   0.87550000000000  O \n"
-      "   0.25000000000000   0.60780000000000   0.32840000000000  O \n"
-      "   0.75000000000000   0.39220000000000   0.32840000000000  O \n"
-      "   0.25000000000000   0.10780000000000   0.82840000000000  O \n"
-      "   0.75000000000000   0.89220000000000   0.82840000000000  O \n";
+    str_cif = string(utd["xstructure_parser"]["cif_CrO3"]);
+    str_poscar = string(utd["xstructure_parser"]["poscar_CrO3"]);
 
     check_function = "xstructure::operator<<";
     check_description = "Parsing CIF file with recognized setting (CrO3)";
 
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " [1] Parsing CIF file with recognized setting (CrO3)" << std::endl;
     aurostd::StringstreamClean(xstrss);
     xstrss << str_cif;
-    xstr_cif = xstructure(xstrss);
+    try {xstr_cif = xstructure(xstrss);}
+    catch(aurostd::xerror& excpt) {errors.push_back("Could not generate CrO3");}
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " [2] Parsing CIF file with recognized setting (CrO3)" << std::endl;
 
     aurostd::StringstreamClean(xstrss);
     xstrss << str_poscar;
     xstr_poscar = xstructure(xstrss);
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " [3] Parsing CIF file with recognized setting (CrO3)" << std::endl;
 
     // ---------------------------------------------------------------------------
     // test: parse structure
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " test: parse structure" << std::endl;
     expected_bool = true;
     calculated_bool = compare::aflowCompareStructure(xstr_cif, xstr_poscar, same_species, scale_volume, optimize_match, misfit);
     checkEqual(expected_bool, calculated_bool, check_function, check_description, passed_checks, results);
 
     // ---------------------------------------------------------------------------
     // test: compare Wyckoff positions
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " test: compare Wyckoff positions" << std::endl;
     check_description = "Compare parsed Wyckoff positions of CrO3";
     vector<wyckoffsite_ITC> vwyckoff(4);
     xvector<double> coords;
@@ -1608,101 +2333,11 @@ namespace unittest {
     // ---------------------------------------------------------------------------
     // Test 2: parse structure with unrecognized (old) settings
     // ---------------------------------------------------------------------------
+    if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " Test 2: parse structure with unrecognized (old) settings" << std::endl;
     check_description = "Parsing CIF file with unrecognized setting (GePt3)";
     aurostd::StringstreamClean(xstrss);
-    str_cif =
-      "data_Ge8Pt24\n"
-      "_pd_phase_name Ge8Pt24\n"
-      "_cell_length_a 7.93\n"
-      "_cell_length_b 7.767\n"
-      "_cell_length_c 7.767\n"
-      "_cell_angle_alpha 90.\n"
-      "_cell_angle_beta 90.06\n"
-      "_cell_angle_gamma 90.\n"
-      "_cell_volume 478.39\n"
-      "_cell_formula_units_Z 8\n"
-      "_space_group_name_H-M_alt 'F 1 2/m 1'\n"
-      "_space_group_IT_number 12\n"
-      "loop_\n"
-      "_space_group_symop_id\n"
-      "_space_group_symop_operation_xyz\n"
-      "1 '-x, -y, -z'\n"
-      "2 'x, -y, z'\n"
-      "3 '-x, y, -z'\n"
-      "4 'x, y, z'\n"
-      "5 '-x, -y+1/2, -z+1/2'\n"
-      "6 'x, -y+1/2, z+1/2'\n"
-      "7 '-x, y+1/2, -z+1/2'\n"
-      "8 'x, y+1/2, z+1/2'\n"
-      "9 '-x+1/2, -y, -z+1/2'\n"
-      "10 'x+1/2, -y, z+1/2'\n"
-      "11 '-x+1/2, y, -z+1/2'\n"
-      "12 'x+1/2, y, z+1/2'\n"
-      "13 '-x+1/2, -y+1/2, -z'\n"
-      "14 'x+1/2, -y+1/2, z'\n"
-      "15 '-x+1/2, y+1/2, -z'\n"
-      "16 'x+1/2, y+1/2, z'\n"
-      "loop_\n"
-      "_atom_type_symbol\n"
-      "_atom_type_oxidation_number\n"
-      "Pt0+ 0\n"
-      "Ge0+ 0\n"
-      "loop_\n"
-      "_atom_site_label\n"
-      "_atom_site_type_symbol\n"
-      "_atom_site_symmetry_multiplicity\n"
-      "_atom_site_Wyckoff_symbol\n"
-      "_atom_site_fract_x\n"
-      "_atom_site_fract_y\n"
-      "_atom_site_fract_z\n"
-      "_atom_site_B_iso_or_equiv\n"
-      "_atom_site_occupancy\n"
-      "Pt1 Pt0+ 8 g 0. 0.2 0. . 1.\n"
-      "Pt2 Pt0+ 8 h 0.25 0.25 0.25 . 1.\n"
-      "Pt3 Pt0+ 8 i 0. 0. 0.3 . 1.\n"
-      "Ge1 Ge0+ 8 i 0.25 0. 0. . 1.\n";
-
-    str_poscar =
-      "Ge8Pt24\n"
-      "1.0000000\n"
-      "7.93000000000000   0.00000000000000   0.00000000000000\n"
-      "0.00000000000000   7.76700000000000   0.00000000000000\n"
-      "-0.00813358189357   0.00000000000000   7.76699574126609\n"
-      "Ge Pt\n"
-      "8 24\n"
-      "Direct(32) [A8B24]\n"
-      "0.25000000000000   0.00000000000000   0.00000000000000  Ge\n"
-      "0.75000000000000   0.00000000000000   0.00000000000000  Ge\n"
-      "0.75000000000000   0.50000000000000   0.50000000000000  Ge\n"
-      "0.25000000000000   0.50000000000000   0.50000000000000  Ge\n"
-      "0.25000000000000   0.00000000000000   0.50000000000000  Ge\n"
-      "0.75000000000000   0.00000000000000   0.50000000000000  Ge\n"
-      "0.25000000000000   0.50000000000000   0.00000000000000  Ge\n"
-      "0.75000000000000   0.50000000000000   0.00000000000000  Ge\n"
-      "0.00000000000000   0.70000000000000   0.50000000000000  Pt\n"
-      "0.50000000000000   0.80000000000000   0.50000000000000  Pt\n"
-      "0.50000000000000   0.20000000000000   0.50000000000000  Pt\n"
-      "0.50000000000000   0.30000000000000   0.00000000000000  Pt\n"
-      "0.50000000000000   0.70000000000000   0.00000000000000  Pt\n"
-      "0.25000000000000   0.25000000000000   0.25000000000000  Pt\n"
-      "0.00000000000000   0.00000000000000   0.30000000000000  Pt\n"
-      "0.00000000000000   0.20000000000000   0.00000000000000  Pt\n"
-      "0.00000000000000   0.00000000000000   0.70000000000000  Pt\n"
-      "0.00000000000000   0.50000000000000   0.20000000000000  Pt\n"
-      "0.00000000000000   0.50000000000000   0.80000000000000  Pt\n"
-      "0.50000000000000   0.00000000000000   0.20000000000000  Pt\n"
-      "0.50000000000000   0.00000000000000   0.80000000000000  Pt\n"
-      "0.50000000000000   0.50000000000000   0.70000000000000  Pt\n"
-      "0.50000000000000   0.50000000000000   0.30000000000000  Pt\n"
-      "0.25000000000000   0.75000000000000   0.25000000000000  Pt\n"
-      "0.75000000000000   0.75000000000000   0.75000000000000  Pt\n"
-      "0.75000000000000   0.25000000000000   0.75000000000000  Pt\n"
-      "0.25000000000000   0.25000000000000   0.75000000000000  Pt\n"
-      "0.75000000000000   0.25000000000000   0.25000000000000  Pt\n"
-      "0.25000000000000   0.75000000000000   0.75000000000000  Pt\n"
-      "0.75000000000000   0.75000000000000   0.25000000000000  Pt\n"
-      "0.00000000000000   0.80000000000000   0.00000000000000  Pt\n"
-      "0.00000000000000   0.30000000000000   0.50000000000000  Pt\n";
+    str_cif = string(utd["xstructure_parser"]["cif_Ge8Pt24"]);
+    str_poscar = string(utd["xstructure_parser"]["poscar_Ge8Pt24"]);
 
     bool quiet_tmp = XHOST.QUIET;
     XHOST.QUIET = !LDEBUG;  // Suppress warnings
@@ -1826,44 +2461,7 @@ namespace unittest {
     //    hkl[1] = 1; hkl[2] = 0; hkl[3] = 4;
 
     //create input structure
-    xstr_str =
-      "FeO\n"
-      "1.0\n"
-      "  0.000000   4.736235   0.000000\n"
-      "  4.101698  -2.368118   0.000000\n"
-      "  0.000000   0.000000  13.492372\n"
-      "12 18\n"
-      "Direct\n"
-      "   0.33333333333332   0.66666666666665   0.31943934568918  Fe\n"
-      "  -0.00000000000002  -0.00000000000001   0.65277267902252  Fe\n"
-      "   0.66666666666665   0.33333333333332   0.98610601235585  Fe\n"
-      "   0.66666666666668   0.33333333333335   0.18056065431082  Fe\n"
-      "   0.33333333333335   0.66666666666668   0.51389398764415  Fe\n"
-      "   0.00000000000002   0.00000000000001   0.84722732097748  Fe\n"
-      "  -0.00000000000001  -0.00000000000001   0.15277363902251  Fe\n"
-      "   0.66666666666665   0.33333333333332   0.48610697235585  Fe\n"
-      "   0.33333333333332   0.66666666666665   0.81944030568918  Fe\n"
-      "   0.33333333333335   0.66666666666668   0.01389302764415  Fe\n"
-      "   0.00000000000001   0.00000000000001   0.34722636097749  Fe\n"
-      "   0.66666666666668   0.33333333333335   0.68055969431082  Fe\n"
-      "   0.00000000000000   0.31486811660227   0.25000000000000  O \n"
-      "   0.66666666666667   0.64820144993561   0.58333333333333  O \n"
-      "   0.33333333333333   0.98153478326894   0.91666666666667  O \n"
-      "   0.68513188339780   0.68513188339776   0.24999999999999  O \n"
-      "   0.35179855006446   0.01846521673110   0.58333333333332  O \n"
-      "   0.01846521673113   0.35179855006443   0.91666666666665  O \n"
-      "   0.31486811660220  -0.00000000000004   0.25000000000001  O \n"
-      "   0.98153478326887   0.33333333333330   0.58333333333335  O \n"
-      "   0.64820144993554   0.66666666666663   0.91666666666668  O \n"
-      "   0.35179771006447   0.33333333333337   0.08333333333332  O \n"
-      "   0.01846437673113   0.66666666666670   0.41666666666665  O \n"
-      "   0.68513104339780   0.00000000000004   0.74999999999999  O \n"
-      "   0.98153562326887   0.64820228993557   0.08333333333335  O \n"
-      "   0.64820228993553   0.98153562326890   0.41666666666668  O \n"
-      "   0.31486895660220   0.31486895660224   0.75000000000001  O \n"
-      "   0.66666666666667   0.01846437673106   0.08333333333333  O \n"
-      "   0.33333333333333   0.35179771006440   0.41666666666667  O \n"
-      "   0.00000000000000   0.68513104339773   0.75000000000000  O \n";
+    xstr_str = string(utd["xstructure"]["poscar_FeO"]);
     aurostd::StringstreamClean(xstrss);
     xstrss << xstr_str;
     xstructure xstr_in;
@@ -1877,44 +2475,7 @@ namespace unittest {
     }
 
     //create xstr_slab (correct answer)
-    xstr_str =
-      "FeO\n"
-      "1.0\n"
-      " -4.73623366665202   0.00000000000000   0.00000000000000\n"
-      " -9.47247466669728  21.24210623923067   0.00000000000000\n"
-      " -2.36811866667432   3.16803536641816   2.60528076661565\n"
-      "12 18\n"
-      "Direct\n"
-      "   0.66666667      0.31943935     0.38890928   Fe\n"
-      "  -0.00000000      0.65277268     0.38890928   Fe\n"
-      "   0.33333333      0.98610601     0.38890928   Fe\n"
-      "   0.33333333      0.18056065     0.61109072   Fe\n"
-      "   0.66666667      0.51389399     0.61109072   Fe\n"
-      "   0.00000000      0.84722732     0.61109072   Fe\n"
-      "  -0.00000000      0.15277364     0.38890544   Fe\n"
-      "   0.33333333      0.48610697     0.38890544   Fe\n"
-      "   0.66666667      0.81944031     0.38890544   Fe\n"
-      "   0.66666667      0.01389303     0.61109456   Fe\n"
-      "   0.00000000      0.34722636     0.61109456   Fe\n"
-      "   0.33333333      0.68055969     0.61109456   Fe\n"
-      "   0.31486812      0.25000000     0.00000000   O \n"
-      "   0.64820145      0.58333333     0.00000000   O \n"
-      "   0.98153478      0.91666667     0.00000000   O \n"
-      "   0.68513188      0.25000000     0.31486812   O \n"
-      "   0.01846522      0.58333333     0.31486812   O \n"
-      "   0.35179855      0.91666667     0.31486812   O \n"
-      "  -0.00000000      0.25000000     0.68513188   O \n"
-      "   0.33333333      0.58333333     0.68513188   O \n"
-      "   0.66666667      0.91666667     0.68513188   O \n"
-      "   0.33333333      0.08333333     0.31486896   O \n"
-      "   0.66666667      0.41666667     0.31486896   O \n"
-      "   0.00000000      0.75000000     0.31486896   O \n"
-      "   0.64820229      0.08333333     0.68513104   O \n"
-      "   0.98153562      0.41666667     0.68513104   O \n"
-      "   0.31486896      0.75000000     0.68513104   O \n"
-      "   0.01846438      0.08333333     0.00000000   O \n"
-      "   0.35179771      0.41666667     0.00000000   O \n"
-      "   0.68513104      0.75000000     0.00000000   O \n";
+    xstr_str = string(utd["xstructure"]["poscar_FeO_slab"]);
     xstructure xstr_slab_correct;
     aurostd::StringstreamClean(xstrss);
     xstrss << xstr_str;
@@ -1954,6 +2515,56 @@ namespace unittest {
     calculated_bool = compare::structuresMatch(xstr_slab_correct,xstr_slab_test,true,false,false);
     checkEqual(calculated_bool, expected_bool, check_function, check_description, passed_checks, results);
 
+    // ---------------------------------------------------------------------------
+    // Check | GetStandardPrimitive //CO20230220
+    // ---------------------------------------------------------------------------
+
+    //create xstr_str
+    xstr_str =
+      "O Co Sr\n"
+      "1.00000000000000\n"
+      "  5.4205419737648093    0.0000000000000000    0.0000000000000000\n"
+      "  0.0000000000000000    5.4205419737648093    0.0000000000000000\n"
+      "  0.0000000000000000    0.0000000000000000    7.6623790337915390\n"
+      "O    Co   Sr\n"
+      "12    4    4\n"
+      "Direct\n"
+      "  0.7499997640097504  0.2500002359902496  0.5000000000000000\n"
+      "  0.2500002359902496  0.7499997640097504  0.5000000000000000\n"
+      "  0.2499997640097504  0.7500002359902496  0.0000000000000000\n"
+      "  0.7500002359902496  0.2499997640097504  0.0000000000000000\n"
+      "  0.7499997640097504  0.7499997640097504  0.5000000000000000\n"
+      "  0.2500002359902496  0.2500002359902496  0.5000000000000000\n"
+      "  0.2499997640097504  0.2499997640097504  0.0000000000000000\n"
+      "  0.7500002359902496  0.7500002359902496  0.0000000000000000\n"
+      "  0.5000000000000000  0.5000000000000000  0.7499999723900999\n"
+      "  0.0000000000000000  0.0000000000000000  0.7500000276099001\n"
+      "  0.0000000000000000  0.0000000000000000  0.2499999723900999\n"
+      "  0.5000000000000000  0.5000000000000000  0.2500000276099001\n"
+      "  0.0000000000000000  0.0000000000000000  0.5000000000000000\n"
+      "  0.5000000000000000  0.5000000000000000  0.0000000000000000\n"
+      "  0.5000000000000000  0.5000000000000000  0.5000000000000000\n"
+      "  0.0000000000000000  0.0000000000000000  0.0000000000000000\n"
+      "  0.5000000000000000  0.0000000000000000  0.7500000000000000\n"
+      "  0.0000000000000000  0.5000000000000000  0.7500000000000000\n"
+      "  0.5000000000000000  0.0000000000000000  0.2500000000000000\n"
+      "  0.0000000000000000  0.5000000000000000  0.2500000000000000\n";
+    aurostd::StringstreamClean(xstrss);
+    xstrss << xstr_str;
+    try {
+      xstrss >> xstr_in;          //CO20200404 - this WILL throw an error because det(lattice)<0.0, leave alone
+    } catch (aurostd::xerror& excpt) {} //CO20200404 - this WILL throw an error because det(lattice)<0.0, leave alone
+
+    // ---------------------------------------------------------------------------
+    // test 1: expand cell
+    // create 3x1x1 supercell expansion matrix
+    check_function = "xstructure::GetStandardPrimitive()";
+    check_description = "resolve primitive cell and find Bravais lattice type";
+    xstr_in.GetStandardPrimitive();
+
+    expected_bool = true;
+    calculated_bool = (xstr_in.bravais_lattice_type=="CUB");
+    checkEqual(expected_bool, calculated_bool, check_function, check_description, passed_checks, results);
   }
 
 }
@@ -2272,48 +2883,12 @@ bool smithTest(ofstream& FileMESSAGE,ostream& oss){  //CO20190520
     cerr << __AFLOW_FUNC__ << " S=" << endl;cerr << S1 << endl;
   }
 
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]if(!(
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      U1[1][1]==24 && U1[1][2]==-13 && U1[1][3]==-1 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      U1[2][1]==13 && U1[2][2]==-7  && U1[2][3]==-1 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      U1[3][1]==2  && U1[3][2]==-1  && U1[3][3]==0  &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      TRUE
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]    )
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  ){
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " U1(1) failed of getSmithNormalForm()" << endl;}
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  return FALSE;
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]}
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]if(!(
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      V1[1][1]==0  && V1[1][2]==1  && V1[1][3]==3  &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      V1[2][1]==-1 && V1[2][2]==-1 && V1[2][3]==-1 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      V1[3][1]==1  && V1[3][2]==0  && V1[3][3]==-1 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      TRUE
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]    )
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  ){
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " V1(1) failed of getSmithNormalForm()" << endl;}
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  return FALSE;
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]}
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]if(!(
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      S1[1][1]==1 && S1[1][2]==0 && S1[1][3]==0 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      S1[2][1]==0 && S1[2][2]==1 && S1[2][3]==0 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      S1[3][1]==0 && S1[3][2]==0 && S1[3][3]==1 &&
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]      TRUE
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]    )
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  ){
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " S1(1) failed of getSmithNormalForm()" << endl;}
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]  return FALSE;
-  //[CO20191201 - OBSOLETE: robust check inside getSmithNormalForm()]}
-
   xmatrix<long long int> A2(5,5),U2,V2,S2;  //long long int is CRUCIAL, Matlab actually gets this wrong because it uses long int by default
   A2 = {{ 25,  -300,   1050, -1400,   630},
     {-300,  4800, -18900, 26880, -12600},
     { 1050,-18900, 79380,-117600, 56700},
     {-1400, 26880,-117600,179200,-88200},
     { 630, -12600, 56700,-88200,  44100}};
-  //  A2[1][1]=25;    A2[1][2]=-300;   A2[1][3]=1050;    A2[1][4]=-1400;   A2[1][5]=630;
-  //  A2[2][1]=-300;  A2[2][2]=4800;   A2[2][3]=-18900;  A2[2][4]=26880;   A2[2][5]=-12600;
-  //  A2[3][1]=1050;  A2[3][2]=-18900; A2[3][3]=79380;   A2[3][4]=-117600; A2[3][5]=56700;
-  //  A2[4][1]=-1400; A2[4][2]=26880;  A2[4][3]=-117600; A2[4][4]=179200;  A2[4][5]=-88200;
-  //  A2[5][1]=630;   A2[5][2]=-12600; A2[5][3]=56700;   A2[5][4]=-88200;  A2[5][5]=44100;
 
   aurostd::getSmithNormalForm(A2,U2,V2,S2);
 
@@ -2324,12 +2899,12 @@ bool smithTest(ofstream& FileMESSAGE,ostream& oss){  //CO20190520
     cerr << __AFLOW_FUNC__ << " S=" << endl;cerr << S2 << endl;
   }
 
-  message << "smith test successful";pflow::logger(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
+  message << "smith test successful";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
   return TRUE; //CO20180419
 }
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo - Duke
@@ -21,7 +21,7 @@
 #define AUTHOR_RECENT_ARTICLES  300
 #define AUTHOR_RECENT_YEARS     30
 
-#define MAX_YEAR_PRESENTATIONS  2022
+#define MAX_YEAR_PRESENTATIONS  2023
 
 // ******************************************************************************************************************************************************
 // _OUTREACH CLASS
@@ -164,7 +164,7 @@ uint bibtex2file(string bibtex,string _authors,string _title,string journal,stri
   string authors=_authors;
   vector<string> vfix;
   aurostd::string2tokens("Buongiorno Nardelli,van Roekeghem,Aspuru-Guzik,Hattrick-Simpers,DeCost,de Coss,De Santo,De Gennaro,Al Rahal Al Orabi,de Jong,D'Amico,van der Zwaag,van de Walle,Di Stefano,Ojeda Mota,Simmons Jr.,Mattos Jr.",vfix,",");
-  for(uint i=0;i<vfix.size();i++) aurostd::StringSubst(authors,vfix.at(i),string("{"+vfix.at(i)+"}")); // FIX
+  for(size_t i=0;i<vfix.size();i++) aurostd::StringSubst(authors,vfix[i],string("{"+vfix[i]+"}")); // FIX
   aurostd::StringSubst(authors,".",".~"); 
   aurostd::StringSubst(authors,"~ "," "); 
   aurostd::StringSubst(authors,"~ "," "); 
@@ -191,8 +191,7 @@ uint bibtex2file(string bibtex,string _authors,string _title,string journal,stri
   bibcontent << "% Automatically generated - AFLOW " << AFLOW_VERSION << endl;
 
   // save
-  aurostd::stringstream2file(bibcontent,bibfile); 
-  // exit(0);
+  aurostd::stringstream2file(bibcontent,bibfile);
   return bibcontent.str().size();
 }
 
@@ -209,17 +208,17 @@ ostream& operator<<(ostream& oss,const _outreach& outreach) {
     // generate authors_json
     string authors_json;
     authors_json="[";
-    for(uint iauth=0;iauth<outreach.vauthor.size();iauth++) {
-      authors_json+="\""+outreach.vauthor.at(iauth)+"\"";
+    for(size_t iauth=0;iauth<outreach.vauthor.size();iauth++) {
+      authors_json+="\""+outreach.vauthor[iauth]+"\"";
       if(iauth!=outreach.vauthor.size()-1) authors_json+=",";
     }
     authors_json+="]";
-    
+
     // generate authors_txt
     string authors_txt;
     authors_txt="";
-    for(uint iauth=0;iauth<outreach.vauthor.size();iauth++) {
-        authors_txt+=outreach.vauthor.at(iauth);
+    for(size_t iauth=0;iauth<outreach.vauthor.size();iauth++) {
+        authors_txt+=outreach.vauthor[iauth];
         if(outreach.vauthor.size()==2 && iauth==outreach.vauthor.size()-2) authors_txt+=" and ";
         if(outreach.vauthor.size()!=2 && iauth==outreach.vauthor.size()-2) authors_txt+=", and ";
         if(iauth!=outreach.vauthor.size()-2 && iauth!=outreach.vauthor.size()-1) authors_txt+=", ";
@@ -801,7 +800,7 @@ void voutreach_print(uint _mode,ostream& oss,string what2print) {
         aurostd::string2tokens(XHOST.vflag_control.getattachedscheme("CV::AUTHOR"),vauthor,",");
         if(vauthor.size()==0) {
           message = "No authors specified.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message);
         }
       }
     }
@@ -814,7 +813,7 @@ void voutreach_print(uint _mode,ostream& oss,string what2print) {
         aurostd::string2tokens(XHOST.vflag_control.getattachedscheme("PHP::PUBS_ALLOY"),valloy,",");
         if(valloy.size()==0) {
           message = "valloy.size() == 0";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message);
         }
       }
     }
@@ -823,7 +822,7 @@ void voutreach_print(uint _mode,ostream& oss,string what2print) {
       aurostd::string2tokens(XHOST.vflag_control.getattachedscheme("PHP::PUBS_KEYWORD"),vkeyword,",");
       if(vkeyword.size()==0) {
         message = "No keywords specified.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message);
       }
       for(uint i=0;i<vkeyword.size();i++) if(!XHOST.QUIET_CERR) cerr << "vkeyword.at(" << i << ")=" <<  vkeyword.at(i) << endl;
     }
@@ -1346,7 +1345,7 @@ int voutreach_call=0;
 uint voutreach_load(vector<_outreach>& voutreach,string what2print) {
   // if(!XHOST.QUIET_CERR) cerr << voutreach_call++ << endl;
   // check cache
-  bool LDEBUG=0; 
+  bool LDEBUG=0;
   voutreach.clear();
   vector<string> valabel;
   vector<string> vjlabel;
@@ -1402,7 +1401,7 @@ uint voutreach_load(vector<_outreach>& voutreach,string what2print) {
     iline=vpres.at(i);
 
     if(LDEBUG) cerr << "voutreach_load [2.line]=" << iline << endl;
-       
+
     iline=aurostd::StringSubst(iline," ","");
     if(iline=="OBJECT={") { // found an object
       for(j=i;i<vpres.size();j++) {
@@ -1589,7 +1588,7 @@ void HT_CHECK_GRANTS(ostream& oss) {//,const vector<string>& vitems,string msg1,
   voutreach_load(voutreach,"PUBLICATIONS");
   if(!vflag.flag("GRANTS")) {
     string message = "No grants.";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message);
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message);
   }
   if(!XHOST.QUIET_CERR) cerr << "LOADED " << voutreach.size() << " " << endl;
   string grant=vflag.getattachedscheme("GRANTS");
@@ -1762,6 +1761,6 @@ void center_print(uint mode, ostream& oss) {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

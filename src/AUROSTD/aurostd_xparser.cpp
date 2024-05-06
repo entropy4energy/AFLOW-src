@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *              Aflow COREY OSES - Duke University 2003-2021               *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Corey Oses 2020
@@ -119,7 +119,6 @@ namespace aurostd {
   void elementsFromCompositionString(const string& input,vector<string>& velements){vector<double> vcomposition;return elementsFromCompositionString(input,velements,vcomposition);}  //CO20190712
   template<class utype> void elementsFromCompositionString(const string& input,vector<string>& velements,vector<utype>& vcomposition){ //CO20190712
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "aurostd::getElementsFromCompositionString():";
     velements.clear();
     vcomposition.clear();  //ME20190628
 
@@ -127,7 +126,7 @@ namespace aurostd {
     // START Checks for correct input by counting number of uppercase letters
     //////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " original input=" << input << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " original input=" << input << endl;}
 
     //CO20180409 - running through input twice, no need, simply check at the end
     //uint numberOfElements = 0;
@@ -137,7 +136,7 @@ namespace aurostd {
     //  }
     //}
     //if(numberOfElements == 0) {
-    //  pflow::logger(_AFLOW_FILE_NAME_, soliloquy, "Elements must be properly capitalized", FileMESSAGE, oss, _LOGGER_ERROR_);
+    //  pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Elements must be properly capitalized", FileMESSAGE, oss, _LOGGER_ERROR_);
     //  return velements;
     //}
 
@@ -169,7 +168,7 @@ namespace aurostd {
         //  //  if(auxstr[j]=='_' || auxstr[j]==':' || isdigit(auxstr[j])){auxstr=auxstr.substr(0,j);break;}  //fix aflow stuff like ':'
         //  //}
         //}
-        if(LDEBUG) {cerr << soliloquy << " element found: " << auxstr << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " element found: " << auxstr << endl;}
         velements.push_back(auxstr);
         //ME20190628 - get composition, too
       } else if ( (input[i]>='0' && input[i]<='9') || (input[i] == '.')) {  //CO20190712 - just in case we have H.25 (not good form but try to catch anyway, never produced by aflow automatically)
@@ -178,7 +177,7 @@ namespace aurostd {
         while ((i < input.size()) && ( (input[i]>='0' && input[i]<='9') || (input[i] == '.'))) {auxstr += input[i++];}
         i--;
         if (LDEBUG) {
-          std::cerr << soliloquy << " found element count: " << auxstr << " of element " << (velements.size() - 1) << ".";
+          std::cerr << __AFLOW_FUNC__ << " found element count: " << auxstr << " of element " << (velements.size() - 1) << ".";
           if (vcomposition.size() != velements.size()) {
             std::cerr << " Will add ones to elements " << vcomposition.size() << " to " << (velements.size() - 2) << ".";
           }
@@ -199,9 +198,8 @@ namespace aurostd {
   //no junk at the end (_ICSD_, :LDAU2, :PAW_PBE, .OLD, etc.), pre-process before
   void elementsFromPPString(const string& input,vector<string>& velements,bool keep_pp){ //CO20190712
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "aurostd::getElementsFromPPString():";
     velements=getElements(input);
-    if(LDEBUG){cerr << soliloquy << " velements=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(velements,"\""),",") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " velements=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(velements,"\""),",") << endl;}
     if(keep_pp==false){return;}
 
     //copy info into vspecies and clear velements
@@ -233,7 +231,7 @@ namespace aurostd {
         //[OBSOLETE]if (!( (loc2-2)<input.size() && (input[loc2] == 'W') && (input[loc2-1] == 'G') && (input[loc2-2] == '_') )){break;} //(loc2-2)<input.size() because loc2 is utype, it's always >0, loc2-2 can wrap around to a big number though
         loc2=input.find(vspecies[i],loc2+1);
       }
-      if(LDEBUG){cerr << soliloquy << " loc1=" << loc1 << ", loc2=" << loc2 << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " loc1=" << loc1 << ", loc2=" << loc2 << endl;}
       if(loc2==string::npos){ //CO20210315
         velements.push_back(input.substr(loc1));
         break;
@@ -243,7 +241,7 @@ namespace aurostd {
       }
     }
 
-    if(LDEBUG){cerr << soliloquy << " velements=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(velements,"\""),",") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " velements=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(velements,"\""),",") << endl;}
 
   }
 
@@ -254,21 +252,20 @@ namespace aurostd {
   // returns UNSORTED vector<string> from string
   vector<string> getElements(const string& input){ //CO20190712 //borrowed from XATOM_SplitAlloySpecies() //slow since we create many strings, but definitely works
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "aurostd::getElements():";
-    if(LDEBUG){cerr << soliloquy << " original input=\"" << input << "\"" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " original input=\"" << input << "\"" << endl;}
     string alloy=input;
     //[CO20190712 - no need for multiple passes anymore]for(uint i=1;i<=2;i++){alloy=KBIN::VASP_PseudoPotential_CleanName(alloy);} //be certain you clean everything, especially _GW (worst offender)
     aurostd::VASP_PseudoPotential_CleanName_InPlace(alloy); //be certain you clean everything, especially _GW (worst offender)
     aurostd::RemoveNumbersInPlace(alloy);              // remove composition
-    if(LDEBUG){cerr << soliloquy << " cleaned input=\"" << alloy << "\"" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " cleaned input=\"" << alloy << "\"" << endl;}
     vector<string> vspecies;
     for(uint i=0;i<alloy.length();i++) {
       if(alloy[i]>='A' && alloy[i]<='Z') vspecies.push_back("");
       vspecies.back()+=alloy[i];
     }
-    if(LDEBUG){cerr << soliloquy << " vspecies pre ASCII clean=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(vspecies,"\""),",") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vspecies pre ASCII clean=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(vspecies,"\""),",") << endl;}
     for(uint i=0;i<vspecies.size();i++){aurostd::CleanStringASCII_InPlace(vspecies[i]);}
-    if(LDEBUG){cerr << soliloquy << " vspecies post ASCII clean=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(vspecies,"\""),",") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vspecies post ASCII clean=" << aurostd::joinWDelimiter(aurostd::wrapVecEntries(vspecies,"\""),",") << endl;}
     return vspecies;
   }
   vector<string> getElements(const string& input,elements_string_type e_str_type,bool clean,bool sort_elements,bool keep_pp,ostream& oss) {  // overload
@@ -291,7 +288,6 @@ namespace aurostd {
   }
   template<class utype> vector<string> getElements(const string& _input,vector<utype>& vcomposition,elements_string_type e_str_type,ofstream& FileMESSAGE,bool clean,bool sort_elements,bool keep_pp,ostream& oss) { // main function
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "aurostd::getElements():";
     vector<string> velements;
     vcomposition.clear();  //ME20190628
 
@@ -299,10 +295,10 @@ namespace aurostd {
     // START Checks for correct input by counting number of uppercase letters
     //////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " original input=" << _input << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " original input=" << _input << endl;}
 
     if(_input.empty()) {
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, "Empty input", FileMESSAGE, oss, _LOGGER_ERROR_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Empty input", FileMESSAGE, oss, _LOGGER_ERROR_);
       return velements;
     }
 
@@ -315,10 +311,10 @@ namespace aurostd {
       aurostd::VASP_PseudoPotential_CleanName_InPlace(input,capital_letters_only,remove_floats);
     }
 
-    if(LDEBUG) {cerr << soliloquy << " checking input [1] =" << input << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " checking input [1] =" << input << endl;}
 
     if(!isupper(input[0])) {
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, "Elements must be properly capitalized (input="+input+")", FileMESSAGE, oss, _LOGGER_ERROR_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Elements must be properly capitalized (input="+input+")", FileMESSAGE, oss, _LOGGER_ERROR_);
       return velements;
     }
 
@@ -338,7 +334,7 @@ namespace aurostd {
       //input=tokens[0];
     }
 
-    if(LDEBUG) {cerr << soliloquy << " checking input [2] =" << input << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " checking input [2] =" << input << endl;}
 
     //CO20180409 - running through input twice, no need, simply check at the end
     //uint numberOfElements = 0;
@@ -348,7 +344,7 @@ namespace aurostd {
     //  }
     //}
     //if(numberOfElements == 0) {
-    //  pflow::logger(_AFLOW_FILE_NAME_, soliloquy, "Elements must be properly capitalized", FileMESSAGE, oss, _LOGGER_ERROR_);
+    //  pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Elements must be properly capitalized", FileMESSAGE, oss, _LOGGER_ERROR_);
     //  return velements;
     //}
 
@@ -363,7 +359,7 @@ namespace aurostd {
     if(e_str_type==composition_string){elementsFromCompositionString(input,velements,vcomposition);}
     else if(e_str_type==pp_string){elementsFromPPString(input,velements,keep_pp);}
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown compound designation",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown compound designation",_INPUT_ILLEGAL_);
     }
 
     if(clean){
@@ -377,7 +373,7 @@ namespace aurostd {
     // END Parsing input
     //////////////////////////////////////////////////////////////////////////////
 
-    if(velements.size()==0){pflow::logger(_AFLOW_FILE_NAME_, soliloquy, "No elements found", FileMESSAGE, oss, _LOGGER_ERROR_);}
+    if(velements.size()==0){pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "No elements found", FileMESSAGE, oss, _LOGGER_ERROR_);}
 
     if(sort_elements && velements.size()>1){
       //this is MORE efficient that std::swap which has a copy constructor inside
@@ -792,7 +788,7 @@ namespace aurostd {
         // If we have a nested object, "value" should only be '{' + white space by now.
         if (value[0] == '{') {
           string message = "JSON parser cannot read nested objects.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
         }
         end = value.find_last_of(",");
         value = value.substr(0, end);
@@ -803,18 +799,39 @@ namespace aurostd {
         // If we have a nested object, it should start with '{'
         if (value[0] == '{') {
           string message = "JSON parser cannot read nested objects.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
         }
       }
-    } else {
-      value = "";
     }
     return value;
   }
 
+  //extractJsonVectorAflow/////////////////////////////////////////////////////
+  vector<string> extractJsonVectorAflow(const string& json, string key) { //SD20220504
+    string value = extractJsonValueAflow(json, key);
+    string::size_type start = value.find("["), stop = value.rfind("]");
+    vector<string> vec;
+    aurostd::string2tokens(value.substr(start + 1, stop - 1), vec, ",");
+    return vec;
+  }
+
+  //extractJsonMatrixAflow/////////////////////////////////////////////////////
+  vector<vector<string>> extractJsonMatrixAflow(const string& json, string key) { //SD20220504
+    string value = extractJsonValueAflow(json, key);
+    string::size_type start = value.find("[["), stop = value.rfind("]]");
+    vector<vector<string>> mat;
+    vector<string> vec, tokens;
+    aurostd::string2tokensByDelimiter(value.substr(start + 2, stop - 2), tokens, "],[");
+    for (uint i = 0; i < tokens.size(); i++) {
+      aurostd::string2tokens(tokens[i], vec, ",");
+      mat.push_back(vec);
+    }
+    return mat;
+  }
+
 }
 
-#endif // _AUROSTD_XPARSER_CPP_
+#endif // _AUROSTD_XPARSER_CPP_d
 
 // **************************************************************************
 // *                                                                        *

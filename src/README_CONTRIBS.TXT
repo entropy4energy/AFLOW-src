@@ -20,6 +20,8 @@
 *                                                                                                  *
 *     Use of AFLOW software and repositories welcomes references to the following publications:    *
 *                                                                                                  *
+*  Esters et al.    Comp. Mat. Sci. 216, 111808 (2023) 10.1016/j.commatsci.2022.111808 (AFLOW.org) *
+*  Oses et al.      Comp. Mat. Sci. 217, 111889 (2023) 10.1016/j.commatsci.2022.111889 (aflow++)   *
 *  Friedrich et al. npj Comput. Mater. 5, 59 (2019)  10.1038/s41524-019-0192-1       (CCE)         *
 *  Hicks et al.     Comp. Mat. Sci. 161, S1 (2019)   10.1016/j.commatsci.2018.10.043 (ANRL proto2) *
 *  Oses et al.      J. Chem. Inf. Model. (2018)      10.1021/acs.jcim.8b00393        (AFLOW-CHULL) *
@@ -35,7 +37,7 @@
 *  Toher et al.     Phys. Rev. B 90, 174107 (2014)   10.1103/PhysRevB.90.174107      (AGL Gibbs)   *
 *  Taylor et al.    Comp. Mat. Sci. 93, 178 (2014)   10.1016/j.commatsci.2014.05.014 (REST-API)    *
 *  Curtarolo et al. Comp. Mat. Sci. 58, 227 (2012)   10.1016/j.commatsci.2012.02.002 (AFLOW.org)   *
-*  Curtarolo et al. Comp. Mat. Sci. 58, 218 (2012)   10.1016/j.commatsci.2012.02.005 (AFLOW C++)   *
+*  Curtarolo et al. Comp. Mat. Sci. 58, 218 (2012)   10.1016/j.commatsci.2012.02.005 (aflow++)     *
 *                                                                                                  *
 ****************************************************************************************************
 *                                                                                                  *
@@ -47,11 +49,11 @@
 *  Richard Taylor (surfaces, apennsy); 2010-2013 Junkai Xue (prototyper); 2010-2013 Kesong Yang    *
 *  (findsym, frozsl, plotband/dos); 2013-2019 Cormac Toher (AGL Debye-Gruneisen, AEL elastic);     *
 *  2013-2019 Frisco Rose (API, Aflux); 2013-2018 Pinku Nath (Quasi-harmonic approximation);        *
-*  2013-2017 Jose J. Plata (AAPL, thermal cond.); 2014-2019 David Hicks (symmetry, structure       *
-*  comparison, prototypes); 2014-2019 Corey Oses (Egap, bader, chull, APL, pocc); 2018-2019 Marco  *
-*  Esters (AAPL, thermal cond.); 2016-2019 Denise Ford (GFA); 2018-2019 Rico Friedrich (CCE);      *
-*                                                                                                  *
+*  2013-2017 Jose J. Plata (AAPL, thermal cond.); 2014-2023 David Hicks (symmetry, structure       *
+*  comparison, prototypes); 2014-2022 Corey Oses (Egap, bader, chull, APL, pocc); 2018-2022 Marco  *
+*  Esters (AAPL, thermal cond.); 2016-2019 Denise Ford (GFA); 2018-2020 Rico Friedrich (CCE);      *
+*  2021-2023 Simon Divilov (QCA, fitting); 2021-2023 Hagen Eckert (GFA, entry loader, JSON);       *
 ****************************************************************************************************
-*               version 3.2.2h - g++/gcc 4.2.1 - built [2020-04-13] - (C) 2003-2021                *
+*                                 version 3.2.14 - (C) 2003-2023                                   *
 ****************************************************************************************************
 

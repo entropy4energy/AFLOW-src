@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow DAVID HICKS - Duke University 2014-2021                 *
 // *                                                                         *
 // ***************************************************************************
@@ -556,7 +556,8 @@ class XtalFinderCalculator : public xStream {
 
     // ---------------------------------------------------------------------------
     // helper functions for external use
-    vector<vector<uint> > groupSimilarXstructures(const vector<xstructure>& vxstrs, bool same_species=true, bool scale_volume=true);
+    vector<vector<uint> > groupSimilarXstructures(const vector<xstructure>& vxstrs, aurostd::xoption& comparison_options, bool same_species=true);
+    vector<vector<uint> > groupSimilarXstructures(const vector<xstructure>& vxstrs, bool same_species=true);
 
     // ---------------------------------------------------------------------------
     // write output to file 
@@ -798,7 +799,7 @@ namespace compare{
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow DAVID HICKS - Duke University 2014-2021                 *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo - 2007-2021
@@ -90,7 +90,7 @@ xPOTCAR xPOTCAR_Finder(vector<string>& species_pp_AUID,vector<string>& species_p
       // if(LVERBOSE)
       cerr << XPID << "xPOTCAR::xPOTCAR_Finder: NOT FOUND: TITEL=" << TITEL << " LEXCH=" <<  LEXCH << " EATOM=" <<  EATOM << " RMAX =" <<  RMAX << endl;
       //    cout << XPID << "xPOTCAR::xPOTCAR_Finder: NOT FOUND: TITEL=" << TITEL << " LEXCH=" <<  LEXCH << " EATOM=" <<  EATOM << " RMAX =" <<  RMAX << endl;
-      // throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR::xPOTCAR_Finder():","Throw for debugging purposes.",_GENERIC_ERROR_);
+      // throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR::xPOTCAR_Finder():","Throw for debugging purposes.",_GENERIC_ERROR_);
     }
     species_pp_AUID.push_back("N/A");
   }
@@ -124,7 +124,7 @@ xPOTCAR xPOTCAR_Finder(const string& AUID,bool LVERBOSE) {
       // if(LVERBOSE)
       cerr << XPID << "xPOTCAR::xPOTCAR_Finder: NOT FOUND: AUID=" << AUID << endl;
       //   cout << XPID << "xPOTCAR::xPOTCAR_Finder: NOT FOUND: AUID=" << AUID << endl;
-      //   throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR::xPOTCAR_Finder():","Throw for debugging purposes.",_GENERIC_ERROR_);
+      //   throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR::xPOTCAR_Finder():","Throw for debugging purposes.",_GENERIC_ERROR_);
     }
   }
 
@@ -299,8 +299,8 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   bool VERBOSE=0;//TRUE;
   if(LDEBUG) cerr << XPID << "xPOTCAR_EnthalpyReference_AUID: [BEGIN]" << endl;
   bool found=FALSE;
-  if(LDEBUG) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): AUID=[" << AUID << "]" << endl; // throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
-  if(LDEBUG) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): METAGGA=[" << METAGGA << "]" << endl; // throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
+  if(LDEBUG) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): AUID=[" << AUID << "]" << endl; // throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
+  if(LDEBUG) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): METAGGA=[" << METAGGA << "]" << endl; // throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
 
   bool nKIN=FALSE,SCAN=FALSE;
   if(METAGGA.empty() || METAGGA=="none" || METAGGA=="NONE") {nKIN=TRUE;SCAN=FALSE;}
@@ -1348,9 +1348,9 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   // ./xgo Cl_h:PAW_PBE:08Apr2002 "found=TRUE;groundstate_structure=\"A11\";groundstate_energy=-1.8156;volume_atom=37.3299;spin_atom=0.0;"WAITING
 
   if(!found) { volume_atom=999999,spin_atom=999999;} // some defaults
-  //  if(!found) cerr <<"ERROR (xPOTCAR_EnthalpyReference_AUID): NOT FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
-  if(LDEBUG && !found) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): NOT FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
-  if(LDEBUG &&  found) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
+  //  if(!found) cerr <<"ERROR (xPOTCAR_EnthalpyReference_AUID): NOT FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
+  if(LDEBUG && !found) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): NOT FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
+  if(LDEBUG &&  found) cout <<"ERROR (xPOTCAR_EnthalpyReference_AUID): FOUND: AUID=" << AUID << endl;// throw aurostd::xerror(__AFLOW_FILE__,XPID+"xPOTCAR_EnthalpyReference_AUID():","Throw for debugging purposes.",_GENERIC_ERROR_);
   if(LDEBUG) cerr << XPID << "xPOTCAR_EnthalpyReference_AUID: [END]" << endl;
   return found;
 };
@@ -1361,6 +1361,6 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2022           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Frisco Rose in 2018
@@ -26,7 +26,8 @@ namespace aurostd {
     bytes[1] = (ip >> 8) & 0xFF;
     bytes[2] = (ip >> 16) & 0xFF;
     bytes[3] = (ip >> 24) & 0xFF;
-    std::sprintf(ip_str, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
+    //HE20221102 switching from deprecated sprintf to snprintf (eliminates the chance of buffer overflows)
+    std::snprintf(ip_str, 20, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
     return (std::string) ip_str;
   }
 
@@ -50,11 +51,10 @@ namespace aurostd {
   xURL httpParseURL(const std::string &url, const bool strict) {
 
     bool LDEBUG = (false || XHOST.DEBUG || _DEBUG_XHTTP_);
-    std::string soliloquy = XPID + "aurostd::httpParseResponse():";
 
     if (LDEBUG) {
-      if (strict) cerr << soliloquy << " Parse '" << url << "' strict" << endl;
-      else cerr << soliloquy << " Parse '" << url << "' lenient" << endl;
+      if (strict) cerr << __AFLOW_FUNC__ << " Parse '" << url << "' strict" << endl;
+      else cerr << __AFLOW_FUNC__ << " Parse '" << url << "' lenient" << endl;
     }
 
     xURL result;
@@ -116,7 +116,7 @@ namespace aurostd {
     }
 
     if (LDEBUG) {
-      cerr << soliloquy << " split up URL:" << "\n";
+      cerr << __AFLOW_FUNC__ << " split up URL:" << "\n";
       cerr << "    " << "scheme: " << result.scheme << "\n";
       cerr << "    " << "user: " << result.user << "\n";
       cerr << "    " << "host: " << result.host << "\n";
@@ -171,7 +171,6 @@ namespace aurostd {
   int httpParseResponse(std::string response,
                         std::string &output, std::map <std::string, std::string> &header) {
 
-    string soliloquy = XPID + "aurostd::httpParseResponse():";
     bool LDEBUG = (false || XHOST.DEBUG || _DEBUG_XHTTP_);
     std::string header_raw = "";
     int status_code = -1;
@@ -235,7 +234,7 @@ namespace aurostd {
           full_request_length += chuck_length;
           // sanity check one - every chunk should end with \r\n
           if (response.substr(chuck_length, offset) != delimiter) {
-            if (LDEBUG) cerr << soliloquy << " Chunk did not end in `\\r\\n`." << endl;
+            if (LDEBUG) cerr << __AFLOW_FUNC__ << " Chunk did not end in `\\r\\n`." << endl;
             return -1;
           }
           output += response.substr(0, chuck_length);
@@ -244,7 +243,7 @@ namespace aurostd {
       }
       // sanity check two - the constructed string should have the length reported by the server
       if (full_request_length != output.length()) {
-        if (LDEBUG) cerr << soliloquy << " Final string size is different from the chunk size sum." << endl;
+        if (LDEBUG) cerr << __AFLOW_FUNC__ << " Final string size is different from the chunk size sum." << endl;
         return -1;
       }
       return status_code;
@@ -262,7 +261,6 @@ namespace aurostd {
   string httpPercentEncodingFull(string work_str){
 
     bool LDEBUG = (false || XHOST.DEBUG || _DEBUG_XHTTP_);
-    string soliloquy = XPID + "aurostd::httpPercentEncoding():";
 
     const char *allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                           "abcdefghijklmnopqrstuvwxyz"
@@ -272,7 +270,7 @@ namespace aurostd {
     size_t pos=0;
     int to_replace=0;
     std::stringstream output;
-    if (LDEBUG) cerr << soliloquy << " Escaping '" << work_str << "'" << std::endl;
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Escaping '" << work_str << "'" << std::endl;
 
     while (!work_str.empty()){
       pos = std::strspn(work_str.c_str(), allowed);
@@ -296,7 +294,6 @@ namespace aurostd {
   bool httpGetResponse(const xURL & url, std::string &response) {
 
     bool LDEBUG = (false || XHOST.DEBUG || _DEBUG_XHTTP_);
-    string soliloquy = XPID + "aurostd::httpGetResponse():";
 
     response.clear();
 
@@ -322,21 +319,21 @@ namespace aurostd {
     // get the TCP protocol entry
     protocol_entry = getprotobyname("tcp");
     if (protocol_entry == nullptr) {
-      if (LDEBUG) cerr << soliloquy << " Failed to get TCP protocol entry!" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to get TCP protocol entry!" << endl;
       return false;
     }
 
     // open the socket
     socket_file_descriptor = socket(AF_INET, SOCK_STREAM, protocol_entry->p_proto);
     if (socket_file_descriptor == -1) {
-      if (LDEBUG) cerr << soliloquy << " Failed to open socket!" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to open socket!" << endl;
       return false;
     }
 
     // find the IP of the host
     host_entry = gethostbyname(url.host.c_str());
     if (host_entry == nullptr) {
-      if (LDEBUG) cerr << soliloquy << " Failed to find information on '" << url.host << "'!" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to find information on '" << url.host << "'!" << endl;
       return false;
     }
 
@@ -346,33 +343,33 @@ namespace aurostd {
     socket_entry.sin_addr.s_addr = ip_address;
     socket_entry.sin_family = AF_INET;
     if (url.port > 65535) {
-      if (LDEBUG) cerr << soliloquy << " Failed to connect to " << url.host << " as port is out of range (" << url.port << ">65535)" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to connect to " << url.host << " as port is out of range (" << url.port << ">65535)" << endl;
       return false;
     }
     socket_entry.sin_port = htons((short) url.port);
 
     // start connection
     if (connect(socket_file_descriptor, (struct sockaddr *) &socket_entry, sizeof(socket_entry)) == -1) {
-      if (LDEBUG) cerr << soliloquy << " Failed to connect to " << url.host << " (" << ip_address_str << ":" << url.port << ")" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to connect to " << url.host << " (" << ip_address_str << ":" << url.port << ")" << endl;
       return false;
     }
     if (LDEBUG)
-      cerr << soliloquy << " Connected to " << url.host << " (" << ip_address_str << ":" << url.port << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " Connected to " << url.host << " (" << ip_address_str << ":" << url.port << ")" << endl;
 
     // send the request
     nbytes_total = 0;
     while (nbytes_total < request_len) {
       nbytes_last = write(socket_file_descriptor, request + nbytes_total, request_len - nbytes_total);
       if (nbytes_last == -1) {
-        if (LDEBUG) cerr << soliloquy << " Failed to send the request to " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
+        if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to send the request to " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
         return false;
       }
       nbytes_total += nbytes_last;
     }
-    if (LDEBUG) cerr << soliloquy << " Request written (" << nbytes_total << " bytes)" << endl;
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Request written (" << nbytes_total << " bytes)" << endl;
 
     // read the response
-    if (LDEBUG) cerr << soliloquy << " Start reading response:";
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Start reading response:";
     while ((nbytes_total = read(socket_file_descriptor, buffer, BUFSIZ)) > 0) {
       if (LDEBUG) {
         loaded_bytes += nbytes_total;
@@ -380,10 +377,10 @@ namespace aurostd {
       }
       response += std::string(buffer, nbytes_total);
     }
-    if (LDEBUG) cerr << soliloquy << " Finished reading response (" << loaded_bytes << " bytes)" << endl;
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Finished reading response (" << loaded_bytes << " bytes)" << endl;
 
     if (nbytes_total == -1) {
-      if (LDEBUG) cerr << soliloquy << " Failed to read response from " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to read response from " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
       response.clear();
       return false;
     }
@@ -403,9 +400,8 @@ namespace aurostd {
                std::string &output, int &status_code, std::map <std::string, std::string> &header) {
 
     bool LDEBUG = (false || XHOST.DEBUG || _DEBUG_XHTTP_);
-    string soliloquy = XPID + "aurostd::httpGet():";
 
-    if (LDEBUG) cerr << soliloquy << " GET '" << url.path << "' from " << url.host << endl;
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " GET '" << url.path << "' from " << url.host << endl;
 
     output.clear();
     header.clear();
@@ -422,34 +418,34 @@ namespace aurostd {
       if (success) {
         // parse the response to extract header and status code
         status_code = httpParseResponse(response, output, header);
-        if (LDEBUG) cerr << soliloquy << " Received status code " << status_code << endl;
+        if (LDEBUG) cerr << __AFLOW_FUNC__ << " Received status code " << status_code << endl;
         if (LDEBUG && status_code!=-1) {
-          cerr << soliloquy << " Header content: " << endl;
+          cerr << __AFLOW_FUNC__ << " Header content: " << endl;
           for (std::map<std::string, std::string>::iterator it = header.begin(); it != header.end(); it++)
             cerr << "    " << it->first << ": " << it->second << std::endl;
         }
         if (std::find(std::begin(redirect_codes), std::end(redirect_codes), status_code) != std::end(redirect_codes)) {
           if (header.find("location")!=header.end()) {
             url = httpParseRedirect(url, header["location"]);
-            if (LDEBUG) cerr << soliloquy << " Redirected to '" << header["location"] << "'" << endl;
+            if (LDEBUG) cerr << __AFLOW_FUNC__ << " Redirected to '" << header["location"] << "'" << endl;
           }
           else {
-            if (LDEBUG) cerr << soliloquy << " GET request failed due to a redirect without location." << endl;
+            if (LDEBUG) cerr << __AFLOW_FUNC__ << " GET request failed due to a redirect without location." << endl;
             return;
           }
         }
       } else if (number_of_tries < max_number_of_tries) {
-        if (LDEBUG) cerr << soliloquy << " Retry failed GET in 5s (" << number_of_tries << " of " << max_number_of_tries << ")" << endl;
+        if (LDEBUG) cerr << __AFLOW_FUNC__ << " Retry failed GET in 5s (" << number_of_tries << " of " << max_number_of_tries << ")" << endl;
         aurostd::Sleep(5);
         continue;
       } else {
-        if (LDEBUG) cerr << soliloquy << " GET request failed after " << number_of_tries << " tries." << endl;
+        if (LDEBUG) cerr << __AFLOW_FUNC__ << " GET request failed after " << number_of_tries << " tries." << endl;
         return;
       }
     }
     if (LDEBUG) {
-      if (number_of_tries > 1) cerr << soliloquy << " GET request done after " << number_of_tries << " tries." << endl;
-      else cerr << soliloquy << " GET request done" << endl;
+      if (number_of_tries > 1) cerr << __AFLOW_FUNC__ << " GET request done after " << number_of_tries << " tries." << endl;
+      else cerr << __AFLOW_FUNC__ << " GET request done" << endl;
     }
   }
 

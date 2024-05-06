@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -14,15 +14,14 @@
 // all vector./matrix must be loaded before
 
 void SpaceGroupOptionRequired(uint &spacegroup, uint &option) {
-  string function_name = XPID + "SpaceGroupOptionRequired():";
-  cerr << function_name << " Wyckoff Spacegroup " << spacegroup << " requires option 1 or 2 (" << option << ")" << endl;
+  cerr << __AFLOW_FUNC__ << " Wyckoff Spacegroup " << spacegroup << " requires option 1 or 2 (" << option << ")" << endl;
   if(option==0 || option>3) {
     option=1;
-    cerr << function_name << " Wyckoff Spacegroup " << spacegroup << " taking option=" << option << " (let`s hope it is the right one, check the concentrations and space-group)" << endl;
+    cerr << __AFLOW_FUNC__ << " Wyckoff Spacegroup " << spacegroup << " taking option=" << option << " (let`s hope it is the right one, check the concentrations and space-group)" << endl;
   }
   if(option==3) {
     option=2;
-    cerr << function_name << " Wyckoff Spacegroup " << spacegroup << " taking option=" << option << " (let`s hope it is the right one, check the concentrations and space-group)" << endl;
+    cerr << __AFLOW_FUNC__ << " Wyckoff Spacegroup " << spacegroup << " taking option=" << option << " (let`s hope it is the right one, check the concentrations and space-group)" << endl;
   }
 }
 
@@ -50,7 +49,7 @@ xvector<double> wv(const double &x,const double &y,const double &z) {
 void wa(_atom& a,xstructure &str) {
   a=BringInCell(a,str.lattice);
   a.cpos=F2C(str.lattice,a.fpos);
-  str.AddAtom(a);  
+  str.AddAtom(a,false); //CO20230319 - add by type
 }
 
 // ----------------------------------------------------------------------------
@@ -62,7 +61,7 @@ xstructure WyckoffPOSITIONS(uint spacegroup_in, uint option_in, xstructure strin
   bool LDEBUG=(FALSE || XHOST.DEBUG);
   if (spacegroup_in < 1 || spacegroup_in > 230) {
     string message = "Invalid space group " + aurostd::utype2string<uint>(spacegroup_in);
-    throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message,_VALUE_RANGE_);
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message,_VALUE_RANGE_);
   }
 
   if(LDEBUG) cerr << "WyckoffPOSITIONS [0]" << endl;
@@ -6744,7 +6743,7 @@ xstructure WyckoffPOSITIONS(uint spacegroup_in, uint option_in, xstructure strin
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

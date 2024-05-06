@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // this file contains the routines to run VASP in KBIN
@@ -103,7 +103,7 @@ namespace ALIEN {
     AflowIn="";char c; while (FileAFLOWIN.get(c)) if(c!='\0'){ AflowIn+=c; }               // READ AFLOW.IN and put into AflowIn //DX20190125 - remove null bytes
     FileAFLOWIN.clear();FileAFLOWIN.seekg(0);
     if(!FileAFLOWIN) {                                                                                      // ******* Aflow.in does not exist
-      aus << "EEEEE  " << _AFLOWIN_ << " ABSENT   = " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+      aus << "EEEEE  " << _AFLOWIN_ << " ABSENT   = " << Message(__AFLOW_FILE__,aflags) << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET);
       return FALSE;
     }
@@ -114,7 +114,7 @@ namespace ALIEN {
     // ***************************************************************************
     // Get the KBIN_BIN name
     aurostd::StringstreamClean(aus);
-    aus << "00000  MESSAGE ALIEN::Directory Running KBIN_BIN=\"" << kflags.KBIN_BIN << "\" " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    aus << "00000  MESSAGE ALIEN::Directory Running KBIN_BIN=\"" << kflags.KBIN_BIN << "\" " << Message(__AFLOW_FILE__,aflags) << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     // ***************************************************************************
     Krun=TRUE;  // guess everything is intelligent !
@@ -135,7 +135,7 @@ namespace ALIEN {
       ifstream DirectoryStream;
       DirectoryStream.open(xalien.Directory.c_str(),std::ios::in);
       if(!DirectoryStream) {
-        aus << "XXXXX  MAKING DIRECTORY = " << xalien.Directory << "  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "XXXXX  MAKING DIRECTORY = " << xalien.Directory << "  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
         string str="mkdir "+xalien.Directory;
         system(str.c_str());
@@ -152,7 +152,7 @@ namespace ALIEN {
         // ***************************************************************************
         // RUN
         ALIEN::Write_INPUT(xalien); // ALIEN WRITE INPUT
-        aus << "AAAAA  ALIEN RUN - " <<  xalien.Directory << " - \"" << kflags.KBIN_BIN << "\" - " << Message(_AFLOW_FILE_NAME_) << endl;
+        aus << "AAAAA  ALIEN RUN - " <<  xalien.Directory << " - \"" << kflags.KBIN_BIN << "\" - " << Message(__AFLOW_FILE__) << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
         // single line command
         if(alienflags.KBIN_ALIEN_COMMAND_BINARY_FLAG==TRUE) {
@@ -192,6 +192,6 @@ namespace ALIEN {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

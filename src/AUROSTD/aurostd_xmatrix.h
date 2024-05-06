@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -81,6 +81,14 @@ namespace aurostd {
         void set(const utype&);
         void reset(void);
         void clear(void);
+        //HE20220915 START
+        // xmatrix manipulation without copy (pointer manipulation)
+        void shift(int new_lrows, int new_lcols);
+        void shiftrow(int new_lrows);
+        void shiftcol(int new_lcols);
+        void reshape(uint new_rows, uint new_cols=0);
+        void reshape(int new_urows, int new_ucols, int new_lrows, int new_lcols);
+        //HE20220915 END
       private:
         //  friend bool operator==(const xmatrix<utype>&,const xmatrix<utype>&);
         utype** corpus;
@@ -127,6 +135,12 @@ namespace aurostd {
   //ME20200330 - Multiplication of a real matrix with a complex vector
   template<class utype> xvector<xcomplex<utype> >
     operator*(const xmatrix<utype>&, const xvector<xcomplex<utype> >&) __xprototype;
+
+  template<class utype> xmatrix<utype>                                   // scalar+matrix
+    operator+(const utype,const xmatrix<utype>&) __xprototype;           // scalar+matrix
+
+  template<class utype> xmatrix<utype>                                   // matrix+scalar
+    operator+(const xmatrix<utype>&,const utype) __xprototype;           // matrix+scalar
 
   template<class utype> xmatrix<utype>                                   // scalar*matrix
     operator*(const utype,const xmatrix<utype>&) __xprototype;           // scalar*matrix
@@ -254,64 +268,23 @@ namespace aurostd {
 // ----------------------------------------------------------- xmatrix constrtuction
 namespace aurostd {
   template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&, int, int) __xprototype;  // ME20210505
-
-  template<class utype> xmatrix<utype>
-    reshape(const xmatrix<utype>&, int, int) __xprototype;  // SD20220126
+    reshape(const xvector<utype>& vec, int rows, int cols=0) __xprototype;  // ME20210505
 
   template<class utype> xmatrix<utype>
     reshape(const xvector<utype>&) __xprototype;
 
   template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&,const xvector<utype>&) __xprototype;
+    reshape_cols(const xvector<utype>& vec) __xprototype;
 
   template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
+    reshape_rows(const xvector<utype>& vec) __xprototype;
 
   template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
+    hstack(const vector<xvector<utype>>& vec_list) __xprototype;
 
   template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
+    vstack(const vector<xvector<utype>>& vec_list) __xprototype;
 
-  template<class utype> xmatrix<utype>
-    reshape(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_cols(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
-
-  template<class utype> xmatrix<utype>
-    reshape_rows(const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&,const xvector<utype>&) __xprototype;
 }
 
 // ----------------------------------------------------------- xmatrix example types
@@ -347,7 +320,9 @@ namespace aurostd {
     xmatrix2vectorvector(const xmatrix<utype>& xmat) __xprototype;
 
   template<class utype> xmatrix<utype>
-    vectorvector2xmatrix(const vector<vector<utype> >& xmat) __xprototype;
+    vectorvector2xmatrix(const vector<vector<utype> >&, int lrows=1, int lcols=1) __xprototype;
+  template<class utype> xmatrix<utype>
+    vectorvector2xmatrix(const vector<vector<string> >&, int lrows=1, int lcols=1) __xprototype;
 
   template<class utype> xmatrix<double> 
     xmatrixutype2double(const xmatrix<utype>& a); //CO20191201
@@ -402,6 +377,20 @@ namespace aurostd {
   template<class utype> bool
     isNonInvertible(const xmatrix<utype>&, xmatrix<utype>&) __xprototype; // RETURN ERROR if non invertible
 
+  template<class utype> xmatrix<utype>
+    inverseByQR(const xmatrix<utype>&) __xprototype;  //SD20220426
+
+  template<class utype> void
+    LUPDecomposition(const xmatrix<utype>& A, xmatrix<double>& LU, xmatrix<double>& P, utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_) __xprototype; //SD20220426  //CO20230313 - utype clang warnings
+  template<class utype> void
+    LUPDecomposition(const xmatrix<utype>& A, xmatrix<double>& L, xmatrix<double>& U, xmatrix<double>& P, utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_) __xprototype; //SD20220426 //CO20230313 - utype clang warnings
+
+  template<class utype> xmatrix<utype>
+    inverseByLUP(const xmatrix<utype>&) __xprototype;  //SD20220426
+
+  template<class utype> utype
+    condition_number(const xmatrix<utype>&) __xprototype; //SD20220425
+
   template<class utype> xmatrix<utype>                  // clear values too small
     roundoff(const xmatrix<utype>&,utype) __xprototype; // claar values too small
 
@@ -450,6 +439,9 @@ namespace aurostd {
     trace(const xmatrix<utype>&) __xprototype;    //DX20180115 - double to utype
 
   template<class utype> xmatrix<utype>
+    HadamardProduct(const xmatrix<utype>&, const xmatrix<utype>&) __xprototype;  //SD20220422
+
+  template<class utype> xmatrix<utype>
     KroneckerProduct(const xmatrix<utype>&, const xmatrix<utype>&) __xprototype;  //ME20180614
 
   template<class utype> xmatrix<utype>
@@ -473,16 +465,7 @@ namespace aurostd {
   template<class utype> void                                           // swap_rows
     swap_rows(xmatrix<utype>&,const int&,const int&) __xprototype;    // swap_rows
 
-  template<class utype> void  // function shift lrows so first index is i
-    shiftlrows(xmatrix<utype>& a,int i); //CO20191201
-
-  template<class utype> void  // function shift lcols so first index is i
-    shiftlcols(xmatrix<utype>& a,int i); //CO20191201
-
-  template<class utype> void  // function shift lrows and lcols so first index is i, j
-    shiftlrowscols(xmatrix<utype>& a,int i,int j); //CO20191201
-
-  template<class utype> xmatrix<utype>
+    template<class utype> xmatrix<utype>
     identity(const xmatrix<utype>&) __xprototype;
 
   // template<class utype> xmatrix<utype>
@@ -593,6 +576,9 @@ namespace aurostd {
   template<class utype> xmatrix<utype>
     atanh(const xmatrix<utype>&) __xprototype;   // MISSING
 
+  template<class utype>
+    xvector<utype> LinearLeastSquares(const xmatrix<utype>&, const xvector<utype>&) __xprototype; //SD20220426
+
   template<class utype>                          // 25 april 2007
     void GaussJordan(xmatrix<utype>&, xmatrix<utype>&) __xprototype;
 
@@ -641,6 +627,9 @@ namespace aurostd {
         xmatrix<utype>& rotation,
         xmatrix<utype>& deformation,
         bool check_orthogonal_rotation=true); __xprototype;
+
+  template<class utype> void equilibrateMatrix(const xmatrix<utype>& A_orig, xmatrix<utype>& A, xmatrix<utype>& R, xmatrix<utype>& C, uint niter=100, utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); __xprototype; //SD20220425  //CO20230313 - utype clang warnings
+
 }
 
 namespace aurostd {
@@ -680,17 +669,17 @@ namespace aurostd {
   // but since you have just done an N3 procedure to get the eigenvalues, you can afford yourself
   // this little indulgence.
   template<class utype> 
-    void QRDecomposition_HouseHolder(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110
+    void QRDecomposition_HouseHolder(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110 //CO20230313 - utype clang warnings
   template<class utype> 
-    void QRDecomposition_HouseHolder_MW(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110
+    void QRDecomposition_HouseHolder_MW(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110  //CO20230313 - utype clang warnings
   template<class utype> 
-    void QRDecomposition_HouseHolder_TB(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110
+    void QRDecomposition_HouseHolder_TB(const xmatrix<utype>& mat,xmatrix<utype>& Q,xmatrix<utype>& R,utype tol=(utype)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO20191110  //CO20230313 - utype clang warnings
   // general Householder, mat is mxn, m>=n
   // See Numerical Linear Algebra, Trefethen and Bau, pg. 73
   template<class utype> 
     void getEHermite(utype a,utype b,xmatrix<utype>& ehermite); //CO+YL20191201
   template<class utype> 
-    void getSmithNormalForm(const xmatrix<utype>& A,xmatrix<utype>& U,xmatrix<utype>& V,xmatrix<utype>& S,double tol=_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO+YL20191201
+    void getSmithNormalForm(const xmatrix<utype>& A,xmatrix<utype>& U,xmatrix<utype>& V,xmatrix<utype>& S,double tol=(double)_AUROSTD_XMATRIX_TOLERANCE_IDENTITY_); //CO+YL20191201 //CO20230313 - utype clang warnings
   template<class utype>
     void tred2(const xmatrix<utype> &a,xvector<utype> &d,xvector<utype> &e) __xprototype;
   // Householder reduction of a real, symmetric matrix a[1..n][1..n].
@@ -859,7 +848,7 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

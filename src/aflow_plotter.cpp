@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************
@@ -123,9 +123,8 @@ namespace plotter {
   // Sets the plot options that are specific to electronic structure plots.
   xoption getPlotOptionsEStructure(const aurostd::xoption& xopt, const string& key, bool datasets) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::getPlotOptionsEStructure():";
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     xoption plotoptions = getPlotOptions(xopt, key, datasets);
 
@@ -136,7 +135,7 @@ namespace plotter {
     } else {
       plotoptions.push_attached("PROJECTION", aurostd::toupper(scheme));
     }
-    if(LDEBUG){cerr << soliloquy << " projection=" << plotoptions.getattachedscheme("PROJECTION") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " projection=" << plotoptions.getattachedscheme("PROJECTION") << endl;}
 
     // No border
     plotoptions.flag("NOBORDER", true);
@@ -230,7 +229,6 @@ namespace plotter {
   // Executes the gnuplot script and converts into the desired image format.
   void savePlotGNUPLOT(const xoption& plotoptions, const stringstream& gpfile) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::savePlotGNUPLOT():";
     //ME20200327 - Check that all required binaries are available
     // Check that gnuplot is version 5+
     if (XHOST.is_command("gnuplot")) {
@@ -240,7 +238,7 @@ namespace plotter {
       double version = aurostd::string2utype<double>(tokens[1]);
       if (version < 5.0) {
         string message = "Gnuplot needs to be version 5 or newer (found " + tokens[1] + ").";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
     }
     // ME20200609
@@ -273,9 +271,9 @@ namespace plotter {
     if (missing_binaries.size() == 0) {
       string directory_work = plotoptions.getattachedscheme("DIRECTORY");
       if(directory_work.empty()){directory_work=aurostd::getPWD();}  //[CO20191112 - OBSOLETE]aurostd::execute2string("pwd")//CO20191004
-      if(LDEBUG) {cerr << soliloquy << " directory_work=" << directory_work << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " directory_work=" << directory_work << endl;}
       string filename = plotoptions.getattachedscheme("FILE_NAME");
-      if(LDEBUG){cerr << soliloquy << " filename=" << filename << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " filename=" << filename << endl;}
       string filename_latex = plotoptions.getattachedscheme("FILE_NAME_LATEX");
       // PDF is default since we use pdflatex to compile
       string format = plotoptions.getattachedscheme("IMAGE_FORMAT");
@@ -288,52 +286,52 @@ namespace plotter {
       string command="",output="";
       aurostd::stringstream2file(gpfile, filename + ".plt");
       command=XHOST.command("gnuplot") + " \"" + filename + ".plt\"";
-      if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
       aurostd::execute(command);
-      if(LDEBUG) cerr << soliloquy << " directory_tmp = " << directory_tmp << endl;
-      if(LDEBUG) cerr << soliloquy << aurostd::execute("ls -las "+directory_tmp) << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " directory_tmp = " << directory_tmp << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << aurostd::execute("ls -las "+directory_tmp) << endl;
       // ME20200609 - old pdfatex versions cannot process eps files
       if (pdflatex_version >= 2010) {
         command=XHOST.command("pdflatex") + " -interaction=nonstopmode -halt-on-error \"" + filename_latex + ".tex\" 2>&1 > /dev/null";
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         aurostd::execute(command);
       } else {
         command=XHOST.command("latex") + " -interaction=nonstopmode -halt-on-error \"" + filename_latex + ".tex\" 2>&1 > /dev/null";
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         aurostd::execute(command);
         command=XHOST.command("dvips") + " " + filename_latex + ".dvi  > /dev/null 2>&1";
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         aurostd::execute(command);
         command=XHOST.command("ps2pdf") + " " + filename_latex + ".ps";
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         aurostd::execute(command);
       }
       // Convert to the desired format if not pdf
       if (format != "pdf") {
         command=XHOST.command("convert") + " -quiet -density 300 -background white \"" + filename_latex + ".pdf\" convert_output." + format + " 1>/dev/null 2>&1";   // to avoid C: ... Carbon:PBE = C: in window //CO20210701 - io redirection
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         output=aurostd::execute2string(command);
         if(0){  //CO20210701 - does not work because of primitive execute2string functionality, will be fixed with upcoming version
           //start here for a patch:
           //https://www.itechlounge.net/2020/09/web-imagickexception-attempt-to-perform-an-operation-not-allowed-by-the-security-policy-pdf/
           if(output.find("not allowed by the security policy")!=string::npos){
             string message="The ImageMagick policy file disables ghostscript formats. Please see here and update the policy file: https://bugs.archlinux.org/task/60580";
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
           }
         }
         if(!aurostd::FileExist("convert_output." + format)){
           string message="The ImageMagick policy file disables ghostscript formats. Please see here and update the policy file: https://bugs.archlinux.org/task/60580";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
-        if(LDEBUG) cerr << soliloquy << aurostd::execute("ls -las "+directory_tmp) << endl;
+        if(LDEBUG) cerr << __AFLOW_FUNC__ << aurostd::execute("ls -las "+directory_tmp) << endl;
         command="mv convert_output." + format + " \"" + filename_latex  + "." + format + "\"";
-        if(LDEBUG){cerr << soliloquy << " executing command: \"" << command << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " executing command: \"" << command << "\"" << endl;}
         aurostd::execute(command);
-        if(LDEBUG) cerr << soliloquy << aurostd::execute("ls -las "+directory_tmp) << endl;
+        if(LDEBUG) cerr << __AFLOW_FUNC__ << aurostd::execute("ls -las "+directory_tmp) << endl;
       }
       chdir(current_dir.c_str());
       aurostd::CopyFile(directory_tmp + filename_latex + "." + format,directory_work + "/" + filename + "." + format);
-      if(LDEBUG) {cerr << soliloquy << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
       // Keep gnuplot file if aflow was called with --keep=gpl
       if (XHOST.vflag_control.flag("KEEP::GPL")) {
         aurostd::CopyFile(directory_tmp + filename + ".plt", directory_work);
@@ -341,11 +339,11 @@ namespace plotter {
       // Clean up
       aurostd::RemoveDirectory(directory_tmp);
       if (!aurostd::FileExist(directory_work + "/" + filename + "." + format)) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Error while generating plot.", _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Error while generating plot.", _RUNTIME_ERROR_);
       }
     } else {
       string message = "The following binaries are missing: " + aurostd::joinWDelimiter(missing_binaries, " ") + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
   }
 
@@ -353,12 +351,11 @@ namespace plotter {
   // [OBSOLETE] // Executes the gnuplot script and converts into the desired image format.
   // [OBSOLETE] void savePlotGNUPLOT_OLD(const xoption& plotoptions, const stringstream& gpfile) {
   // [OBSOLETE]   bool LDEBUG=(FALSE || XHOST.DEBUG); 
-  // [OBSOLETE]   string soliloquy = XPID + "plotter::savePlotGNUPLOT():";
   // [OBSOLETE]   string directory_work = plotoptions.getattachedscheme("DIRECTORY");
   // [OBSOLETE]   if(directory_work.empty()){directory_work=aurostd::getPWD();}  //[CO20191112 - OBSOLETE]aurostd::execute2string("pwd")//CO20191004
-  // [OBSOLETE]   if(LDEBUG) {cerr << soliloquy << " directory_work=" << directory_work << endl;}
+  // [OBSOLETE]   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " directory_work=" << directory_work << endl;}
   // [OBSOLETE]   string filename = plotoptions.getattachedscheme("FILE_NAME");
-  // [OBSOLETE]   if(LDEBUG) {cerr << soliloquy << " filename=" << filename << endl;}
+  // [OBSOLETE]   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " filename=" << filename << endl;}
   // [OBSOLETE]   string filename_latex = plotoptions.getattachedscheme("FILE_NAME_LATEX");
   // [OBSOLETE]   // PDF is default since we use pdflatex to compile
   // [OBSOLETE]   string format = plotoptions.getattachedscheme("IMAGE_FORMAT");
@@ -377,7 +374,7 @@ namespace plotter {
   // [OBSOLETE]   }
   // [OBSOLETE]   chdir(current_dir.c_str());
   // [OBSOLETE]   aurostd::CopyFile(directory_tmp + filename_latex + "." + format,directory_work + "/" + filename + "." + format);
-  // [OBSOLETE]   if(LDEBUG) {cerr << soliloquy << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
+  // [OBSOLETE]   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
   // [OBSOLETE]   // Keep gnuplot file if aflow was called with --keep=gpl
   // [OBSOLETE]   if (XHOST.vflag_control.flag("KEEP::GPL")) {
   // [OBSOLETE]    aurostd::CopyFile(directory_tmp + filename + ".plt", directory_work);
@@ -387,7 +384,7 @@ namespace plotter {
   // [OBSOLETE]   if (!aurostd::FileExist(directory_work + "/" + filename + "." + format)) {
   // [OBSOLETE]      string function = "plotter::savePlotGNUPLOT():";
   // [OBSOLETE]      string message = "Error while generating plot.";
-  // [OBSOLETE]     throw aurostd::xerror(_AFLOW_FILE_NAME_,function, message, _RUNTIME_ERROR_);
+  // [OBSOLETE]     throw aurostd::xerror(__AFLOW_FILE__,function, message, _RUNTIME_ERROR_);
   // [OBSOLETE]   }
   // [OBSOLETE] }
 
@@ -397,18 +394,17 @@ namespace plotter {
   // than the output image.
   void setFileName(xoption& plotoptions, string filename) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::setFileName():";
-    if(LDEBUG){cerr << soliloquy << " filename_in=" << filename << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " filename_in=" << filename << endl;}
     if (filename.empty()) {
       filename = plotoptions.getattachedscheme("FILE_NAME_USER");  //ME20200313 - user-defined output file
       if (filename.empty()) {
         string default_title = plotoptions.getattachedscheme("DEFAULT_TITLE");
-        if(LDEBUG){cerr << soliloquy << " default_title=" << default_title << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " default_title=" << default_title << endl;}
         //ME20200228 - Remove ANRL parameters
         string::size_type t = default_title.find(":ANRL=");
         if (t != string::npos) {
           default_title = default_title.substr(0, t);
-          if(LDEBUG){std::cerr << soliloquy << " default_title (post ANRL)=" << default_title << std::endl;}
+          if(LDEBUG){std::cerr << __AFLOW_FUNC__ << " default_title (post ANRL)=" << default_title << std::endl;}
         }
         filename = default_title;
         // Get filename
@@ -433,8 +429,8 @@ namespace plotter {
     aurostd::StringSubst(filename_latex, ":", "_"); //ME20200409 - Some terminals do not handle : well, which can break convert
     plotoptions.push_attached("FILE_NAME_LATEX", filename_latex);
     if(LDEBUG){
-      cerr << soliloquy << " filename=" << plotoptions.getattachedscheme("FILE_NAME") << endl;
-      cerr << soliloquy << " filename_latex=" << plotoptions.getattachedscheme("FILE_NAME_LATEX") << endl;
+      cerr << __AFLOW_FUNC__ << " filename=" << plotoptions.getattachedscheme("FILE_NAME") << endl;
+      cerr << __AFLOW_FUNC__ << " filename_latex=" << plotoptions.getattachedscheme("FILE_NAME_LATEX") << endl;
     }
   }
 
@@ -454,9 +450,8 @@ namespace plotter {
   string formatDefaultPlotTitle(const xoption& plotoptions,ostream& oss) {ofstream FileMESSAGE;return formatDefaultPlotTitle(plotoptions,FileMESSAGE,oss);} //CO20200404
   string formatDefaultPlotTitle(const xoption& plotoptions,ofstream& FileMESSAGE,ostream& oss) { //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::formatDefaultPlotTitle():";
     string default_title = plotoptions.getattachedscheme("DEFAULT_TITLE");
-    if(LDEBUG) {cerr << soliloquy << " default_title=" << default_title << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " default_title=" << default_title << endl;}
     if (default_title.empty()) return default_title;
     string title="";
     if (default_title.find("_ICSD_")!=string::npos) {  // Check if AFLOW ICSD format
@@ -471,7 +466,7 @@ namespace plotter {
         return aurostd::fixStringLatex(default_title, false, false);
       }
     } else if (aurostd::substring2bool(default_title, TAG_TITLE_POCC)) {  // Check if in POCC format
-      if(LDEBUG){cerr << soliloquy << " found POCC" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " found POCC" << endl;}
       title = formatDefaultTitlePOCC(plotoptions,FileMESSAGE,oss); //CO20200404
     } else if (aurostd::substring2bool(default_title, ".")) {  // Check if AFLOW prototype format
       vector<string> tokens;
@@ -489,17 +484,17 @@ namespace plotter {
       comp_str=comp_str.substr(0,loc);
       if ((tokens.size() == 2) || (tokens.size() == 3)) {
         string proto = tokens[1];
-        if(LDEBUG){cerr << soliloquy << " proto=" << proto << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " proto=" << proto << endl;}
         vector<string> protos;
         aflowlib::GetAllPrototypeLabels(protos, "anrl");
         if (aurostd::WithinList(protos, proto)) {
-          if(LDEBUG){cerr << soliloquy << " found proto in ANRL" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " found proto in ANRL" << endl;}
           if (tokens.size() == 3) proto += "." + tokens[2];
           vector<string> elements = aurostd::getElements(comp_str);
           vector<double> composition = getCompositionFromANRLPrototype(proto);
           if(LDEBUG){
-            cerr << soliloquy << " elements=" << aurostd::joinWDelimiter(elements,",") << endl;
-            cerr << soliloquy << " composition=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(composition,5),",") << endl;
+            cerr << __AFLOW_FUNC__ << " elements=" << aurostd::joinWDelimiter(elements,",") << endl;
+            cerr << __AFLOW_FUNC__ << " composition=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(composition,5),",") << endl;
           }
           proto = aurostd::fixStringLatex(proto, false, false); // Prevent LaTeX errors
           title = pflow::prettyPrintCompound(elements, composition, no_vrt, true, latex_ft) + " (" + proto;  //_none_ //_latex_ //CO20190629
@@ -508,14 +503,14 @@ namespace plotter {
           vector<string> comp;
           protos.clear();
           aflowlib::GetAllPrototypeLabels(protos, comp, "htqc");
-          int index;
+          int index = 0;
           if (aurostd::WithinList(protos, proto, index)) {
             proto = aurostd::fixStringLatex(proto, false, false); // Prevent LaTeX errors
             vector<string> elements = aurostd::getElements(comp_str);
             vector<double> composition = getCompositionFromHTQCPrototype(proto, comp[index]);
             if(LDEBUG){
-              cerr << soliloquy << " elements=" << aurostd::joinWDelimiter(elements,",") << endl;
-              cerr << soliloquy << " composition=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(composition,5),",") << endl;
+              cerr << __AFLOW_FUNC__ << " elements=" << aurostd::joinWDelimiter(elements,",") << endl;
+              cerr << __AFLOW_FUNC__ << " composition=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(composition,5),",") << endl;
             }
             //DX+ME20210729 - the code below is wrapped in a try-catch block because there are unary prototypes in LIB2 (e.g., /common/LIB2/LIB/LaMn_pv/117)
             // in these instances, we will return the default title
@@ -534,7 +529,7 @@ namespace plotter {
     } else {  // Not an AFLOW-formatted default
       return aurostd::fixStringLatex(default_title, false, false);
     }
-    if(LDEBUG) {cerr << soliloquy << " title=" << title << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " title=" << title << endl;}
     // Code only gets here if the title is AFLOW-formatted
     string set = plotoptions.getattachedscheme("DATASET");
     if (aurostd::string2utype<int>(set) > 0) {
@@ -599,10 +594,9 @@ namespace plotter {
   string formatDefaultTitlePOCC_20191004(const xoption& plotoptions,ostream& oss) {ofstream FileMESSAGE;return formatDefaultTitlePOCC_20191004(plotoptions,FileMESSAGE,oss);}  //CO version //CO20191110  //CO20200404
   string formatDefaultTitlePOCC_20191004(const xoption& plotoptions,ofstream& FileMESSAGE,ostream& oss) {  //CO version //CO20191110  //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::formatDefaultTitlePOCC():";
     stringstream message;
     string default_title = plotoptions.getattachedscheme("DEFAULT_TITLE");
-    if(LDEBUG) {cerr << soliloquy << " default_title=" << default_title << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " default_title=" << default_title << endl;}
 
     aurostd::xoption pocc_settings;
     xstructure xstr;
@@ -621,7 +615,7 @@ namespace plotter {
     int comp_prec=(int)ceil(log10(1.0/xstr.partial_occupation_stoich_tol));  //ceil ensures we round up above 1 //CO20181226
     for(uint ispecies=0;ispecies<xstr.species.size();ispecies++){
       clean_specie=KBIN::VASP_PseudoPotential_CleanName(xstr.species[ispecies]);
-      if(LDEBUG) {cerr << soliloquy << " species[ispecies=" << ispecies << "]=" << clean_specie << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species[ispecies=" << ispecies << "]=" << clean_specie << endl;}
       new_title+=aurostd::fixStringLatex(clean_specie,false,false);
       new_title+=(aurostd::isequal(xstr.comp_each_type[ispecies],1.0,xstr.partial_occupation_stoich_tol) ? "" : "$_{"+aurostd::utype2string(xstr.comp_each_type[ispecies],comp_prec)+"}$");
     }
@@ -649,13 +643,12 @@ namespace plotter {
 
     new_title+=")";
 
-    if(LDEBUG) {cerr << soliloquy << " new_title=" << new_title << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " new_title=" << new_title << endl;}
 
     return new_title; //aurostd::fixStringLatex(new_title, false, false);  //substs $ for \\$
   }
   string formatDefaultTitlePOCC_20190101(const xoption& plotoptions) {  //ME version
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::formatDefaultTitlePOCC():";
     string default_title = plotoptions.getattachedscheme("DEFAULT_TITLE");
     //Get all the pieces of the default title
     string::size_type t = default_title.find(":POCC");
@@ -668,7 +661,7 @@ namespace plotter {
     bool generic = false;
     // Need _S because S could theoretically also be a decorator
     if (aurostd::substring2bool(pocc, "_S")) generic = true;
-    if(LDEBUG) {cerr << soliloquy << " found _S tag = " << generic << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " found _S tag = " << generic << endl;}
     pocc = pocc.substr(1, pocc.size());  // Remove the leading _
 
     // Get the HNF matrix string
@@ -678,7 +671,7 @@ namespace plotter {
       t = pocc.find(":");
       hnf = pocc.substr(t + 1, string::npos);
       pocc = pocc.substr(0, t);  // Remove ARUN from pocc
-      if(LDEBUG) {cerr << soliloquy << " hnf=" << hnf << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " hnf=" << hnf << endl;}
       if (!hnf.empty()) {
         aurostd::string2tokens(hnf, tokens, "_");
         hnf = tokens.back();
@@ -692,9 +685,9 @@ namespace plotter {
     bool broken = false;
     vector<double> composition = getCompositionFromPoccString(pocc, broken);
     if(LDEBUG){  //CO20191110
-      cerr << soliloquy << " broken=" << broken << endl;
+      cerr << __AFLOW_FUNC__ << " broken=" << broken << endl;
       if(!broken){
-        cerr << soliloquy << " composition=";
+        cerr << __AFLOW_FUNC__ << " composition=";
         for(uint i=0;i<composition.size();i++){
           cerr << composition[i] << (i==composition.size()-1?"":",");
         }
@@ -708,8 +701,8 @@ namespace plotter {
         string directory = plotoptions.getattachedscheme("DIRECTORY");
         string extension = plotoptions.getattachedscheme("EXTENSION");
         if(LDEBUG){
-          cerr << soliloquy << " directory=" << directory << endl;
-          cerr << soliloquy << " extension=" << extension << endl;
+          cerr << __AFLOW_FUNC__ << " directory=" << directory << endl;
+          cerr << __AFLOW_FUNC__ << " extension=" << extension << endl;
         }
         if (aurostd::substring2bool(extension, "phdisp") || (extension == "phdos")) {
           aurostd::efile2vectorstring("PHPOSCAR", vstr);
@@ -893,12 +886,11 @@ namespace plotter {
   void PLOT_DOS(xoption& plotoptions, stringstream& out,ostream& oss) {ofstream FileMESSAGE;return PLOT_DOS(plotoptions,out,FileMESSAGE,oss);} //CO20191110 //CO20200404
   void PLOT_DOS(xoption& plotoptions, stringstream& out,ofstream& FileMESSAGE,ostream& oss) { //CO20191110  //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::PLOT_DOS():";
 
     // Read files
     string directory = plotoptions.getattachedscheme("DIRECTORY");
     xDOSCAR xdos;
-    if(LDEBUG) {cerr << soliloquy << " directory=" << directory << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " directory=" << directory << endl;}
     //CO20210701 - adding support for POCC
     //check if POCC directory
     vector<string> vfiles,vpocc_doscars;
@@ -910,8 +902,8 @@ namespace plotter {
     if(vpocc_doscars.size()>0){
       std::sort(vpocc_doscars.begin(),vpocc_doscars.end());
       string pscheme=plotoptions.getattachedscheme("PROJECTION");
-      if(LDEBUG){cerr << soliloquy << " pscheme=" << pscheme << endl;}
-      if(pscheme.empty()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No projection scheme provided",_INPUT_MISSING_);}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " pscheme=" << pscheme << endl;}
+      if(pscheme.empty()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No projection scheme provided",_INPUT_MISSING_);}
       double temperature=0.0;
       _aflags aflags;aflags.Directory=directory;
       bool see_sub_output=false;//true;
@@ -930,7 +922,7 @@ namespace plotter {
         vector<double> v_temperatures;
         pcalc.loadDataIntoCalculator();pcalc.setTemperatureStringParameters(v_temperatures); //needed for DOSCAR plots
         pocc::getTemperatureStringParameters(v_temperatures,temperature_precision,temperatures_int,zero_padding_temperature);
-        if(pcalc.m_ARUN_directories.size()==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No ARUN.POCC_* runs found",_FILE_CORRUPT_);}
+        if(pcalc.m_ARUN_directories.size()==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No ARUN.POCC_* runs found",_FILE_CORRUPT_);}
         plotoptions.push_attached("ARUN_DIRECTORY",pcalc.m_ARUN_directories[0]);
       }else{
         pocc::getTemperatureStringParameters(temperature_precision,temperatures_int,zero_padding_temperature);
@@ -938,12 +930,12 @@ namespace plotter {
         //maybe someone is trying to plot in a directory only having aflow.in and DOSCAR's (but no ARUN's). 
         //we need the ARUNs if we want to do projection==species, but not if projection==orbital
         if(pscheme=="SPECIES"){ //we need ARUN_DIRECTORY
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Need ARUN.POCC_* runs for projection==\"species\"",_INPUT_MISSING_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Need ARUN.POCC_* runs for projection==\"species\"",_INPUT_MISSING_);
         }
       }
-      if(LDEBUG){cerr << soliloquy << " found POCC directory" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " found POCC directory" << endl;}
       for(i=0;i<vpocc_doscars.size();i++){
-        if(LDEBUG){cerr << soliloquy << " looking at POCC DOSCAR: " << vpocc_doscars[i] << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking at POCC DOSCAR: " << vpocc_doscars[i] << endl;}
         xdos.GetPropertiesFile(vpocc_doscars[i]);
         temperature=pocc::poccDOSCAR2temperature(vpocc_doscars[i]);
         plotoptions.push_attached("NORMALIZATION","ATOM");  //CO20211124
@@ -961,24 +953,22 @@ namespace plotter {
 
   void patchDefaultTitleAFLOWIN(xoption& plotoptions) { //CO20191110
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::patchDefaultTitleAFLOWIN():"; //CO20200404
 
     const string& directory = plotoptions.getattachedscheme("DIRECTORY");
     if (!aurostd::FileExist(directory + "/" + _AFLOWIN_)) return;  //ME20200922
-    if(LDEBUG) {cerr << soliloquy << " directory=" << directory << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " directory=" << directory << endl;}
     string SYSTEM=KBIN::ExtractSystemName(directory); //CO20200731
     if(!SYSTEM.empty()){
-      if(LDEBUG) {cerr << soliloquy << " DEFAULT_TITLE(OLD)=" << plotoptions.getattachedscheme("DEFAULT_TITLE") << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DEFAULT_TITLE(OLD)=" << plotoptions.getattachedscheme("DEFAULT_TITLE") << endl;}
       plotoptions.pop_attached("DEFAULT_TITLE");
       plotoptions.push_attached("DEFAULT_TITLE", SYSTEM);
-      if(LDEBUG) {cerr << soliloquy << " DEFAULT_TITLE(NEW)=" << plotoptions.getattachedscheme("DEFAULT_TITLE") << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DEFAULT_TITLE(NEW)=" << plotoptions.getattachedscheme("DEFAULT_TITLE") << endl;}
     }
   }
 
   void PLOT_DOS(xoption& plotoptions, stringstream& out, const xDOSCAR& xdos,ostream& oss) {ofstream FileMESSAGE;return PLOT_DOS(plotoptions,out,xdos,FileMESSAGE,oss);}  //CO20200404
   void PLOT_DOS(xoption& plotoptions, stringstream& out, const xDOSCAR& xdos,ofstream& FileMESSAGE,ostream& oss) {  //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy=XPID+"plotter::PLOT_DOS():";
     string extension=plotoptions.getattachedscheme("EXTENSION");
     if(extension.empty()) plotoptions.push_attached("EXTENSION", "dos");
     // Make sure the projections are consistent with the DOSCAR file
@@ -1002,7 +992,7 @@ namespace plotter {
       plotoptions.push_attached("EFERMI", "0.0");
     }
 
-    if(LDEBUG) {cerr << soliloquy << " EFERMI set" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EFERMI set" << endl;}
 
     // Set Emin and Emax
     setEMinMax(plotoptions, xdos.energy_min, xdos.energy_max);
@@ -1236,9 +1226,8 @@ namespace plotter {
   xstructure getStructureWithNames(const xoption& plotoptions,const string& carstring,ostream& oss) {ofstream FileMESSAGE;return getStructureWithNames(plotoptions,FileMESSAGE,carstring,oss);} //CO20200404
   xstructure getStructureWithNames(const xoption& plotoptions,ofstream& FileMESSAGE,const string& carstring,ostream& oss) { //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG);
-    string soliloquy="plotter::getStructureWithNames():";
     string directory = plotoptions.getattachedscheme("DIRECTORY");
-    if(LDEBUG){cerr << soliloquy << " directory(input)=" << directory << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " directory(input)=" << directory << endl;}
     string poscar_file = "POSCAR"; //CO20200404
     std::stringstream poscar;
     //if (plotoptions.getattachedscheme("EXTENSION") == "phdos")
@@ -1251,15 +1240,15 @@ namespace plotter {
         //[do NOT load in PARTCAR, we need an example ARUN POSCAR, they all have the same num_each_type]aurostd::efile2stringstream(directory+"/PARTCAR", poscar);
         string arun="";
         arun = plotoptions.getattachedscheme("ARUN_DIRECTORY");  //relative path
-        if(LDEBUG){cerr << soliloquy << " grabbing POSCAR from " << arun << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " grabbing POSCAR from " << arun << endl;}
         directory+="/"+arun;
         aurostd::StringSubst(directory,"/RAW/","/LIB/");  //read POSCAR from LIB, not RAW (may not have been processed yet)
       }
-      if(LDEBUG){cerr << soliloquy << " directory(POSCAR)=" << directory << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " directory(POSCAR)=" << directory << endl;}
       aflowlib::vaspfile2stringstream(directory + "", poscar_file, poscar);  //CO20200404
     }
 
-    if(LDEBUG){cerr << soliloquy << " poscar=" << endl << poscar.str() << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " poscar=" << endl << poscar.str() << endl;}
     xstructure xstr(poscar);
     if (xstr.is_vasp4_poscar_format) {  //PARTCAR has species and it is NOT vasp4 format  //CO20191110
       // No special case for phonons needed because PHPOSCAR is always in VASP5 format
@@ -1270,9 +1259,9 @@ namespace plotter {
       }
       if(not_all_names_given){ //CO20200404
         stringstream message;
-        message << "Species CANNOT be extracted from dir=" << directory << ", no labels can be supplied";pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, FileMESSAGE, oss, _LOGGER_WARNING_);  //CO20200404
+        message << "Species CANNOT be extracted from dir=" << directory << ", no labels can be supplied";pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_WARNING_);  //CO20200404
       }else{ //CO20200404
-        if(LDEBUG){cerr << soliloquy << " patching names of POSCAR with: " << aurostd::joinWDelimiter(atom_names,", ") << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " patching names of POSCAR with: " << aurostd::joinWDelimiter(atom_names,", ") << endl;}
         //CO20200404 - ALWAYS use AddAtom() for changing atom properties, indices of species/species_pp/etc will be a mess otherwise
         deque<_atom> atoms=xstr.atoms;
         for(uint i=0;i<atoms.size(); i++) {
@@ -1282,7 +1271,7 @@ namespace plotter {
         xstr.ReplaceAtoms(atoms); //CO20200404 - patches species too, CRITICAL
       }
     }
-    if(LDEBUG){cerr << soliloquy << " final xstr=" << endl;cerr << xstr << endl;}  //CO20200404
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " final xstr=" << endl;cerr << xstr << endl;}  //CO20200404
     return xstr;
   }
 
@@ -1788,7 +1777,6 @@ namespace plotter {
   void generateDosPlot(stringstream& out,const xDOSCAR& xdos,xoption& plotoptions,ostream& oss) {ofstream FileMESSAGE;return generateDosPlot(out,xdos,plotoptions,FileMESSAGE,oss);} //CO20200404
   void generateDosPlot(stringstream& out,const xDOSCAR& xdos,xoption& plotoptions,ofstream& FileMESSAGE,ostream& oss) {  //CO20200404
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::generateDosPlot():";
     deque<deque<deque<double> > > dos;
     string dataset=plotoptions.getattachedscheme("DATASET");
     int pdos = aurostd::string2utype<int>(dataset);
@@ -1798,10 +1786,10 @@ namespace plotter {
     string projection = plotoptions.getattachedscheme("PROJECTION");
     string datatype=plotoptions.getattachedscheme("DATATYPE");  //CO20191010 - which table to look at, "atoms-projected" by default
     if(LDEBUG){
-      cerr << soliloquy << " dataset=" << dataset << endl;
-      cerr << soliloquy << " pdos=" << pdos << endl;
-      cerr << soliloquy << " projection=" << projection << endl;
-      cerr << soliloquy << " datatype=" << datatype << endl;
+      cerr << __AFLOW_FUNC__ << " dataset=" << dataset << endl;
+      cerr << __AFLOW_FUNC__ << " pdos=" << pdos << endl;
+      cerr << __AFLOW_FUNC__ << " projection=" << projection << endl;
+      cerr << __AFLOW_FUNC__ << " datatype=" << datatype << endl;
     }
     if (projection == "ORBITALS") {
       // If the DOSCAR is lm-resolved, the orbital projection is the sum of all individual
@@ -1812,18 +1800,18 @@ namespace plotter {
         deque<deque<deque<deque<double> > > > vDOS_species=xdos.GetVDOSSpecies(xstr);
         if (!dosDataAvailable(vDOS_species, pdos)) {
           string message = "DOS data not available for pdos = " + aurostd::utype2string<int>(pdos);
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
         norbitals=vDOS_species.front().size();
         dos=vDOS_species[pdos];
       }else{  //CO20191010 - plot "atoms-projected"
         if (!dosDataAvailable(xdos.vDOS, pdos)) {
           string message = "DOS data not available for pdos = " + aurostd::utype2string<int>(pdos);
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
         if (xdos.lmResolved){norbitals = (int) std::sqrt(xdos.vDOS[pdos].size());}  // size is either 17 or 10
         else{norbitals = (int) xdos.vDOS[pdos].size() - 1;}
-        if(LDEBUG){cerr << soliloquy << " norbitals=" << norbitals << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " norbitals=" << norbitals << endl;}
         if (xdos.lmResolved) {
           // Total DOS and s-orbitals
           dos.push_back(xdos.vDOS[pdos][0]);
@@ -1844,7 +1832,7 @@ namespace plotter {
           dos = xdos.vDOS[pdos];
         }
       }
-      if(LDEBUG) {cerr << soliloquy << " norbitals=" << norbitals << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " norbitals=" << norbitals << endl;}
       //CO20191010 - do labels last
       for (int i = 0; i < norbitals; i++) {
         labels.push_back("$" + ORBITALS[i] + "$");
@@ -1853,11 +1841,11 @@ namespace plotter {
       // Safety check
       if (!xdos.lmResolved) {
         string message = "Projection scheme LM chosen, but DOSCAR is not lm-resolved.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       if (!dosDataAvailable(xdos.vDOS, pdos)) {
         string message = "DOS data not available for pdos = " + aurostd::utype2string<int>(pdos);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       for (uint i = 1; i < xdos.vDOS[pdos].size(); i++) {
         labels.push_back("$" + LM_ORBITALS_LATEX[i-1] + "$");
@@ -1866,7 +1854,7 @@ namespace plotter {
     } else if (projection == "ATOMS") { //CO20191004 - "ATOMS" is really "IATOMS"
       if (!dosDataAvailable(xdos.vDOS, 0)) {
         string message = "Total DOS not available";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       dos.push_back(xdos.vDOS[0][0]);
       xstructure xstr = getStructureWithNames(plotoptions,FileMESSAGE,xdos.carstring,oss);  //CO20200404
@@ -1875,7 +1863,7 @@ namespace plotter {
           for (uint i = 0; i < xstr.atoms.size(); i++) {
             if (!dosDataAvailable(xdos.vDOS, i + 1)) {
               string message = "DOS data not available for atom " + aurostd::utype2string<uint>(i + 1);
-              throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+              throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
             }
             dos.push_back(xdos.vDOS[i + 1][0]);
             xstr.atoms[i].CleanName();
@@ -1891,7 +1879,7 @@ namespace plotter {
               iat = xstr.iatoms[i][0];
               if (!dosDataAvailable(xdos.vDOS, iat + 1)) {
                 string message = "DOS data not available for iatom " + aurostd::utype2string<int>(iat + 1);
-                throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+                throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
               }
               dos.push_back(xdos.vDOS[iat + 1][0]);
               xstr.atoms[iat].CleanName();
@@ -1901,7 +1889,7 @@ namespace plotter {
         } else { // In case someone uses pdos option and projection=atoms
           if (!dosDataAvailable(xdos.vDOS, pdos)) {
             string message = "DOS data not available for pdos = " + aurostd::utype2string<int>(pdos);
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
           }
           xstr.atoms[pdos - 1].CleanName();
           labels.push_back(xstr.atoms[pdos - 1].cleanname + "(" + aurostd::utype2string<int>(pdos) + ")");
@@ -1910,7 +1898,7 @@ namespace plotter {
       }
     } else if (projection == "SPECIES") {  //CO20191110
       xstructure xstr = getStructureWithNames(plotoptions,FileMESSAGE,xdos.carstring,oss);  //CO20200404
-      if(LDEBUG){cerr << soliloquy << " xstr=" << endl;cerr << xstr << endl;}  //CO20200404
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xstr=" << endl;cerr << xstr << endl;}  //CO20200404
       deque<deque<deque<deque<double> > > > vDOS_species=xdos.GetVDOSSpecies(xstr);
       if (pdos == 0) {
         dos.push_back(vDOS_species[0][0]);
@@ -1918,7 +1906,7 @@ namespace plotter {
           for (uint i = 0; i < xstr.species.size(); i++) {
             if (!dosDataAvailable(vDOS_species, i + 1)) {
               string message = "DOS data not available for species " + aurostd::utype2string<uint>(i + 1);
-              throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+              throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
             }
             dos.push_back(vDOS_species[i+1][0]);
             labels.push_back(xstr.species[i]);
@@ -1931,19 +1919,19 @@ namespace plotter {
         int dos_index = xstr.atoms[pdos - 1].type + 1;
         if (!dosDataAvailable(vDOS_species, dos_index)) {
           string message = "DOS data not available for dos_index = " + aurostd::utype2string<int>(dos_index);
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
         dos.push_back(vDOS_species[dos_index][0]);//AS20201028
       }
     } else if (projection == "NONE") {  // Total DOS only without projections
       if (!dosDataAvailable(xdos.vDOS, 0)) {
         string message = "Total DOS not available";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       dos.push_back(xdos.vDOS[0][0]);
     } else {
       string message = "Unknown projection scheme " + projection + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
     }
     if(plotoptions.flag("LEGEND_HORIZONTAL")==false && labels.size()>4){  //CO20211227, avoid overlap between legend and DOS
       plotoptions.flag("LEGEND_HORIZONTAL",true);
@@ -1970,7 +1958,7 @@ namespace plotter {
     // Make sure that the number of k-points is consistent with EIGENVAL
     if (xeigen.number_kpoints != nsegments * xkpts.path_grid) {
       string message = "Number of k-points in EIGENVAL and KPOINTS files do not match.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     // Labels
@@ -2085,7 +2073,6 @@ namespace plotter {
       const deque<deque<deque<double> > >& dos, const vector<string>& labels,
       const xoption& plotoptions) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::generateDosPlotGNUPLOT():";
     // Initialize variables
     double Efermi = aurostd::string2utype<double>(plotoptions.getattachedscheme("EFERMI"));
     double Emin = aurostd::string2utype<double>(plotoptions.getattachedscheme("XMIN"));
@@ -2097,8 +2084,8 @@ namespace plotter {
     double dosmax = getDosLimits(plotoptions, xdos, dos, energies);
 
     if(LDEBUG){
-      cerr << soliloquy << " dosmax=" << dosmax << endl;
-      cerr << soliloquy << " xdos.spin=" << xdos.spin << endl;
+      cerr << __AFLOW_FUNC__ << " dosmax=" << dosmax << endl;
+      cerr << __AFLOW_FUNC__ << " xdos.spin=" << xdos.spin << endl;
     }
 
     if(aurostd::isequal(dosmax,0.0)){dosmax=1.0;} //CO+ME20210729 - issues with LIB0 pDOS plots, might need to rerun with NEDOS=5000, EMIN=-45, EMAX=30
@@ -2219,7 +2206,7 @@ namespace plotter {
       }
     }
 
-    if(LDEBUG){cerr << soliloquy << " gnuplot file:" << endl << out.str() << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " gnuplot file:" << endl << out.str() << endl;}
   }
 
   //getDosLimits//////////////////////////////////////////////////////////////
@@ -2231,7 +2218,6 @@ namespace plotter {
   double getDosLimits(const xoption& plotoptions, const xDOSCAR& xdos,
       const deque<deque<deque<double> > >& dos, const deque<double>& energies) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::getDosLimits():";
 
     double Emin = aurostd::string2utype<double>(plotoptions.getattachedscheme("XMIN"));
     double Emax = aurostd::string2utype<double>(plotoptions.getattachedscheme("XMAX"));
@@ -2239,8 +2225,8 @@ namespace plotter {
     uint ndos = dos.size(); //orbital
 
     if(LDEBUG){
-      cerr << soliloquy << " Emin=" << Emin << endl;
-      cerr << soliloquy << " Emax=" << Emax << endl;
+      cerr << __AFLOW_FUNC__ << " Emin=" << Emin << endl;
+      cerr << __AFLOW_FUNC__ << " Emax=" << Emax << endl;
     }
 
     double dosmax = 0.0;
@@ -2265,11 +2251,11 @@ namespace plotter {
       }
     }
 
-    if(LDEBUG) {cerr << soliloquy << " dosmax(FOUND)=" << dosmax << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " dosmax(FOUND)=" << dosmax << endl;}
 
     if (!dosscale.empty()) dosmax *= aurostd::string2utype<double>(dosscale);
 
-    if(LDEBUG) {cerr << soliloquy << " dosmax(SCALED)=" << dosmax << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " dosmax(SCALED)=" << dosmax << endl;}
 
     // l = order of magnitude
     // x = scalar multiple
@@ -2278,14 +2264,14 @@ namespace plotter {
     int x = (int) ceil(dosmax/std::pow(10.0, l));
 
     if(LDEBUG){
-      cerr << soliloquy << " l=" << l << endl;
-      cerr << soliloquy << " x=" << x << endl;
+      cerr << __AFLOW_FUNC__ << " l=" << l << endl;
+      cerr << __AFLOW_FUNC__ << " x=" << x << endl;
     }
 
     //CO20191110 - add 30% for every orbital bigger than d to account for larger key
     if(0){  //CO20200404 - TOO much padding for LIB6 species-projection dos, better not to include any ad hoc fixes for general plotting
       if(ndos>4){x+=3*(ndos-4);}
-      if(LDEBUG){cerr << soliloquy << " x(new1)=" << x << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " x(new1)=" << x << endl;}
     }
 
     //[CO20191110 OBSOLETE]if ((xdos.spin == 1) || (l > 1) || (l < -1) || (2 * x % 4 == 0)) {
@@ -2304,11 +2290,11 @@ namespace plotter {
     //  * The maximum (l) is smaller than 1, in which case they all have decimal points.
     //  * The number is divisible by 4.
     if (!((xdos.spin == 1) || (l > 1) || (l < -1) || (2 * x % 4 == 0))) {x++;}
-    if(LDEBUG) {cerr << soliloquy << " x(new2)=" << x << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " x(new2)=" << x << endl;}
 
     dosmax = x * std::pow(10.0, l); 
 
-    if(LDEBUG){cerr << soliloquy << " dosmax=" << dosmax << endl;} //CO20200404
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " dosmax=" << dosmax << endl;} //CO20200404
 
     return dosmax;
   }
@@ -2319,7 +2305,6 @@ namespace plotter {
       const vector<double>& xvals, const vector<double>& ticvals,
       const vector<string>& ticlabels, const xoption& plotoptions) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::generateBandPlotGNUPLOT():";
 
     // Initialize variables
     double Efermi = aurostd::string2utype<double>(plotoptions.getattachedscheme("EFERMI"));
@@ -2328,8 +2313,8 @@ namespace plotter {
     bool banddos = plotoptions.flag("BANDDOS");
 
     if(LDEBUG){
-      cerr << soliloquy << " Emin=" << Emin << endl;
-      cerr << soliloquy << " Emax=" << Emax << endl;
+      cerr << __AFLOW_FUNC__ << " Emin=" << Emin << endl;
+      cerr << __AFLOW_FUNC__ << " Emax=" << Emax << endl;
     }
 
     string unit = plotoptions.getattachedscheme("UNIT");
@@ -2733,7 +2718,7 @@ namespace plotter {
       }
     } else {
       string message = "Could not find file " + thermo_file + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
   }
 
@@ -2769,7 +2754,7 @@ namespace plotter {
         eos_model != "BM4" && eos_model != "M"){
       msg = "Wrong name of the EOS model was specified. ";
       msg += "Only SJ, BM2, BM3, BM4 or M labels are allowed.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, msg, _INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, msg, _INPUT_ILLEGAL_);
     }
     string keyword = "QHA_" + eos_model + "_THERMO";
 
@@ -2799,7 +2784,7 @@ namespace plotter {
       }
     } else {
       msg = "Could not find file " + thermo_file + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, msg, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, msg, _FILE_NOT_FOUND_);
     }
   }
   //AS20200909 END
@@ -2907,7 +2892,7 @@ namespace plotter {
       plotMatrix(plotoptions, out,FileMESSAGE,oss);  //CO20200404
     } else {
       string message = "Could not find file " + tcond_file + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
   }
 
@@ -3039,13 +3024,13 @@ namespace plotter {
       if (vcontent[iline] == stopstring) break;
       if (iline == nlines) {
         message = "Wrong file format. No STOP tag found.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
       }
     }
     if (data.size() == 0) {
       message = "No data extracted from file " + path_to_file + ".";
       message += "File is either empty or has the wrong format.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_WRONG_FORMAT_);
     }
     return data;
   }
@@ -3055,7 +3040,6 @@ namespace plotter {
   void generatePlotGNUPLOT(stringstream& out, const xoption& plotoptions,
       const vector<vector<double> >& data) {
     bool LDEBUG=(FALSE || _DEBUG_PLOTTER_ || XHOST.DEBUG); 
-    string soliloquy=XPID+"plotter::generatePlotGNUPLOT():";
     uint ndata = data[0].size() - 1;
 
     // Axes settings
@@ -3071,8 +3055,8 @@ namespace plotter {
     if (!yunit.empty()) yunit = " (" + yunit + ")";
 
     if(LDEBUG){
-      cerr << soliloquy << " ymin=" << ymin << endl;
-      cerr << soliloquy << " ymax=" << ymax << endl;
+      cerr << __AFLOW_FUNC__ << " ymin=" << ymin << endl;
+      cerr << __AFLOW_FUNC__ << " ymax=" << ymax << endl;
     }
 
     // Plot types: lines (default), linespoints, or points only (nolines)
@@ -3164,7 +3148,7 @@ namespace plotter {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -62,6 +62,10 @@ namespace aurostd {
         void clear(void);
         void null(void);  //CO20200731 - to create null vector
         void resize(int=3,int nl=1); //CO20201111
+        //HE20220915 START
+        // xvector manipulation without copy (pointer manipulation)
+        void shift(int new_lrows);
+        //HE20220915 END
       private:
         utype *corpus;
         // bool isfloat,iscomplex;
@@ -176,14 +180,20 @@ namespace aurostd {
   template<class utype> xvector<utype>
     operator<<(const utype,const xvector<utype>&) __xprototype;
 
-  template<class utype> utype                        
+  template<class utype> utype
     operator*(const xvector<utype>&,const xvector<utype>&) __xprototype;
 
-  template<class utype> utype                        
+  template<class utype> utype
     scalar_product(const xvector<utype>&,const xvector<utype>&) __xprototype;
 
-  template<class utype> xvector<utype>                
+  template<class utype> xvector<utype>
     vector_product(const xvector<utype>&,const xvector<utype>&) __xprototype;
+
+  template<class utype> xvector<utype>                
+    elementwise_product(const xvector<utype>&,const xvector<utype>&) __xprototype; //SD20220422
+
+  template<class utype> utype
+    elements_product(const xvector<utype>&) __xprototype; //SD20220617
 
   //ME20200327
   template<class utype> xmatrix<utype>
@@ -208,10 +218,19 @@ namespace aurostd {
     identical(const xvector<utype>&,const xvector<utype>&,const utype&) __xprototype;
 
   template<class utype> bool
+    identical(const xvector<xcomplex<utype>>&,const xvector<xcomplex<utype>>&,const utype&) __xprototype;
+
+  template<class utype> bool
     identical(const xvector<utype>&, utype tol=(utype)_AUROSTD_XVECTOR_TOLERANCE_IDENTITY_) __xprototype; //DX20210503
 
   template<class utype> bool
+    identical(const xvector<xcomplex<utype>>&, utype tol=(utype)_AUROSTD_XVECTOR_TOLERANCE_IDENTITY_) __xprototype; //DX20210503
+
+  template<class utype> bool
     identical(const xvector<utype>&,const xvector<utype>&) __xprototype;
+
+  template<class utype> bool
+    identical(const xvector<xcomplex<utype>>&,const xvector<xcomplex<utype>>&) __xprototype;
 
   template<class utype> bool
     operator==(const xvector<utype>&,const xvector<utype>&) __xprototype;
@@ -229,32 +248,17 @@ namespace aurostd {
     isequal(const xvector<utype>&,const xvector<utype>&) __xprototype;
 
   template<class utype> bool
+    isequal(const xvector<xcomplex<utype>>&,const xvector<xcomplex<utype>>&) __xprototype;
+
+  template<class utype> bool
     operator!=(const xvector<utype>&,const xvector<utype>&) __xprototype;
 
   template<class utype> bool
     isinteger(const xvector<utype>&,const utype& tol=(utype)0.01) __xprototype; //CO20180409
 
   template<class utype> bool
-    iszero(const xvector<utype>&, double tol=_AUROSTD_XVECTOR_TOLERANCE_IDENTITY_) __xprototype;  //ME20180702 //CO20191201 - 1e-7 seems arbitrary
-  // CONSTRUCTIONS OF VECTORS FROM SCALARS
+    iszero(const xvector<utype>&, double tol=(double)_AUROSTD_XVECTOR_TOLERANCE_IDENTITY_) __xprototype;  //ME20180702 //CO20191201 - 1e-7 seems arbitrary  //CO20230313 - utype clang warnings
 
-  template<class utype> xvector<utype>
-    reshape(const utype&) __xprototype;
-
-  template<class utype> xvector<utype>
-    reshape(const utype&,const utype&) __xprototype;
-
-  template<class utype> xvector<utype>
-    reshape(const utype&,const utype&,const utype&) __xprototype;
-
-  template<class utype> xvector<utype>
-    reshape(const utype&,const utype&,const utype&,const utype&) __xprototype;
-
-  template<class utype> xvector<utype>
-    reshape(const utype&,const utype&,const utype&,const utype&,const utype&) __xprototype;
-
-  template<class utype> xvector<utype>
-    reshape(const utype&,const utype&,const utype&,const utype&,const utype&,const utype&) __xprototype;
 }
 
 // ----------------------------------------------------------- xvector example types
@@ -263,8 +267,9 @@ namespace aurostd {
   template<class utype> xvector<utype> null_xv() __xprototype;  //CO20200731 - friend so it can access refresh()
   template<class utype> xvector<utype> ones_xv(int=3,int=1) __xprototype;
   template<class utype> xvector<utype> box_filter_xv(int window,int lrows=1) __xprototype;
-  template<class utype> xvector<utype> gaussian_filter_xv(utype sigma) __xprototype;  //if you need lrows!=1, use shiftlrows()
-  template<class utype> xvector<utype> gaussian_filter_xv(utype sigma,int window,int lrows=1) __xprototype;
+  template<class utype> int gaussian_filter_get_window(utype sigma) __xprototype;  //CO20220627
+  template<class utype> xvector<utype> gaussian_filter_xv(utype sigma) __xprototype;  //if you need lrows!=1, use shift()
+  template<class utype> xvector<utype> gaussian_filter_xv(utype sigma,int window,int lrows=1) __xprototype; //CO20190419
 }
 
 namespace aurostd {
@@ -298,6 +303,12 @@ namespace aurostd {
   template<class utype> xvector<float>
     xfloat(const xvector<utype>&) __xprototype;
 
+  template<class utype> xvector<utype>
+    pow(const xvector<utype>&,const utype d) __xprototype;  //SD20220324
+
+  template<class utype> xvector<utype>
+    pow(const xvector<utype>&,const xvector<utype>&) __xprototype;  //SD20220324
+
   template<class utype> xvector<long int>
     xlongint(const xvector<utype>&) __xprototype;
 
@@ -315,8 +326,11 @@ namespace aurostd {
   template<class utype> xvector<utype>
     vector2xvector(const vector<string>&,int lrows=1) __xprototype; //CO20180409
 
-  xvector<double> xvectorint2double(const xvector<int>&); //CO20180515
-  xvector<int> xvectordouble2int(const xvector<double>&,bool check_int=true); //CO20180515
+  //[SD20220512 - OBSOLETE]xvector<double> xvectorint2double(const xvector<int>&); //CO20180515
+  //[SD20220512 - OBSOLETE]xvector<int> xvectordouble2int(const xvector<double>&,bool check_int=true); //CO20180515
+
+  template<class utype1,class utype2> xvector<utype2>
+    xvector2utype(const xvector<utype1>& a) __xprototype; //SD20220512
 
   // OPERATIONS ON XVECTORS
 
@@ -411,9 +425,6 @@ namespace aurostd {
   template<class utype> void                                   // swap
     swap(xvector<utype>&,const int&,const int&) __xprototype;  // swap
 
-  template<class utype> void                              //shift lrows so first index is i //CO20180409
-    shiftlrows(xvector<utype>&,const int&) __xprototype;  //shift lrows so first index is i //CO20180409
-
   // Complex operations
   template<class utype> xvector<utype>
     conj(const xvector<utype>&) __xprototype;
@@ -444,6 +455,7 @@ namespace aurostd {
 
   template<class utype> xvector<utype>
     asin(const xvector<utype>&) __xprototype;
+  
 
   template<class utype> xvector<utype>
     acos(const xvector<utype>&) __xprototype;
@@ -555,6 +567,10 @@ namespace aurostd {
   template<class utype> xvector<utype> getVectorProjection(const xvector<utype>& b, const xvector<utype>& a);  //ME20200511
   template<class utype> xvector<utype> getModeratedVectorProjection(const xvector<utype> c, const xvector<utype>& b, const xvector<utype>& a);  //ME20200511
 
+  // grid generation
+  xvector<double> linspace(const double start, const double stop, const int n);
+  xvector<double> linspace(const double start, const double stop, const double n);
+
   // SIMPLE SORT ROUTINES
   template<class utype> void // WRAP TO SHELL SHORT
     sort(xvector<utype>& a) __xprototype;
@@ -642,6 +658,11 @@ namespace aurostd { //CO20190620
   //signal processing
   template<class utype> vector<int> getPeaks(const xvector<utype>& signal_input,uint smoothing_iterations=4,uint avg_window=4,int width_maximum=1,double significance_multiplier=1.0);  //CO20190620
   template<class utype> vector<int> getPeaks(const xvector<utype>& signal_input,xvector<utype>& signal_smooth,uint smoothing_iterations=4,uint avg_window=4,int width_maximum=1,double significance_multiplier=1.0);  //CO20190620
+
+  template<class utype> vector<xvector<double>> histogram(const xvector<utype>& data, uint bins, double minimum_data, double maximum_data);
+  template<class utype> vector<xvector<double>> histogram(const xvector<utype>& data, uint bins); //AZ20230204
+  template<class utype> vector<xvector<double>> histogram(const xvector<utype>& data, uint max_bins, uint bin_mode); //AZ20230204
+														     
 }
 
 namespace aurostd {
@@ -656,7 +677,7 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

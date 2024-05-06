@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo 
@@ -273,6 +273,9 @@ namespace aflowlib {
       vector<uint> vNsgroup;                            // vNsgroups
       vector<string> vsgroup;                           // vsgroups
       vector<xstructure> vstr;                          // vstructures
+      // details from EntryLoader //HE20220913
+      string el_source_type;
+      string el_source;
       // functions
       bool FixDescription(void);                        // fix description names
       void GetSGROUP(string aflowlibentry);             // disassemble SG
@@ -294,10 +297,12 @@ namespace aflowlib {
       void correctBadDatabase(ofstream& FileMESSAGE,bool verbose=true,ostream& oss=cout);   //CO20171202 - apennsy fixes
       bool ignoreBadDatabase() const;                                                       //CO20171202 - apennsy fixes
       bool ignoreBadDatabase(string& reason) const;                                         //CO20171202 - apennsy fixes
-      string getPathAURL(ostream& oss=cout, bool load_from_common=false);                   // converts entry.aurl to url/path (common)
-      string getPathAURL(ofstream& FileMESSAGE, ostream& oss, bool load_from_common=false); // converts entry.aurl to url/path (common)
-      vector<string> getSpeciesAURL(ostream& oss);                                          //CO20210201 - extracts species from aurl
-      vector<string> getSpeciesAURL(ofstream& FileMESSAGE,ostream& oss);                    //CO20210201 - extracts species from aurl
+      string getPathAURL(ostream& oss=cout, bool load_from_common=false) const;                   // converts entry.aurl to url/path (common)
+      string getPathAURL(ofstream& FileMESSAGE, ostream& oss, bool load_from_common=false) const; // converts entry.aurl to url/path (common)
+      string getPathDirectory(const string& filesystem_collection="LIB");                         //SD20221207
+      vector<string> getSpecies() const;                                                          //CO20221110 - extracts species from restapi
+      vector<string> getSpeciesAURL(ostream& oss) const;                                          //CO20210201 - extracts species from aurl
+      vector<string> getSpeciesAURL(ofstream& FileMESSAGE,ostream& oss) const;                    //CO20210201 - extracts species from aurl
       //ML stoich features
       void getStoichFeatures(vector<string>& vheaders,const string& e_props=_AFLOW_XELEMENT_PROPERTIES_ALL_);
       void getStoichFeatures(vector<string>& vheaders,vector<double>& vfeatures,bool vheaders_only=false,const string& e_props=_AFLOW_XELEMENT_PROPERTIES_ALL_);
@@ -314,6 +319,41 @@ namespace aflowlib {
   string auid2directory(const string auid);                                // gives AUID directory from existence of vauid
   void insertStoichStats(const vector<string> vstats,const xvector<double>& nspecies_xv,const xvector<double>& stoich_xv,vector<double>& vfeatures);  //CO20201111
 }
+
+// ***************************************************************************
+// XPLUG/XUPDATE STUFF
+namespace aflowlib {  //CO20210302
+  class ARun: public xStream {  //CO20210302
+    private:
+      //NECESSARY PUBLIC CLASS METHODS - START
+      //constructors - START
+      ARun(const string& dir,ostream& oss=cout);
+      ARun(const string& dir,ofstream& FileMESSAGE, ostream& oss=cout);
+      ARun(const ARun& b);
+      //constructors - STOP
+      ~ARun();
+      const ARun& operator=(const ARun& other);
+      void clear();
+      //NECESSARY PUBLIC CLASS METHODS - STOP
+      
+      //attributes
+      bool m_initialized;
+      string m_dir;
+      string m_aflowin;
+      string m_LOCK;
+      bool m_completed;
+
+      //methods
+      bool initialize(const string& dir="");
+
+    public:
+      //NECESSARY private CLASS METHODS - START
+      void free();
+      void copy(const ARun& b);
+      //NECESSARY END CLASS METHODS - END
+  };
+}
+// ***************************************************************************
 
 // ***************************************************************************
 // AFLUX STUFF // Obsolete with aurostd::xhttp //HE20220407
@@ -509,7 +549,7 @@ class _outreach {
     vector<string> vauthor;
     vector<string> vcorrespondingauthor;
     string title;
-    string journal,link,arxiv,supplementary,supplementary_url; 
+    string journal,link,arxiv,supplementary,supplementary_url;
     string place,date;
     string type;   // ARTICLE PRESENTATION_TALK PRESENTATION_SEMINAR PRESENTATION_COLLOQUIUM PRESENTATION_KEYNOTE PRESENTATION_PLENARY PRESENTATION_TUTORIAL PRESENTATION_CONTRIBUTED PRESENTATION_POSTER
     bool _isinvited;       // YES
@@ -785,16 +825,6 @@ namespace aflowlib {
       ///       the loaded entries after the EntryLoader class goes out of scope
       std::shared_ptr<std::map<short, std::map<std::string, std::vector<std::shared_ptr<aflowlib::_aflowlib_entry>>>>> m_entries_layered_map;
 
-      // REGEX expressions for quick finding/replacements in strings
-      /// REGEX to find all chemical elements in a string
-      const std::regex m_re_elements{"(A[cglmrstu]|B[aehikr]?|C[adeflmnorsu]?|D[bsy]|E[rsu]|F[elmr]?|G[ade]|H[efgos]?|I[nr]?|Kr?|L[airuv]|M[dgnot]|N[abdeiop]?|Os?|P[abdmortu]?|R[abefghnu]|S[bcegimnr]?|T[abcehilm]|U(u[opst])?|V|W|Xe|Yb?|Z[nr])"};
-      /// REGEX to find all pseudo potentials that contain uppercase letters from a string (could be mistaken for a chemical element)
-      const std::regex m_re_ppclean{"("+ std::regex_replace(CAPITAL_LETTERS_PP_LIST, std::regex(","), "|") + ")"};
-      /// @brief REGEX to help change a AURL into a file path
-      /// @note the content of the group `((?:(?:LIB\d{1,})|(?:ICSD)))` can be used in the replacement  with `$1`;
-      ///       the second group `(?:(?:RAW)|(?:LIB)|(?:WEB))` is there to select the full substring to be replaced
-      const std::regex m_re_aurl2file{"((?:(?:LIB\\d{1,})|(?:ICSD)))_(?:(?:RAW)|(?:LIB)|(?:WEB))\\/"};
-
       // Generic entry loaders
       void loadAUID(std::string AUID);
       void loadAUID(const std::vector<std::string> &AUID);
@@ -811,12 +841,16 @@ namespace aflowlib {
       void loadAFLUXMatchbook(const std::map<std::string, std::string> & matchbook);
       void loadRestAPIQueries(const std::vector<std::string> & queries, bool full_url=false);
       void loadFiles(const std::vector<std::string> & files);
-      void loadText(const std::vector<std::string> & raw_data_lines);
-      void loadVector(const std::vector<std::string> &keys, const std::vector<std::vector<std::string>> & content);
+      void loadFiles(const std::string & file_path);
+      void loadFolders(const std::vector<std::string> & folders);
+      void loadFolders(const std::string & folder_path);
+      void loadText(const std::vector<std::string> & raw_data_lines, const std::string & source="");
+      void loadVector(const std::vector<std::string> &keys, const std::vector<std::vector<std::string>> & content, const std::string & source="");
 
       // Source setter and getter
       bool setSource(EntryLoader::Source new_source);
       EntryLoader::Source getSource() const;
+      std::string getSourceString() const;
 
       // Getter for raw data
       std::vector<std::string> getRawSqliteWhere(const std::string & where) const;
@@ -883,7 +917,6 @@ namespace aflowlib {
 // will be moved near LI2RAW
 namespace aflowlib {
   uint MOSFET(int mode,bool VERBOSE);
-  uint MULTIPLEXER(int mode,bool VERBOSE);
   uint MAIL2SCAN(string library,bool VERBOSE);
   uint LIB2SCRUB(string library,bool VERBOSE);
   bool LIB2AUID(string entry,bool TEST,bool _VERBOSE);
@@ -895,6 +928,6 @@ namespace aflowlib {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

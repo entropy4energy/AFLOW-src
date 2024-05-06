@@ -1,6 +1,6 @@
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                  Marco Esters - Duke University 2021                    *
 // *                                                                         *
 //****************************************************************************
@@ -30,11 +30,11 @@ namespace pocc {
     uint nruns = m_ARUN_directories.size();
     if (nruns == 0) {
       message << "Number of ARUN directories is zero.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     if (l_supercell_sets.size() != nruns) {
       message << "Number of directories and number of supercells are different.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
 
     vector<int> vexclude;
@@ -66,11 +66,11 @@ namespace pocc {
     if (vxdos.size() == 0) {
       if (m_kflags.KBIN_POCC_EXCLUDE_UNSTABLE) {
         message << "No structures left after excluding dynamically unstable representatives.";
-        pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
+        pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
         return;
       } else {
         message << "No phonon DOSCARs calculated.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
     }
     vphcalc.clear();
@@ -91,7 +91,7 @@ namespace pocc {
     aurostd::stringstream2file(phposcar, phposcar_file);
     if (!aurostd::FileExist(phposcar_file)) {
       message << "Could not write file " << phposcar_file << ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
 
     uint nexclude = vexclude.size();
@@ -136,20 +136,20 @@ namespace pocc {
           message << "There are imaginary frequencies in the DOS at " << T << " K, covering "
             << std::dec << setprecision(3) << percent <<  "\% of the integrated DOS. These frequencies were"
             << " omitted in the calculation of thermodynamic properties.";
-          pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
+          pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
         }
       }
 
       string tstring = getTemperatureString(T);
       string filename = aurostd::CleanFileName(m_aflags.Directory + "/" + POCC_PHDOSCAR_FILE + "_T" + tstring + "K");
       message << "Writing out " << filename << ".";
-      pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss);
+      pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, *p_FileMESSAGE, *p_oss);
       stringstream phdoscar;
       phdoscar << xdos_T;
       aurostd::stringstream2file(phdoscar, filename);
       if (!aurostd::FileExist(filename)) {
         message << "Could not write file " << filename << ".";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
       }
 
       tpc.clear();
@@ -168,7 +168,7 @@ namespace pocc {
       aurostd::stringstream2file(aplout, filename);
       if (!aurostd::FileExist(filename)) {
         message << "Cannot open output file " << filename << ".";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
       }
     }
 
@@ -188,7 +188,7 @@ namespace pocc {
 
   vector<apl::PhononCalculator> POccCalculator::initializePhononCalculators() {
     string message = "Initializing phonon calculators.";
-    pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
+    pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
 
     vector<apl::PhononCalculator> vphcalc;
     unsigned long long int isupercell = 0;
@@ -198,12 +198,12 @@ namespace pocc {
       imax = std::max((int) (*it).getHNFIndex(), imax);
       string directory = aurostd::CleanFileName(m_aflags.Directory + "/" + m_ARUN_directories[isupercell]);
       message = "Descending into directory " + directory + ".";
-      pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
+      pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
 
       string statefile = aurostd::CleanFileName(directory + "/" + DEFAULT_APL_FILE_PREFIX + DEFAULT_APL_STATE_FILE);
       if (!aurostd::EFileExist(statefile)) {
         message = "Cannot find state file in directory " + directory + ".";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
       }
 
       // Initialize phonon calculator
@@ -220,11 +220,11 @@ namespace pocc {
       if (awakeHarmIFCs) {
         try {
           message = "Reading force constant from hibernate file.";
-          pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, directory, *p_FileMESSAGE, *p_oss);
+          pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, directory, *p_FileMESSAGE, *p_oss);
           phcalc.awake();
         } catch (aurostd::xerror& e) {
           message = e.buildMessageString() + " Recalculating force constants.";
-          pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, directory, *p_FileMESSAGE, *p_oss);
+          pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, directory, *p_FileMESSAGE, *p_oss);
           awakeHarmIFCs = false;
         }
       }
@@ -246,7 +246,7 @@ namespace pocc {
           phcalc.setHarmonicForceConstants(fccalc);
         } else {
           message = "Could not calculate harmonic force constants for directory " + directory + ".";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
       }
 
@@ -259,7 +259,7 @@ namespace pocc {
 
   vector<xDOSCAR> POccCalculator::getPhononDoscars(vector<apl::PhononCalculator>& vphcalc, xoption& aplopts, vector<int>& vexclude) {
     string message = "Calculating phonon densities of states.";
-    pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
+    pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
 
     bool projected = aplopts.flag("DOS_PROJECT");
 
@@ -299,7 +299,7 @@ namespace pocc {
 
     if (aplopts.getattachedscheme("DOSMETHOD") == "LT") message = "Calculating phonon DOS using the linear tetrahedron method.";
     else message = "Calculating phonon DOS using the root sampling method.";
-    pflow::logger(_AFLOW_FILE_NAME_, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
+    pflow::logger(__AFLOW_FILE__, _POCC_APL_MODULE_, message, m_aflags, *p_FileMESSAGE, *p_oss);
 
 #ifdef AFLOW_MULTITHREADS_ENABLE
     std::mutex m;
@@ -433,7 +433,7 @@ namespace pocc {
             }
           }
         }
-        if (mismatch) throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+        if (mismatch) throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
       }
       uint nat = xdos.vDOS.size();
       uint nproj = xdos.vDOS[0].size();
@@ -466,7 +466,7 @@ namespace pocc {
 
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2020           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                  Marco Esters - Duke University 2020                    *
 // *                                                                         *
 //****************************************************************************

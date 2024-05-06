@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -45,7 +45,9 @@
 //ME20181020 - check out https://physics.nist.gov/cuu/Constants/index.html
 //#define PI                    3.14159265359
 #define PI                      3.14159265358979323846
+#define pi                      PI
 #define TWOPI                   6.28318530717958647692
+#define EULERSNUMBER            2.71828182845904523536
 #define RTPI                    (sqrt(PI))
 #define C_VACUUM                2.99792458E+8                   // m/s
 #define EPS_VACUUM              8.854187817E-12                 // C/(N-m2)
@@ -100,23 +102,6 @@
 // ----------------------------------------------------------------------------
 // ------------------------------------------------------------------ constants
 
-#define _mm_epsilon      1.0e-10
-#define _mm_e            2.71828182845904523536028747135266249
-#define _mm_log2e        1.4426950408889634074
-#define _mm_log10e       0.43429448190325182765
-#define _mm_ln2          0.69314718055994530942
-#define _mm_ln10         2.30258509299404568402
-#define _mm_pi           3.14159265358979323846
-#define pi               3.14159265358979323846
-#define PI               3.14159265358979323846
-#define _mm_pi_2         1.57079632679489661923
-#define _mm_pi_4         0.78539816339744830962
-#define _mm_1_pi         0.31830988618379067154
-#define _mm_2_pi         0.63661977236758134308
-#define _mm_2_sqrtpi     1.12837916709551257390
-#define _mm_sqrt2        1.41421356237309504880
-#define _mm_sqrt1_2      0.70710678118654752440
-
 #define _AUROSTD_XSCALAR_TOLERANCE_IDENTITY_ 1.0e-6
 #define _AUROSTD_XSCALAR_TOLERANCE_ROUNDOFF_ 1.0e-6
 
@@ -149,6 +134,7 @@ namespace aurostd {
   template<class utype> int _size(utype) __xprototype;
   template<class utype> utype abs(utype) __xprototype;
   template<class utype> utype sqrt(utype) __xprototype;
+  template<class utype> utype exp(utype) __xprototype; //SD20220512
   template<class utype> utype sign(utype) __xprototype;
   template<class utype> utype mod(utype,utype) __xprototype;
   template<class utype> utype mod_floored(utype,utype) __xprototype;
@@ -495,9 +481,48 @@ namespace aurostd {
 #endif
 }
 
+// ----------------------------------------------------------------------------
+// exp  exp  exp  exp  exp
+namespace aurostd {
+  // namespace aurostd
+  // EXP(X)
+  char exp(char x) __xprototype; //SD20220512
+  int exp(int x) __xprototype; //SD20220512
+  uint exp(uint x) __xprototype; //SD20220512
+  float exp(float x) __xprototype; //SD20220512
+  double exp(double x) __xprototype; //SD20220512
+  long int exp(long int x) __xprototype; //SD20220512
+  long long int exp(long long int x) __xprototype; //SD20220512
+  unsigned long long int exp(unsigned long long int x) __xprototype; //SD20220512
+  long double exp(long double x) __xprototype; //SD20220512
+}
+
+// ----------------------------------------------------------------------------
+// pow  pow  pow  pow  pow
+namespace aurostd {
+  // namespace aurostd
+  // POW(X)
+  char pow(char x,char d) __xprototype; //SD20220512
+  int pow(int x,int d) __xprototype; //SD20220512
+  uint pow(uint x, uint d) __xprototype; //SD20220512
+  float pow(float x, float d) __xprototype; //SD20220512
+  double pow(double x,double d) __xprototype; //SD20220512
+  long int pow(long int x,long int d) __xprototype; //SD20220512
+  long long int pow(long long int x,long long int d) __xprototype; //SD20220512
+  unsigned long long int pow(unsigned long long int x,unsigned long long int d) __xprototype; //SD20220512
+  long double pow(long double x,long double d) __xprototype; //SD20220512
+}
+
 //--------------------------------------------------------------- round
 namespace aurostd {
-  double round(double x);
+  double round(double x, uint digits=0); //SD20220603
+  int roundDouble(double doub, int multiple, bool up);  //CO20220624 (moved from chull)
+  bool greaterEqualZero(double val);  //CO20220624 (moved from chull)
+  bool lessEqualZero(double val); //CO20220624 (moved from chull)
+  bool notPositive(double val,bool soft_cutoff,double tol);  //CO20220624 (moved from chull)
+  bool notNegative(double val,bool soft_cutoff,double tol);  //CO20220624 (moved from chull)
+  bool zeroWithinTol(double val,double tol); //CO20220624 (moved from chull)
+  bool nonZeroWithinTol(double val,double tol);  //CO20220624 (moved from chull)
 }
 
 //--------------------------------------------------------------- isequal
@@ -505,10 +530,19 @@ namespace aurostd {
   // with const utype&
   template<class utype> bool identical(const utype&,const utype&,const utype&) __xprototype;
   template<class utype> bool identical(const utype&,const utype&) __xprototype;
+  bool identical (const bool a,const bool b); //SD20220705
+  bool identical (const char a,const char b); //SD20220705
+  bool identical (const string& a,const string& b); //SD20220705
   template<class utype> bool isdifferent(const utype&,const utype&,const utype&) __xprototype;
   template<class utype> bool isdifferent(const utype&,const utype&) __xprototype;
+  bool isdifferent (const bool a,const bool b); //SD20220705
+  bool isdifferent (const char a,const char b); //SD20220705
+  bool isdifferent (const string& a,const string& b); //SD20220705
   template<class utype> bool isequal(const utype&,const utype&,const utype&) __xprototype;
   template<class utype> bool isequal(const utype&,const utype&) __xprototype;
+  bool isequal (const bool a,const bool b); //SD20220705
+  bool isequal (const char a,const char b); //SD20220705
+  bool isequal (const string& a,const string& b); //SD20220705
   // with utype
   //template<class utype> bool identical(utype,utype,utype) __xprototype;
   //template<class utype> bool identical(utype,utype) __xprototype;
@@ -596,7 +630,7 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

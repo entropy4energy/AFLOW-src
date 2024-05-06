@@ -1253,6 +1253,64 @@ POCC_ANIONS_LIST
   default: "B,C,N,O"
 
 ####################################################################################################
+DEFAULTS QCA
+
+DEFAULT_QCA_MIN_SLEEP_SECONDS
+  description: Minimum time to sleep between waiting for ATAT to finish.
+  type: integer
+  default: 60
+
+DEFAULT_QCA_MAX_NUM_ATOMS
+  description: Maximum number of atoms in the unit cell for derivative structures created by the ATAT structure generator.
+  type: integer
+  default: 8
+
+DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS
+  description: Maximum number of atoms in the unit cell for derivative structures found in the AFLOW calculations.
+  type: integer
+  default: 4
+
+DEFAULT_QCA_CV_CUTOFF
+  description: Cross-validation score cut-off (in eV) for the cluster expansion.
+  type: double
+  default: 0.05
+
+DEFAULT_QCA_CONC_NPTS
+  description: Number of points to sub-divide the concentration profile.
+  type: integer
+  default: 20
+
+DEFAULT_QCA_TEMP_NPTS
+  description: Number of points to sub-divide the temperature profile.
+  type: integer
+  default: 150
+
+DEFAULT_QCA_TEMP_MIN
+  description: Minimum temperature (in K) of the temperature profile.
+  type: double
+  default: 300
+
+DEFAULT_QCA_TEMP_MAX
+  description: Maximum temperature (in K) of the temperature profile.
+  type: double
+  default: 5000
+
+DEFAULT_QCA_TEMP_MIN_LIMIT
+  description: Temperature limit (in K) at which to end the calculation if a solution cannot be found.
+  type: double
+  default: 10000
+
+DEFAULT_QCA_FORMAT_DATA
+  description: Format of the output data.
+  type: string
+  default: "txt"
+
+DEFAULT_QCA_FORMAT_PLOT
+  description: Format of the plotted image.
+  type: string
+  default: "png"
+
+####################################################################################################
 DEFAULTS APL
 
 DEFAULT_APL_PREC

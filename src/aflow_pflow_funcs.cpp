@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -67,7 +67,6 @@ string getGenericTitleXStructure(const xstructure& xstr,bool latex){ //CO2019052
 xvector<double> balanceChemicalEquation(const vector<xvector<double> >& lhs,const vector<xvector<double> >& rhs,
     bool normalize,double tol){ //CO20180801
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "balanceChemicalEquation():";
   xvector<double> dummy;
   if(lhs.size()==0 || rhs.size()==0){return dummy;}
   int dim=lhs[0].rows;
@@ -75,12 +74,12 @@ xvector<double> balanceChemicalEquation(const vector<xvector<double> >& lhs,cons
   for(uint i=0;i<rhs.size();i++){if(rhs[i].rows!=dim){return dummy;}}
 
   if(LDEBUG) {
-    cerr << soliloquy << " lhs=";
+    cerr << __AFLOW_FUNC__ << " lhs=";
     for(uint i=0;i<lhs.size();i++){
       cerr << lhs[i] << (i!=lhs.size()-1?", ":"");
     }
     cerr << endl;
-    cerr << soliloquy << " rhs=";
+    cerr << __AFLOW_FUNC__ << " rhs=";
     for(uint i=0;i<rhs.size();i++){
       cerr << rhs[i] << (i!=rhs.size()-1?", ":"");
     }
@@ -93,12 +92,12 @@ xvector<double> balanceChemicalEquation(const vector<xvector<double> >& lhs,cons
   //[OBSOLETE CO20180801]  for(uint i=0;i<_lhs.size();i++){lhs.push_back(aurostd::reduceByGCD(_lhs[i],tol));}
   //[OBSOLETE CO20180801]  for(uint i=0;i<_rhs.size();i++){rhs.push_back(aurostd::reduceByGCD(_rhs[i],tol));}
   //[OBSOLETE CO20180801]  if(LDEBUG) {
-  //[OBSOLETE CO20180801]    cerr << soliloquy << " lhs REDUCED=";
+  //[OBSOLETE CO20180801]    cerr << __AFLOW_FUNC__ << " lhs REDUCED=";
   //[OBSOLETE CO20180801]    for(uint i=0;i<lhs.size();i++){
   //[OBSOLETE CO20180801]      cerr << lhs[i] << (i!=lhs.size()-1?", ":"");
   //[OBSOLETE CO20180801]    }
   //[OBSOLETE CO20180801]    cerr << endl;
-  //[OBSOLETE CO20180801]    cerr << soliloquy << " rhs REDUCED=";
+  //[OBSOLETE CO20180801]    cerr << __AFLOW_FUNC__ << " rhs REDUCED=";
   //[OBSOLETE CO20180801]    for(uint i=0;i<rhs.size();i++){
   //[OBSOLETE CO20180801]      cerr << rhs[i] << (i!=rhs.size()-1?", ":"");
   //[OBSOLETE CO20180801]    }
@@ -121,7 +120,7 @@ xvector<double> balanceChemicalEquation(const vector<xvector<double> >& lhs,cons
   for(uint i=0;i<rhs.size();i++){counter=1;for(int j=rhs[i].lrows;j<=rhs[i].urows;j++){composition_matrix(i+1+lhs.size(),counter++)=-rhs[i][j];}} //rhs
 
   if(LDEBUG) {
-    cerr << soliloquy << " composition matrix:" << endl;
+    cerr << __AFLOW_FUNC__ << " composition matrix:" << endl;
     cerr << composition_matrix << endl;
   }
 
@@ -131,37 +130,36 @@ xvector<double> balanceChemicalEquation(const vector<xvector<double> >& lhs,cons
 //normalize === set first coefficient to 1
 xvector<double> balanceChemicalEquation(const xmatrix<double>& composition_matrix,bool normalize,double tol){ //CO20191110
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "balanceChemicalEquation():";
   stringstream message;
   if(composition_matrix.rows<=composition_matrix.cols){
     message << "Composition matrix (m<=n) will NOT yield a viable null space for this analysis";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20190226
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20190226
   }
   //[CO20191110 - OBSOLETE]xmatrix<double> composition_matrix=_composition_matrix;
   //[CO20191110 - OBSOLETE]xmatrix<double> Q=aurostd::generalHouseHolderQRDecomposition(composition_matrix);
   xmatrix<double> Q,R;
   aurostd::QRDecomposition_HouseHolder(composition_matrix,Q,R);
   if(LDEBUG) {
-    cerr << soliloquy << " Q:" << endl;
+    cerr << __AFLOW_FUNC__ << " Q:" << endl;
     cerr << Q << endl;
   }
   xvector<double> coef(R.rows);
   for(int i=1;i<Q.rows+1;i++){coef[i]=Q(i,Q.ucols);}
-  if(LDEBUG) {cerr << soliloquy << " PRE-coefficients =" << coef << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " PRE-coefficients =" << coef << endl;}
   if(normalize){
     if(abs(coef[1])<tol){return coef;} //avoid divide by 0
     coef/=coef[1];
   }
-  if(LDEBUG) {cerr << soliloquy << " POST-coefficients=" << coef << endl;}
-  if(LDEBUG) {cerr << soliloquy << " checking: all coef's are >0" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " POST-coefficients=" << coef << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " checking: all coef's are >0" << endl;}
   //check that none are negative, that means we did NOT provide a valid equation (check products)
   for(int i=1;i<coef.rows+1;i++){
     if(coef[i]<-_ZERO_TOL_){
       message << "Found negative coef[" << i << "], invalid chemical equation (run with --debug to see): coef=" << coef;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_RANGE_); //CO20190226
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_RANGE_); //CO20190226
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " checking: all scalar products should yield 0" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " checking: all scalar products should yield 0" << endl;}
   double sum;
   for(int i=1;i<composition_matrix.cols+1;i++){
     if(LDEBUG) {cerr << "component-" << i << ": sum=";}
@@ -170,7 +168,7 @@ xvector<double> balanceChemicalEquation(const xmatrix<double>& composition_matri
     if(LDEBUG) {cerr << sum << endl;}
     if(abs(sum)>_ZERO_TOL_){
       message << "Chemical equation was not balanced (run with --debug to see): coef=" << coef;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_RANGE_); //CO20190226
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_RANGE_); //CO20190226
     }
   }
   return coef;
@@ -214,21 +212,20 @@ namespace pflow {
   }
   void GeneralizedStackingFaultEnergyCalculation(const aurostd::xoption& vpflow,const xstructure& xstr_in,const _aflags& aflags,const _kflags& kflags,const _vflags& vflags,ofstream& FileMESSAGE,ostream& oss){
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "pflow::GeneralizedStackingFaultEnergyCalculation():";
     stringstream message;
     std::streamsize prec = 8;
     bool check_min_dist=true; //turn off if it gets too slow
     int count_check_min_dist=0;
 
     message << aflow::Banner("BANNER_NORMAL");
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);  //first to screen (not logged, file not opened)
-    if(LDEBUG) {cerr << soliloquy << " starting" << endl;}
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);  //first to screen (not logged, file not opened)
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting" << endl;}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // START - get conventional cell
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " get conventional cell" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " get conventional cell" << endl;}
 
     xstructure xstr_bulk(xstr_in);
     double min_dist=xstr_bulk.dist_nn_min;
@@ -236,19 +233,19 @@ namespace pflow {
     double min_dist_orig=min_dist;
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
-      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
     }
 
     bool convert_sconv=true;
     if(convert_sconv){xstr_bulk=Standard_Conventional_UnitCellForm(xstr_bulk);xstr_bulk.clean();}  //best to work with standard conventional unitcell //DX20191220 - uppercase to lowercase clean
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
       if(!aurostd::isequal(min_dist_orig,min_dist)){
         //throw a warning here instead, minimum distance MIGHT change with sconv
-        //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);
-        message << "Minimum distance changed (sprim -> sconv)";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
+        //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);
+        message << "Minimum distance changed (sprim -> sconv)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
         min_dist_orig=min_dist;
       }
     }
@@ -259,13 +256,13 @@ namespace pflow {
     if(LDEBUG) {xstr_bulk.write_DEBUG_flag=TRUE;}
     //xstr_bulk.coord_flag=_COORDS_CARTESIAN_;  //much more accurate for this type of calculation
 
-    message << "structure(standard conventional)=";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << xstr_bulk << endl;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
+    message << "structure(standard conventional)=";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << xstr_bulk << endl;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
 
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
-      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -282,9 +279,9 @@ namespace pflow {
     xstr_bulk.sym_eps=xstr_sym.sym_eps;
     bool skew=SYM::isLatticeSkewed(xstr_bulk.lattice,xstr_bulk.dist_nn_min,xstr_bulk.sym_eps);
     if(LDEBUG){
-      cerr << soliloquy << " xstr_bulk.dist_nn_min=" << xstr_bulk.dist_nn_min << endl;
-      cerr << soliloquy << " xstr_bulk.sym_eps=" << xstr_bulk.sym_eps << endl;
-      cerr << soliloquy << " skew=" << skew << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_bulk.dist_nn_min=" << xstr_bulk.dist_nn_min << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_bulk.sym_eps=" << xstr_bulk.sym_eps << endl;
+      cerr << __AFLOW_FUNC__ << " skew=" << skew << endl;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -295,7 +292,7 @@ namespace pflow {
     // START - read flags
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " reading flags" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " reading flags" << endl;}
 
     int h_s=1,k_s=1,l_s=0;  //hkl of shear
     xvector<int> hkl_s,hkl_s_ORIG;
@@ -312,7 +309,7 @@ namespace pflow {
       l_s=aurostd::string2utype<int>(tokens[2]);
     }
     hkl_s[1]=h_s;hkl_s[2]=k_s;hkl_s[3]=l_s;
-    if(hkl_s[1]==0 && hkl_s[2]==0 && hkl_s[3]==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"hkl_s=(0,0,0)",_INPUT_ERROR_);}
+    if(hkl_s[1]==0 && hkl_s[2]==0 && hkl_s[3]==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"hkl_s=(0,0,0)",_INPUT_ERROR_);}
     hkl_s_ORIG=hkl_s;
     string step_size_string=vpflow.getattachedscheme("GENERALIZED_STACKING_FAULT_ENERGY::STEP_SIZE"); //step size
     if(aurostd::isfloat(step_size_string)){
@@ -337,11 +334,11 @@ namespace pflow {
     message.precision(prec);
     message.unsetf(std::ios_base::floatfield);
 
-    message << "shear_direction" << hkl_s;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << "step_size=" << step_size;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << "fixed_layers=" << fixed_layers;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << "spin=" << (spin_off?"OFF":"ON");pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << "partial_dissociation=" << (partial_dissociation?"ON":"OFF");pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "shear_direction" << hkl_s;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "step_size=" << step_size;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "fixed_layers=" << fixed_layers;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "spin=" << (spin_off?"OFF":"ON");pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "partial_dissociation=" << (partial_dissociation?"ON":"OFF");pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
     message.precision(prec_original); //set back
     message.flags(ff_original); //set back
@@ -356,7 +353,7 @@ namespace pflow {
     // START - create slab
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    message << "Creating slab";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "Creating slab";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
     xvector<int> hkl_i;
     int total_layers;
@@ -381,30 +378,30 @@ namespace pflow {
     //xmatrix<double> rotation=trasp(trasp(xstr_slab_newbasis.lattice)*inverse(trasp(xstr_bulk.lattice)));
     //xmatrix<double> rotation=aurostd::inverse(trasp(xstr_slab_newbasis.lattice*aurostd::inverse(xstr_bulk.lattice)));
     if(LDEBUG){
-      cerr << soliloquy << " xstr_bulk.lattice=" << endl;cerr << xstr_bulk.lattice << endl;
-      cerr << soliloquy << " xstr_slab_newbasis.lattice=" << endl;cerr << xstr_slab_newbasis.lattice << endl;
-      cerr << soliloquy << " rotation=" << endl;cerr << rotation << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_bulk.lattice=" << endl;cerr << xstr_bulk.lattice << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_slab_newbasis.lattice=" << endl;cerr << xstr_slab_newbasis.lattice << endl;
+      cerr << __AFLOW_FUNC__ << " rotation=" << endl;cerr << rotation << endl;
     }
 
-    if(total_layers%2!=0){message << "total_layers is odd, it is better to pick an even number (top vs. bottom)";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);}
+    if(total_layers%2!=0){message << "total_layers is odd, it is better to pick an even number (top vs. bottom)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);}
 
     //rotate n_s too
     //[CO20190408 - do rotation last!]bool rotate_shear=false;
     //[CO20190408 - do rotation last!]if(rotate_shear){
     //[CO20190408 - do rotation last!]  n_s=R*n_s;  //CO20190322 - don't think this needs to be rotated
-    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << soliloquy << " rotated n_s=" << n_s << endl;}  //CO20190322 - don't think this needs to be rotated
+    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " rotated n_s=" << n_s << endl;}  //CO20190322 - don't think this needs to be rotated
     //[CO20190408 - do rotation last!]}
     //[CO20190408 - do rotation last!]//create rotated primitive cell: faster to rotate smaller cell than bigger one
     //[CO20190408 - do rotation last!]xstructure xstr_slab_newbasis(a);
     //[CO20190408 - do rotation last!]if(0){  //try rotating atoms, DOES NOT WORK
     //[CO20190408 - do rotation last!]  _sym_op rot; rot.setUc(R,xstr_bulk.lattice); rot.is_pgroup=true;  //just rotation
-    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << soliloquy << " sym_op=" << endl;cerr << rot << endl;}
+    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " sym_op=" << endl;cerr << rot << endl;}
     //[CO20190408 - do rotation last!]  if(1){  //try ApplyXstructure(), same as ApplyAtomValidate on all atoms individually
     //[CO20190408 - do rotation last!]    xstr_slab_newbasis=SYM::ApplyXstructure(rot,xstr_bulk,false);  //no incell, we'll figure this out later
     //[CO20190408 - do rotation last!]  } else {  //try ApplyAtomValidate
     //[CO20190408 - do rotation last!]    for(uint i=0;i<xstr_bulk.atoms.size();i++){
     //[CO20190408 - do rotation last!]      if(!SYM::ApplyAtomValidate(xstr_bulk.atoms[i],xstr_slab_newbasis.atoms[i],rot,xstr_bulk,true,false)){
-    //[CO20190408 - do rotation last!]        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ApplyAtomValidate() failed",_VALUE_ERROR_);
+    //[CO20190408 - do rotation last!]        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ApplyAtomValidate() failed",_VALUE_ERROR_);
     //[CO20190408 - do rotation last!]      }
     //[CO20190408 - do rotation last!]    }
     //[CO20190408 - do rotation last!]  }
@@ -416,11 +413,11 @@ namespace pflow {
     //[CO20190408 - do rotation last!]  for(uint i=0;i<xstr_slab_newbasis.atoms.size();i++){xstr_slab_newbasis.atoms[i].cpos=f2c*xstr_slab_newbasis.atoms[i].fpos;}
     //[CO20190408 - do rotation last!]  //xstr_slab_newbasis=Standard_Conventional_UnitCellForm(a);xstr_slab_newbasis.clean(); //DX20191220 - uppercase to lowercase clean
     //[CO20190408 - do rotation last!]}
-    //[CO20190408 - do rotation last!]if(LDEBUG) {cerr << soliloquy << " xstr_slab_newbasis=" << endl;cerr << xstr_slab_newbasis << endl;}
+    //[CO20190408 - do rotation last!]if(LDEBUG) {cerr << __AFLOW_FUNC__ << " xstr_slab_newbasis=" << endl;cerr << xstr_slab_newbasis << endl;}
     //[CO20190408 - do rotation last!]if(check_min_dist){ //sanity check as we rotate structure/atoms
     //[CO20190408 - do rotation last!]  min_dist=xstr_slab_newbasis.MinDist();
-    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
-    //[CO20190408 - do rotation last!]  if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+    //[CO20190408 - do rotation last!]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+    //[CO20190408 - do rotation last!]  if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
     //[CO20190408 - do rotation last!]}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -431,28 +428,28 @@ namespace pflow {
     // START - defining hkl normals
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " defining HKL normals" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " defining HKL normals" << endl;}
 
     //we need UN-ROTATED lattice here so we can get the right distance
     xvector<double> n_i=slab::HKLPlane2Normal(xstr_bulk.lattice,hkl_i);
     xvector<double> n_i_ORIG=n_i;
-    if(LDEBUG) {cerr << soliloquy << " n_i[hkl=" << hkl_i << "]=" << n_i << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_i[hkl=" << hkl_i << "]=" << n_i << endl;}
 
     //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]//n_i and n_s must be perpendicular
     //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]if(!aurostd::isequal(aurostd::scalar_product(n_i,n_s),0.0,0.1)){
     //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]  message << "n_i(" << n_i << ") is not perpendicular to n_s(" << n_s << ")" << endl;
     //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]  message << "n_i DOT n_s = " << aurostd::scalar_product(n_i,n_s) << endl;
-    //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+    //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
     //[CO20190515 - not necessarily true that n_i and n_s are perpendicular, n_s must have no 0 component AFTER rotation]}
 
     //[CO20190515 - WRONG, [hkl] WITH brackets is ALREADY in direct space]xvector<double> n_s=HKLPlane2Normal(xstr_bulk.lattice,hkl_s);  //we need UN-ROTATED lattice here so we can get the right distance
     //[CO20190515 - WRONG, [hkl] WITH brackets is ALREADY in direct space]double d_layers=getDistanceBetweenImages(xstr_bulk.lattice,h_s,k_s,l_s); //this depends on UN-ROTATED lattice
-    xvector<double> n_s=xstr_bulk.f2c*aurostd::xvectorint2double(hkl_s);n_s/=aurostd::modulus(n_s); //f2c=trasp(xstr_bulk.lattice)
+    xvector<double> n_s=xstr_bulk.f2c*aurostd::xvector2utype<int,double>(hkl_s);n_s/=aurostd::modulus(n_s); //f2c=trasp(xstr_bulk.lattice)
     xvector<double> n_s_ORIG=n_s;
-    if(LDEBUG) {cerr << soliloquy << " n_s[hkl=" << hkl_s << "]=" << n_s << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_s[hkl=" << hkl_s << "]=" << n_s << endl;}
 
     double angle_ns_unrotated=aurostd::angle(n_i,n_s);
-    if(LDEBUG) {cerr << soliloquy << " angle_ns(unrotated)=" << rad2deg*angle_ns_unrotated << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " angle_ns(unrotated)=" << rad2deg*angle_ns_unrotated << endl;}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // STOP - defining hkl normals
@@ -463,31 +460,31 @@ namespace pflow {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //rotate n_i and n_s
-    if(LDEBUG) {cerr << soliloquy << " n_i[hkl=" << hkl_i << "](unrotated)=" << n_i << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_i[hkl=" << hkl_i << "](unrotated)=" << n_i << endl;}
     xvector<double> n_i_rotated=rotation*n_i;n_i_rotated/=aurostd::modulus(n_i_rotated);  //rotate to match structure rotation
-    if(LDEBUG) {cerr << soliloquy << " n_i[hkl=" << hkl_i << "](rotated)  =" << n_i_rotated << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_i[hkl=" << hkl_i << "](rotated)  =" << n_i_rotated << endl;}
 
     if(!aurostd::isequal(abs(n_i_rotated[3]),1.0)){
       message << "Rotation unsuccessful, n_i should be aligned along the z-axis" << endl;
       message << "n_i(rotated)  =" << n_i_rotated << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
     }
 
-    if(LDEBUG) {cerr << soliloquy << " n_s[hkl=" << hkl_s << "](unrotated)=" << n_s << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_s[hkl=" << hkl_s << "](unrotated)=" << n_s << endl;}
     xvector<double> n_s_rotated=rotation*n_s;n_s_rotated/=aurostd::modulus(n_s_rotated);  //rotate to match structure rotation
-    if(LDEBUG) {cerr << soliloquy << " n_s[hkl=" << hkl_s << "](rotated)  =" << n_s_rotated << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_s[hkl=" << hkl_s << "](rotated)  =" << n_s_rotated << endl;}
 
     double angle_ns_rotated=aurostd::angle(n_i_rotated,n_s_rotated);
     if(LDEBUG) {
-      cerr << soliloquy << " angle_ns(unrotated)=" << rad2deg*angle_ns_unrotated << endl;
-      cerr << soliloquy << " angle_ns(rotated)  =" << rad2deg*angle_ns_rotated << endl;
+      cerr << __AFLOW_FUNC__ << " angle_ns(unrotated)=" << rad2deg*angle_ns_unrotated << endl;
+      cerr << __AFLOW_FUNC__ << " angle_ns(rotated)  =" << rad2deg*angle_ns_rotated << endl;
     }
 
     if(!aurostd::isequal(angle_ns_unrotated,angle_ns_rotated)){
       message << "Rotation unsuccessful" << endl;
       message << "angle_ns(unrotated)=" << rad2deg*angle_ns_unrotated << endl;
       message << "angle_ns(rotated)  =" << rad2deg*angle_ns_rotated << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -501,7 +498,7 @@ namespace pflow {
     if(!partial_dissociation){
       if(!aurostd::isequal(rad2deg*angle_ns_unrotated,90.0) || aurostd::isequal(n_s_rotated[3],0.0)){ //not sure about partial dissociation
         message << "Need to find symmetrically equivalent n_s (angle_ns_unrotated(degrees)=" << rad2deg*angle_ns_unrotated << ",n_s(rotated)=" << n_s_rotated << ")";
-        pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
 
         const vector<_sym_op>& v_pgroups=xstr_sym.pgroup_xtal;
         vector<xvector<double> > v_n_s_sym,v_n_s_sym_rotated;
@@ -514,7 +511,7 @@ namespace pflow {
           if(aurostd::isequal(rad2deg*angle_nssym_unrotated,90.0)){
             n_s_sym_rotated=rotation*n_s_sym;
             if(aurostd::isequal(n_s_sym_rotated[3],0.0)){
-              if(LDEBUG){cerr << soliloquy << " found viable symmetrically equivalent n_s=" << n_s_sym << ", n_s_sym_rotated=" << n_s_sym_rotated << ", pg=" << pg << endl;}
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " found viable symmetrically equivalent n_s=" << n_s_sym << ", n_s_sym_rotated=" << n_s_sym_rotated << ", pg=" << pg << endl;}
               v_n_s_sym.push_back(n_s_sym);
               v_n_s_sym_rotated.push_back(n_s_sym_rotated);
               v_pgs.push_back(pg);
@@ -522,7 +519,7 @@ namespace pflow {
           }
         }
 
-        if(v_n_s_sym.size()==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Cannot find any viable symmetrically equivalent n_s",_RUNTIME_ERROR_);}
+        if(v_n_s_sym.size()==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot find any viable symmetrically equivalent n_s",_RUNTIME_ERROR_);}
 
         //sort the two lists (symmetrically equivalent and rotated variants) by the rotated variants
         //look for 1 0 0 first, then -1 0 0, then
@@ -542,7 +539,7 @@ namespace pflow {
         int lrows=n_s.lrows;
         for(uint i=0;i<v_n_s_sym_rotated.size()-1;i++){
           for(uint j=i+1;j<v_n_s_sym_rotated.size();j++){
-            if(LDEBUG){cerr << soliloquy << " comparing " << v_n_s_sym_rotated[i] << " with " << v_n_s_sym_rotated[j] << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " comparing " << v_n_s_sym_rotated[i] << " with " << v_n_s_sym_rotated[j] << endl;}
 
             swap=false;
 
@@ -554,11 +551,11 @@ namespace pflow {
               sing_dir_vec_j=false;
               for(int k=v_n_s_sym_rotated[i].lrows;k<=v_n_s_sym_rotated[i].urows;k++){
                 if(aurostd::isequal(abs(v_n_s_sym_rotated[i][k]),1.0)){
-                  if(LDEBUG){cerr << soliloquy << " [i] is single direction" << endl;}
+                  if(LDEBUG){cerr << __AFLOW_FUNC__ << " [i] is single direction" << endl;}
                   sing_dir_vec_i=true;
                 }
                 if(aurostd::isequal(abs(v_n_s_sym_rotated[j][k]),1.0)){
-                  if(LDEBUG){cerr << soliloquy << " [j] is single direction" << endl;}
+                  if(LDEBUG){cerr << __AFLOW_FUNC__ << " [j] is single direction" << endl;}
                   sing_dir_vec_j=true;
                 }
               }
@@ -583,15 +580,15 @@ namespace pflow {
             if(swap==false){
               for(int k=v_n_s_sym_rotated[i].lrows;k<=v_n_s_sym_rotated[i].urows && swap==false;k++){
                 components_equ=aurostd::isequal(v_n_s_sym_rotated[i][k],v_n_s_sym_rotated[j][k]);
-                if(LDEBUG){cerr << soliloquy << " [i][k=" << k << "] ?== [j][k=" << k << "] == " << components_equ << endl;}
+                if(LDEBUG){cerr << __AFLOW_FUNC__ << " [i][k=" << k << "] ?== [j][k=" << k << "] == " << components_equ << endl;}
                 if(components_equ==false){
                   components_equ_abs=aurostd::isequal(abs(v_n_s_sym_rotated[i][k]),abs(v_n_s_sym_rotated[j][k]));
                   j_gt_i_abs=bool(abs(v_n_s_sym_rotated[j][k])>abs(v_n_s_sym_rotated[i][k]));
                   j_gt_i=bool(v_n_s_sym_rotated[j][k]>v_n_s_sym_rotated[i][k]);
                   if(LDEBUG){
-                    cerr << soliloquy << " abs([i][k=" << k << "]) ?== abs([j][k=" << k << "]) == " << components_equ_abs << endl;
-                    cerr << soliloquy << " abs([j][k=" << k << "]) ?> abs([i][k=" << k << "]) == " << j_gt_i_abs << endl;
-                    cerr << soliloquy << " [j][k=" << k << "] ?> [i][k=" << k << "] == " << j_gt_i << endl;
+                    cerr << __AFLOW_FUNC__ << " abs([i][k=" << k << "]) ?== abs([j][k=" << k << "]) == " << components_equ_abs << endl;
+                    cerr << __AFLOW_FUNC__ << " abs([j][k=" << k << "]) ?> abs([i][k=" << k << "]) == " << j_gt_i_abs << endl;
+                    cerr << __AFLOW_FUNC__ << " [j][k=" << k << "] ?> [i][k=" << k << "] == " << j_gt_i << endl;
                   }
                   if( (components_equ_abs==false && j_gt_i_abs==true) || 
                       (components_equ_abs==true && components_equ==false && j_gt_i==true) ){swap=true;}
@@ -600,7 +597,7 @@ namespace pflow {
               }
             }
             if(swap){
-              if(LDEBUG){cerr << soliloquy << " swapping " << v_n_s_sym_rotated[i] << " and " << v_n_s_sym_rotated[j] << endl;}
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " swapping " << v_n_s_sym_rotated[i] << " and " << v_n_s_sym_rotated[j] << endl;}
               xvtmp=v_n_s_sym[i];
               xvtmp_rotated=v_n_s_sym_rotated[i];
               uitmp=v_pgs[i];
@@ -616,7 +613,7 @@ namespace pflow {
 
         if(LDEBUG){
           for(uint i=0;i<v_n_s_sym.size();i++){
-            cerr << soliloquy << " v_n_s_sym[i=" << i << "]=" << v_n_s_sym[i] << ", v_n_s_sym_rotated[i=" << i << "]=" << v_n_s_sym_rotated[i] << ", v_pgs[i=" << i << "]="<< v_pgs[i] << endl;
+            cerr << __AFLOW_FUNC__ << " v_n_s_sym[i=" << i << "]=" << v_n_s_sym[i] << ", v_n_s_sym_rotated[i=" << i << "]=" << v_n_s_sym_rotated[i] << ", v_pgs[i=" << i << "]="<< v_pgs[i] << endl;
           }
         }
 
@@ -628,14 +625,14 @@ namespace pflow {
         //cannot use n_s, as it is normalized
         //rotated hkl_s by v_pgroups
         //rotate in Cartesian coordinates, then convert to fractional
-        xvector<double> n_s_tmp=xstr_bulk.f2c*aurostd::xvectorint2double(hkl_s);  //do not normalize
+        xvector<double> n_s_tmp=xstr_bulk.f2c*aurostd::xvector2utype<int,double>(hkl_s);  //do not normalize
         n_s_tmp=v_pgroups[v_pgs[0]].Uc*n_s_tmp; //rotate
-        hkl_s=aurostd::xvectordouble2int(xstr_bulk.c2f*n_s_tmp);  //convert to fractional
+        hkl_s=aurostd::xvector2utype<double,int>(xstr_bulk.c2f*n_s_tmp);  //convert to fractional
 
         message << "Selecting symmetrically equivalent hkl_s=" << hkl_s << endl;
         message << "n_s=" << n_s << endl;
         message << "n_s(rotated)=" << n_s_rotated << endl;
-        pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
       }
     }
 
@@ -658,12 +655,12 @@ namespace pflow {
     int layers_per_cell_i=(int)(d_cells_i/d_layers_i);  //floor
     int supercell_layers_i=(total_layers+layers_per_cell_i-1)/layers_per_cell_i;  //ceil //(double)total_layers;
     if(LDEBUG) {
-      cerr << soliloquy << " n_i[hkl=" << hkl_i << "]=" << n_i << endl;
-      cerr << soliloquy << " d_spacing_i=" << d_spacing_i << endl;
-      cerr << soliloquy << " d_layers_i=" << d_layers_i << endl;
-      cerr << soliloquy << " d_cells_i=" << d_cells_i << endl;
-      cerr << soliloquy << " layers_per_cell_i=" << layers_per_cell_i << endl;
-      cerr << soliloquy << " supercell_layers_i=" << supercell_layers_i << endl;
+      cerr << __AFLOW_FUNC__ << " n_i[hkl=" << hkl_i << "]=" << n_i << endl;
+      cerr << __AFLOW_FUNC__ << " d_spacing_i=" << d_spacing_i << endl;
+      cerr << __AFLOW_FUNC__ << " d_layers_i=" << d_layers_i << endl;
+      cerr << __AFLOW_FUNC__ << " d_cells_i=" << d_cells_i << endl;
+      cerr << __AFLOW_FUNC__ << " layers_per_cell_i=" << layers_per_cell_i << endl;
+      cerr << __AFLOW_FUNC__ << " supercell_layers_i=" << supercell_layers_i << endl;
     }
     double d_spacing_s=slab::getSpacingHKLPlane(xstr_bulk,hkl_s); //aurostd::modulus(xstr_slab.lattice(1))/sqrt(h_s*h_s+k_s*k_s+l_s*l_s);
     double d_layers_s=slab::getDistanceBetweenImages(xstr_bulk,n_s,false); //this depends on UN-ROTATED lattice
@@ -671,14 +668,14 @@ namespace pflow {
     int layers_per_cell_s=(int)(d_cells_s/d_layers_s);  //floor
     int supercell_layers_s=(total_layers+layers_per_cell_s-1)/layers_per_cell_s;  //ceil //(double)total_layers;
     if(LDEBUG) {
-      cerr << soliloquy << " n_s[hkl=" << hkl_s << "]=" << n_s << endl;
-      cerr << soliloquy << " d_spacing_s=" << d_spacing_s << endl;
-      cerr << soliloquy << " d_layers_s=" << d_layers_s << endl;
-      cerr << soliloquy << " d_cells_s=" << d_cells_s << endl;
-      cerr << soliloquy << " layers_per_cell_s=" << layers_per_cell_s << endl;
-      cerr << soliloquy << " supercell_layers_s=" << supercell_layers_s << endl;
+      cerr << __AFLOW_FUNC__ << " n_s[hkl=" << hkl_s << "]=" << n_s << endl;
+      cerr << __AFLOW_FUNC__ << " d_spacing_s=" << d_spacing_s << endl;
+      cerr << __AFLOW_FUNC__ << " d_layers_s=" << d_layers_s << endl;
+      cerr << __AFLOW_FUNC__ << " d_cells_s=" << d_cells_s << endl;
+      cerr << __AFLOW_FUNC__ << " layers_per_cell_s=" << layers_per_cell_s << endl;
+      cerr << __AFLOW_FUNC__ << " supercell_layers_s=" << supercell_layers_s << endl;
     }
-    //[CO20190520 - do NOT reduce total_layers based on shear direction]if(layers_per_cell_s<1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"layers_per_cell_s<1 (="+aurostd::utype2string(layers_per_cell_s)+")",_INPUT_ERROR_);}
+    //[CO20190520 - do NOT reduce total_layers based on shear direction]if(layers_per_cell_s<1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"layers_per_cell_s<1 (="+aurostd::utype2string(layers_per_cell_s)+")",_INPUT_ERROR_);}
     //[CO20190520 - do NOT reduce total_layers based on shear direction]if(layers_per_cell_s>1){  //let's adjust total_layers input to CreateSlab_RigidRotation() which builds supercell assuming layers_per_cell_s==1
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  int total_layers=DEFAULT_TOTAL_LAYERS;
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  string total_layers_string=vpflow.getattachedscheme("CREATE_SLAB::TOTAL_LAYERS");
@@ -686,9 +683,9 @@ namespace pflow {
     //[CO20190520 - do NOT reduce total_layers based on shear direction]    int _total_layers=aurostd::string2utype<int>(total_layers_string);
     //[CO20190520 - do NOT reduce total_layers based on shear direction]    if(_total_layers>0){total_layers=_total_layers;}
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  }
-    //[CO20190520 - do NOT reduce total_layers based on shear direction]  if(LDEBUG){cerr << soliloquy << " total_layers(pre)=" << total_layers << endl;}
+    //[CO20190520 - do NOT reduce total_layers based on shear direction]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " total_layers(pre)=" << total_layers << endl;}
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  total_layers=(total_layers+layers_per_cell_s-1)/layers_per_cell_s;  //ceil
-    //[CO20190520 - do NOT reduce total_layers based on shear direction]  if(LDEBUG){cerr << soliloquy << " total_layers(post)=" << total_layers << endl;}
+    //[CO20190520 - do NOT reduce total_layers based on shear direction]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " total_layers(post)=" << total_layers << endl;}
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  slab_flags.pop_attached("CREATE_SLAB::TOTAL_LAYERS");
     //[CO20190520 - do NOT reduce total_layers based on shear direction]  slab_flags.push_attached("CREATE_SLAB::TOTAL_LAYERS",aurostd::utype2string(total_layers));
     //[CO20190520 - do NOT reduce total_layers based on shear direction]}
@@ -712,7 +709,7 @@ namespace pflow {
         message << "rotation=" << endl; message << rotation << endl;
         message << "hkl_i=" << hkl_i << ", n_i(rotated)=" << n_i << endl;
         message << "hkl_s=" << hkl_s << ", n_s(rotated)=" << n_s << endl;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
       }
     }
 
@@ -725,7 +722,7 @@ namespace pflow {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(0){  //too much work, rely on atom.ijk instead!
-    //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {cerr << soliloquy << " defining half plane" << endl;}
+    //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {cerr << __AFLOW_FUNC__ << " defining half plane" << endl;}
     //[CO20190423 - too much work, rely on atom.ijk instead!]
     //[CO20190423 - too much work, rely on atom.ijk instead!]int count_total,count_above,count_below;
     //[CO20190423 - too much work, rely on atom.ijk instead!]count_total=xstr_slab.atoms.size();
@@ -734,17 +731,17 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]//int count_above=0,count_below=0,count_total=xstr_slab.atoms.size();
     //[CO20190423 - too much work, rely on atom.ijk instead!]
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " count_above=" << count_above << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " count_below=" << count_below << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " count_total=" << count_total << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " count_above=" << count_above << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " count_below=" << count_below << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " count_total=" << count_total << endl;
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(count_above!=count_below){
     //[CO20190423 - too much work, rely on atom.ijk instead!]  message << "count_above!=count_below";
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(count_above+count_below!=count_total){
     //[CO20190423 - too much work, rely on atom.ijk instead!]  message << "count_above+count_below!=count_total";
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]
     //[CO20190423 - too much work, rely on atom.ijk instead!]//half-plane is bad idea, too much room for error
@@ -754,9 +751,9 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]//xvector<double> p_hp=aurostd::modulus(xstr_slab_newbasis_supercell.lattice(3))/2.0*n_hp; //half plane value
     //[CO20190423 - too much work, rely on atom.ijk instead!]//double D_hp=-aurostd::scalar_product(n_hp,p_hp);
     //[CO20190423 - too much work, rely on atom.ijk instead!]//if(LDEBUG) {
-    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << soliloquy << " n_hp=" << n_hp << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << soliloquy << " p_hp=" << p_hp << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << soliloquy << " D_hp=" << D_hp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << __AFLOW_FUNC__ << " n_hp=" << n_hp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << __AFLOW_FUNC__ << " p_hp=" << p_hp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]//  cerr << __AFLOW_FUNC__ << " D_hp=" << D_hp << endl;
     //[CO20190423 - too much work, rely on atom.ijk instead!]//}
 
     //[CO20190423 - too much work, rely on atom.ijk instead!]//define zero plane along c-axis
@@ -765,9 +762,9 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]xvector<double> p_zp; //0,0,0
     //[CO20190423 - too much work, rely on atom.ijk instead!]double D_zp=-aurostd::scalar_product(n_zp,p_zp);
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " n_zp=" << n_zp << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " p_zp=" << p_zp << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << soliloquy << " D_zp=" << D_zp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " n_zp=" << n_zp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " p_zp=" << p_zp << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  cerr << __AFLOW_FUNC__ << " D_zp=" << D_zp << endl;
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
 
@@ -779,7 +776,7 @@ namespace pflow {
     // START - identify selective dynamics
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " identifying selective dynamics" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " identifying selective dynamics" << endl;}
 
     //k in atom.ijk will go from 0 to supercell_layers_i-1
 
@@ -788,15 +785,15 @@ namespace pflow {
     int k=0,k_min=xstr_slab.atoms.size(),k_max=-xstr_slab.atoms.size();
     for(uint i=0;i<xstr_slab.atoms.size();i++){
       const _atom& atom=xstr_slab.atoms[i];
-      if(LDEBUG) {cerr << soliloquy << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
       k=atom.ijk[3];
       if(k<k_min){k_min=k;}
       if(k>k_max){k_max=k;}
     }
-    if(LDEBUG) {cerr << soliloquy << " k_min=" << k_min << ", k_max=" << k_max << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " k_min=" << k_min << ", k_max=" << k_max << endl;}
     if(k_max-k_min+1!=supercell_layers_i){  //test of stupidity
       message << "k_max-k_min+1!=supercell_layers_i";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
     }
 
     uint count_total_fixed=0,count_bottom_fixed=0,count_top_fixed=0; //tests of stupidity
@@ -805,7 +802,7 @@ namespace pflow {
     xstr_slab.isd=true; //set selective dynamics
     for(uint i=0;i<xstr_slab.atoms.size();i++){
       _atom& atom=xstr_slab.atoms[i];
-      if(LDEBUG) {cerr << soliloquy << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
       k=atom.ijk[3];
       fixed_bottom=(k<(k_min+fixed_layers));
       fixed_top=(k>(k_min+(supercell_layers_i-fixed_layers-1)));
@@ -815,23 +812,23 @@ namespace pflow {
         count_total_fixed++;
         if(fixed_bottom){count_bottom_fixed++;}
         else if(fixed_top){count_top_fixed++;}
-        if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " is FIXED" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " is FIXED" << endl;}
       } else {
         //we only allow relaxation in z-direction because we want to allow planes of atoms to come together/go apart
         //atom.sd="TTT";  //default, allow relaxation
         atom.sd="FFT";  //default, allow relaxation //CORRECTION: only relax in z direction: Vitek Phil Mag 18, 773-786 (1968), also http://theory.cm.utexas.edu/forum/viewtopic.php?t=3301
-        if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " will RELAX" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " will RELAX" << endl;}
       }
     }
     if(LDEBUG) {
-      cerr << soliloquy << " count_bottom_fixed=" << count_bottom_fixed << endl;
-      cerr << soliloquy << " count_top_fixed=" << count_top_fixed << endl;
-      cerr << soliloquy << " count_bottom_fixed+count_top_fixed=" << count_bottom_fixed+count_top_fixed << endl;
-      cerr << soliloquy << " count_total_fixed=" << count_total_fixed << endl;
+      cerr << __AFLOW_FUNC__ << " count_bottom_fixed=" << count_bottom_fixed << endl;
+      cerr << __AFLOW_FUNC__ << " count_top_fixed=" << count_top_fixed << endl;
+      cerr << __AFLOW_FUNC__ << " count_bottom_fixed+count_top_fixed=" << count_bottom_fixed+count_top_fixed << endl;
+      cerr << __AFLOW_FUNC__ << " count_total_fixed=" << count_total_fixed << endl;
     }
     if(count_total_fixed!=count_bottom_fixed+count_top_fixed){
       message << "count_total_fixed!=count_bottom_fixed+count_top_fixed (" << count_total_fixed << "!=" << count_bottom_fixed+count_top_fixed << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     }
 
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(0){  //too much work, rely on atom.ijk instead!
@@ -843,8 +840,8 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]  xstr_slab.atoms[i].sd="TTT";  //default, change to FFF later
     //[CO20190423 - too much work, rely on atom.ijk instead!]  signed_point_plane_distance=aurostd::scalar_product(n_zp,xstr_slab.atoms[i].cpos)+D_zp; //n_zp is already normalized to 1.0
     //[CO20190423 - too much work, rely on atom.ijk instead!]  if(LDEBUG) {
-    //[CO20190423 - too much work, rely on atom.ijk instead!]    cerr << soliloquy << " atom.ijk=" << xstr_slab.atoms[i].ijk << endl;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]    cerr << soliloquy << " signed_point_plane_distance[atom=" << i << "]=" << signed_point_plane_distance << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]    cerr << __AFLOW_FUNC__ << " atom.ijk=" << xstr_slab.atoms[i].ijk << endl;
+    //[CO20190423 - too much work, rely on atom.ijk instead!]    cerr << __AFLOW_FUNC__ << " signed_point_plane_distance[atom=" << i << "]=" << signed_point_plane_distance << endl;
     //[CO20190423 - too much work, rely on atom.ijk instead!]  }
     //[CO20190423 - too much work, rely on atom.ijk instead!]  //(std::signbit(signed_point_plane_distance + _ZERO_TOL_ ) ? count_below++ : count_above++);  //not great about atoms right on plane
     //[CO20190423 - too much work, rely on atom.ijk instead!]  //[do later]((signed_point_plane_distance<-_ZERO_TOL_)? count_below++ : count_above++);
@@ -857,10 +854,10 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]//get number to keep fixed, assume a layer is one unit cell
     //[CO20190423 - too much work, rely on atom.ijk instead!]//uint count_keep_fixed=xstr_bulk.atoms.size() * supercell_layers_i * supercell_layers_i * fixed_layers;
     //[CO20190423 - too much work, rely on atom.ijk instead!]uint count_keep_fixed=xstr_bulk.atoms.size() * xy_dims * xy_dims * fixed_layers;
-    //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {cerr << soliloquy << " count_keep_fixed=" << count_keep_fixed << endl;}
+    //[CO20190423 - too much work, rely on atom.ijk instead!]if(LDEBUG) {cerr << __AFLOW_FUNC__ << " count_keep_fixed=" << count_keep_fixed << endl;}
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(2*count_keep_fixed>xstr_slab.atoms.size()){
     //[CO20190423 - too much work, rely on atom.ijk instead!]  message << "2*count_keep_fixed>xstr_slab.atoms.size()";
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]
     //[CO20190423 - too much work, rely on atom.ijk instead!]//fixed selective dynamics stuff at once
@@ -868,13 +865,13 @@ namespace pflow {
     //[CO20190423 - too much work, rely on atom.ijk instead!]for(uint i=0;i<count_keep_fixed;i++){xstr_slab.atoms[v_apd[i].index].sd="FFF";count_check++;} //bottom
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(count_check!=count_keep_fixed){
     //[CO20190423 - too much work, rely on atom.ijk instead!]  message << "count_check!=count_keep_fixed [1]";
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]count_check=0;
     //[CO20190423 - too much work, rely on atom.ijk instead!]for(uint i=v_apd.size()-1;i>v_apd.size()-1-count_keep_fixed;i--){xstr_slab.atoms[v_apd[i].index].sd="FFF";count_check++;} //top
     //[CO20190423 - too much work, rely on atom.ijk instead!]if(count_check!=count_keep_fixed){
     //[CO20190423 - too much work, rely on atom.ijk instead!]  message << "count_check!=count_keep_fixed [2]";
-    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+    //[CO20190423 - too much work, rely on atom.ijk instead!]  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
     //[CO20190423 - too much work, rely on atom.ijk instead!]}
 
@@ -904,12 +901,12 @@ namespace pflow {
       xvector<double> total_shift_fpos=xstr_slab_newbasis.c2f*total_shift_cpos;
       z_shift_fpos=total_shift_fpos[3];
       if(LDEBUG){
-        cerr << soliloquy << " total_shift_cpos=" << total_shift_cpos << endl;
-        cerr << soliloquy << " total_shift_fpos=" << total_shift_fpos << endl;
-        cerr << soliloquy << " z_shift_fpos=" << z_shift_fpos << endl;
+        cerr << __AFLOW_FUNC__ << " total_shift_cpos=" << total_shift_cpos << endl;
+        cerr << __AFLOW_FUNC__ << " total_shift_fpos=" << total_shift_fpos << endl;
+        cerr << __AFLOW_FUNC__ << " z_shift_fpos=" << z_shift_fpos << endl;
       }
     }
-    if(LDEBUG){cerr << soliloquy << " z_shift_fpos=" << z_shift_fpos << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " z_shift_fpos=" << z_shift_fpos << endl;}
 
     //stringstream POSCAR;
     stringstream new_AflowIn_ss;
@@ -945,14 +942,14 @@ namespace pflow {
       AVASP_populateXVASP(aflags,kflags,vflags,xvasp);
 
       FileName=xvasp.Directory + "/" + DEFAULT_AFLOW_QMVASP_OUT;
-      if(LDEBUG){cerr << soliloquy << " looking for: " << FileName << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking for: " << FileName << endl;}
       if(!aurostd::EFileExist(FileName)){all_vasp_done=false;break;}
       shear_fraction+=step_size;
       dir_count++;
     }
     dir_count=0;shear_fraction=0.0;
 
-    if(!all_vasp_done){message << "Creating sheared VASP runs";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);}
+    if(!all_vasp_done){message << "Creating sheared VASP runs";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);}
 
     //create directories if vasp is not done
     int half_k=supercell_layers_i/2;  //floor
@@ -961,10 +958,10 @@ namespace pflow {
     while(shear_fraction<shear_fraction_final){
       if(all_vasp_done==false){
         xvasp.clear();
-        if(LDEBUG) {cerr << soliloquy << " shear_fraction=" << shear_fraction << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " shear_fraction=" << shear_fraction << endl;}
 
         //apply shear
-        if(LDEBUG) {cerr << soliloquy << " applying shear" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " applying shear" << endl;}
         xstructure xstr_shear(xstr_slab);
         xstr_shear.write_DEBUG_flag=FALSE;  //FORCE
         const xmatrix<double>& c2f=xstr_slab.c2f;
@@ -972,13 +969,13 @@ namespace pflow {
         count_total=0;count_bottom=0;count_top=0;
         for(uint i=0;i<xstr_shear.atoms.size();i++){
           _atom& atom=xstr_shear.atoms[i];
-          if(LDEBUG) {cerr << soliloquy << " atom.fpos=" << atom.fpos << endl;}
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.fpos=" << atom.fpos << endl;}
           k=atom.ijk[3];
           if(k<(k_min+half_k)){ //not shearing
-            if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " NOT shearing" << endl;}
+            if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " NOT shearing" << endl;}
             count_bottom++;
           } else {  //shearing
-            if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " shearing" << endl;}
+            if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " shearing" << endl;}
             atom.cpos += (shear_fraction * d_layers_s) * n_s;
             if(partial_dissociation){atom.cpos -= (shear_fraction * z_shift_fpos) * n_z;}
             atom.fpos = c2f*atom.cpos; //C2F(xstr_shear.lattice,atom.cpos);
@@ -987,19 +984,19 @@ namespace pflow {
           count_total++;
         }
         if(LDEBUG) {
-          cerr << soliloquy << " count_bottom=" << count_bottom << endl;
-          cerr << soliloquy << " count_top=" << count_top << endl;
-          cerr << soliloquy << " count_bottom+count_top=" << count_bottom+count_top << endl;
-          cerr << soliloquy << " count_total=" << count_total << endl;
-          cerr << soliloquy << " xstr_shear.atoms.size()=" << xstr_shear.atoms.size() << endl;
+          cerr << __AFLOW_FUNC__ << " count_bottom=" << count_bottom << endl;
+          cerr << __AFLOW_FUNC__ << " count_top=" << count_top << endl;
+          cerr << __AFLOW_FUNC__ << " count_bottom+count_top=" << count_bottom+count_top << endl;
+          cerr << __AFLOW_FUNC__ << " count_total=" << count_total << endl;
+          cerr << __AFLOW_FUNC__ << " xstr_shear.atoms.size()=" << xstr_shear.atoms.size() << endl;
         }
         if(count_total!=xstr_shear.atoms.size()){
           message << "count_total!=xstr_shear.atoms.size()";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
         }
         if(count_total!=count_bottom+count_top){
           message << "count_total!=count_bottom+count_top";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
         }
 
         //[CO20190423 - too much work, rely on atom.ijk instead!]if(0){  //too much work, rely on atom.ijk instead!
@@ -1018,17 +1015,17 @@ namespace pflow {
         //  }
         //}
         xstr_shear.BringInCell(); //wrap around
-        if(LDEBUG) {cerr << soliloquy << " xstr_shear=" << endl;cerr << xstr_shear << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " xstr_shear=" << endl;cerr << xstr_shear << endl;}
 
         if(check_min_dist){ //sanity check as we rotate structure/atoms
           min_dist=xstr_shear.MinDist();
-          if(LDEBUG) {cerr << soliloquy << " mindist[" << (count_check_min_dist++)+dir_count << "]=" << min_dist << endl;}
-          if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << (count_check_min_dist++)+dir_count << "]=" << min_dist << endl;}
+          if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
         }
 
         //if(0){
         //  string destination=aurostd::utype2string(h_i)+aurostd::utype2string(k_i)+aurostd::utype2string(l_i) + "/" + aurostd::utype2string(dir_count);
-        //  if(LDEBUG) {cerr << soliloquy << " creating " << destination << endl;}
+        //  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " creating " << destination << endl;}
         //  aurostd::DirectoryMake(destination);
         //  destination+="/POSCAR";
         //  stringstream POSCAR; POSCAR.str("");
@@ -1086,7 +1083,7 @@ namespace pflow {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if(!all_vasp_done){
-      message << "Now waiting for sheared VASP runs";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
+      message << "Now waiting for sheared VASP runs";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
       return;
     }
 
@@ -1135,21 +1132,20 @@ namespace pflow {
   }
   void CleavageEnergyCalculation(const aurostd::xoption& vpflow,const xstructure& xstr_in,const _aflags& aflags,const _kflags& kflags,const _vflags& vflags,ofstream& FileMESSAGE,ostream& oss){
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "pflow::CleavageEnergyCalculation():";
     stringstream message;
     std::streamsize prec = 8;
     bool check_min_dist=true; //turn off if it gets too slow
     int count_check_min_dist=0;
 
     message << aflow::Banner("BANNER_NORMAL");
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);  //first to screen (not logged, file not opened)
-    if(LDEBUG) {cerr << soliloquy << " starting" << endl;}
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);  //first to screen (not logged, file not opened)
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting" << endl;}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // START - get conventional cell
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " get conventional cell" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " get conventional cell" << endl;}
 
     xstructure xstr_bulk(xstr_in);
     double min_dist=xstr_bulk.dist_nn_min;
@@ -1157,19 +1153,19 @@ namespace pflow {
     double min_dist_orig=min_dist;
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
-      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
     }
 
     bool convert_sconv=true;
     if(convert_sconv){xstr_bulk=Standard_Conventional_UnitCellForm(xstr_bulk);xstr_bulk.clean();}  //best to work with standard conventional unitcell //DX20191220 - uppercase to lowercase clean
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
       if(!aurostd::isequal(min_dist_orig,min_dist)){
         //throw a warning here instead, minimum distance MIGHT change with sconv
-        //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);
-        message << "Minimum distance changed (sprim -> sconv)";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
+        //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);
+        message << "Minimum distance changed (sprim -> sconv)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);
         min_dist_orig=min_dist;
       }
     }
@@ -1180,13 +1176,13 @@ namespace pflow {
     if(LDEBUG) {xstr_bulk.write_DEBUG_flag=TRUE;}
     //xstr_bulk.coord_flag=_COORDS_CARTESIAN_;  //much more accurate for this type of calculation
 
-    message << "structure(standard conventional)=";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << xstr_bulk << endl;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
+    message << "structure(standard conventional)=";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << xstr_bulk << endl;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
 
     if(check_min_dist){ //sanity check as we rotate structure/atoms
       min_dist=xstr_bulk.MinDist();
-      if(LDEBUG) {cerr << soliloquy << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
-      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Minimum distance changed",_VALUE_ERROR_);}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " mindist[" << count_check_min_dist++ << "]=" << min_dist << endl;}
+      if(!aurostd::isequal(min_dist_orig,min_dist)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Minimum distance changed",_VALUE_ERROR_);}
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1203,9 +1199,9 @@ namespace pflow {
     xstr_bulk.sym_eps=xstr_sym.sym_eps;
     bool skew=SYM::isLatticeSkewed(xstr_bulk.lattice,xstr_bulk.dist_nn_min,xstr_bulk.sym_eps);
     if(LDEBUG){
-      cerr << soliloquy << " xstr_bulk.dist_nn_min=" << xstr_bulk.dist_nn_min << endl;
-      cerr << soliloquy << " xstr_bulk.sym_eps=" << xstr_bulk.sym_eps << endl;
-      cerr << soliloquy << " skew=" << skew << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_bulk.dist_nn_min=" << xstr_bulk.dist_nn_min << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_bulk.sym_eps=" << xstr_bulk.sym_eps << endl;
+      cerr << __AFLOW_FUNC__ << " skew=" << skew << endl;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1216,7 +1212,7 @@ namespace pflow {
     // START - read flags
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " reading flags" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " reading flags" << endl;}
 
     int h_i=1,k_i=1,l_i=1;  //hkl of interest //needed for dirname
     xvector<int> hkl_i;     //needed for dirname
@@ -1231,7 +1227,7 @@ namespace pflow {
       l_i=aurostd::string2utype<int>(tokens[2]);
     }
     hkl_i[1]=h_i;hkl_i[2]=k_i;hkl_i[3]=l_i;
-    if(hkl_i[1]==0 && hkl_i[2]==0 && hkl_i[3]==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"hkl_i=(0,0,0)",_INPUT_ERROR_);}
+    if(hkl_i[1]==0 && hkl_i[2]==0 && hkl_i[3]==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"hkl_i=(0,0,0)",_INPUT_ERROR_);}
     string relaxation_layers_string=vpflow.getattachedscheme("CLEAVAGE_ENERGY::RELAXATION_LAYERS"); //step size
     if(aurostd::isfloat(relaxation_layers_string)){
       int _relaxation_layers=aurostd::string2utype<int>(relaxation_layers_string);
@@ -1244,8 +1240,8 @@ namespace pflow {
     message.precision(prec);
     message.unsetf(std::ios_base::floatfield);
 
-    message << "relaxation_layers=" << relaxation_layers;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << "spin=" << (spin_off?"OFF":"ON");pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "relaxation_layers=" << relaxation_layers;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "spin=" << (spin_off?"OFF":"ON");pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
     message.precision(prec_original); //set back
     message.flags(ff_original); //set back
@@ -1258,10 +1254,10 @@ namespace pflow {
     // START - defining hkl normals
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " defining HKL normals" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " defining HKL normals" << endl;}
 
     xvector<double> n_i=slab::HKLPlane2Normal(xstr_bulk.lattice,hkl_i);
-    if(LDEBUG) {cerr << soliloquy << " n_i[h=" << hkl_i << "]=" << n_i << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " n_i[h=" << hkl_i << "]=" << n_i << endl;}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // STOP - defining hkl normals
@@ -1293,12 +1289,12 @@ namespace pflow {
 
     all_vasp_done=true;
     FileName=xvasp.Directory + "/" + DEFAULT_AFLOW_QMVASP_OUT;
-    if(LDEBUG){cerr << soliloquy << " looking for: " << FileName << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking for: " << FileName << endl;}
     if(!aurostd::EFileExist(FileName)){all_vasp_done=false;}
 
     bool convert_sprim=true;
     if(!all_vasp_done){
-      message << "Creating bulk VASP run";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+      message << "Creating bulk VASP run";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
       xvasp.clear();
 
@@ -1349,7 +1345,7 @@ namespace pflow {
     dir_count++;
 
     if(!all_vasp_done){
-      message << "Now waiting for the bulk VASP run";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
+      message << "Now waiting for the bulk VASP run";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
       return;
     }
 
@@ -1362,8 +1358,8 @@ namespace pflow {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     xstructure xstr_relaxed=KBIN::GetMostRelaxedStructure(xvasp.Directory);
-    message << "structure(bulk_relaxed)=";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
-    message << xstr_relaxed << endl;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
+    message << "structure(bulk_relaxed)=";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << xstr_relaxed << endl;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_RAW_);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // STOP - grab relaxed bulk
@@ -1373,7 +1369,7 @@ namespace pflow {
     // START - create slab
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    message << "Creating slab";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    message << "Creating slab";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
     //xvector<int> hkl_i;
     int total_layers = 0;
@@ -1383,7 +1379,7 @@ namespace pflow {
 
     xstructure xstr_slab=slab::CreateSlab_SurfaceLattice(vpflow,xstr_relaxed,hkl_i,total_layers,rotation,xstr_slablattice,sc2pcMap_slab,pc2scMap_slab,aflags,FileMESSAGE,AUROSTD_MAX_DOUBLE,oss);
 
-    if(total_layers%2!=0){message << "total_layers is odd, it is better to pick an even number (top vs. bottom)";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);}
+    if(total_layers%2!=0){message << "total_layers is odd, it is better to pick an even number (top vs. bottom)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_WARNING_);}
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // STOP - create slab
@@ -1393,7 +1389,7 @@ namespace pflow {
     // START - resolve layers count
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG){cerr << soliloquy << " resolving layers count" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " resolving layers count" << endl;}
 
     double d_spacing=slab::getSpacingHKLPlane(xstr_bulk,hkl_i); //aurostd::modulus(xstr_slab.lattice(1))/sqrt(h_s*h_s+k_s*k_s+l_s*l_s);
     double d_layers=slab::getDistanceBetweenImages(xstr_bulk,n_i,false); //this depends on UN-ROTATED lattice
@@ -1401,13 +1397,13 @@ namespace pflow {
     int layers_per_cell=(int)(d_cells/d_layers);  //floor
     int supercell_layers=(total_layers+layers_per_cell-1)/layers_per_cell;  //ceil //(double)total_layers;
     if(LDEBUG) {
-      cerr << soliloquy << " n_i[h=" << hkl_i << "]=" << n_i << endl;
-      cerr << soliloquy << " d_spacing=" << d_spacing << endl;
-      cerr << soliloquy << " d_layers=" << d_layers << endl;
-      cerr << soliloquy << " d_cells=" << d_cells << endl;
-      cerr << soliloquy << " abs(d_layers-d_cells)=" << abs(d_layers-d_cells) << endl;
-      cerr << soliloquy << " layers_per_cell=" << layers_per_cell << endl;
-      cerr << soliloquy << " supercell_layers=" << supercell_layers << endl;
+      cerr << __AFLOW_FUNC__ << " n_i[h=" << hkl_i << "]=" << n_i << endl;
+      cerr << __AFLOW_FUNC__ << " d_spacing=" << d_spacing << endl;
+      cerr << __AFLOW_FUNC__ << " d_layers=" << d_layers << endl;
+      cerr << __AFLOW_FUNC__ << " d_cells=" << d_cells << endl;
+      cerr << __AFLOW_FUNC__ << " abs(d_layers-d_cells)=" << abs(d_layers-d_cells) << endl;
+      cerr << __AFLOW_FUNC__ << " layers_per_cell=" << layers_per_cell << endl;
+      cerr << __AFLOW_FUNC__ << " supercell_layers=" << supercell_layers << endl;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1418,7 +1414,7 @@ namespace pflow {
     // START - identify selective dynamics
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(LDEBUG) {cerr << soliloquy << " identifying selective dynamics" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " identifying selective dynamics" << endl;}
 
     //k in atom.ijk will go from 0 to supercell_layers-1
 
@@ -1427,15 +1423,15 @@ namespace pflow {
     int k=0,k_min=xstr_slab.atoms.size(),k_max=-xstr_slab.atoms.size();
     for(uint i=0;i<xstr_slab.atoms.size();i++){
       const _atom& atom=xstr_slab.atoms[i];
-      if(LDEBUG) {cerr << soliloquy << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
       k=atom.ijk[3];
       if(k<k_min){k_min=k;}
       if(k>k_max){k_max=k;}
     }
-    if(LDEBUG) {cerr << soliloquy << " k_min=" << k_min << ", k_max=" << k_max << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " k_min=" << k_min << ", k_max=" << k_max << endl;}
     if(k_max-k_min+1!=supercell_layers){  //test of stupidity
       message << "k_max-k_min!=supercell_layers";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
     }
 
     uint count_total_relaxing=0,count_bottom_relaxing=0,count_top_relaxing=0; //tests of stupidity
@@ -1444,7 +1440,7 @@ namespace pflow {
     xstr_slab.isd=true; //set selective dynamics
     for(uint i=0;i<xstr_slab.atoms.size();i++){
       _atom& atom=xstr_slab.atoms[i];
-      if(LDEBUG) {cerr << soliloquy << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.fpos=" << atom.fpos << ", atom.ijk=" << atom.ijk << endl;}
       k=atom.ijk[3];
       relax_bottom=(k<(k_min+relaxation_layers));
       relax_top=(k>(k_min+(supercell_layers-relaxation_layers-1)));
@@ -1454,21 +1450,21 @@ namespace pflow {
         count_total_relaxing++;
         if(relax_bottom){count_bottom_relaxing++;}
         else if(relax_top){count_top_relaxing++;}
-        if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " will RELAX" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " will RELAX" << endl;}
       } else {
         atom.sd="FFF";  //keep fixed
-        if(LDEBUG) {cerr << soliloquy << " atom.ijk=" << atom.ijk << " is FIXED" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom.ijk=" << atom.ijk << " is FIXED" << endl;}
       }
     }
     if(LDEBUG) {
-      cerr << soliloquy << " count_bottom_relaxing=" << count_bottom_relaxing << endl;
-      cerr << soliloquy << " count_top_relaxing=" << count_top_relaxing << endl;
-      cerr << soliloquy << " count_bottom_relaxing+count_top_relaxing=" << count_bottom_relaxing+count_top_relaxing << endl;
-      cerr << soliloquy << " count_total_relaxing=" << count_total_relaxing << endl;
+      cerr << __AFLOW_FUNC__ << " count_bottom_relaxing=" << count_bottom_relaxing << endl;
+      cerr << __AFLOW_FUNC__ << " count_top_relaxing=" << count_top_relaxing << endl;
+      cerr << __AFLOW_FUNC__ << " count_bottom_relaxing+count_top_relaxing=" << count_bottom_relaxing+count_top_relaxing << endl;
+      cerr << __AFLOW_FUNC__ << " count_total_relaxing=" << count_total_relaxing << endl;
     }
     if(count_total_relaxing!=count_bottom_relaxing+count_top_relaxing){
       message << "count_total_relaxing!=count_bottom_relaxing+count_top_relaxing (" << count_total_relaxing << "!=" << count_bottom_relaxing+count_top_relaxing << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_VALUE_ERROR_); //CO20190226
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //CO20190226
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1493,11 +1489,11 @@ namespace pflow {
 
     all_vasp_done=true;
     FileName=xvasp.Directory + "/" + DEFAULT_AFLOW_QMVASP_OUT;
-    if(LDEBUG){cerr << soliloquy << " looking for: " << FileName << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking for: " << FileName << endl;}
     if(!aurostd::EFileExist(FileName)){all_vasp_done=false;}
 
     if(!all_vasp_done){
-      message << "Creating slab VASP run";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+      message << "Creating slab VASP run";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
 
       xvasp.clear();
       //load in xstructure
@@ -1541,7 +1537,7 @@ namespace pflow {
     dir_count++;
 
     if(!all_vasp_done){
-      message << "Now waiting for the slab VASP run";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
+      message << "Now waiting for the slab VASP run";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_COMPLETE_);
       return;
     }
 
@@ -1563,15 +1559,14 @@ namespace pflow {
   bool findClosedPackingPlane(istream& input){xstructure xstr_in(input,IOAFLOW_AUTO);return findClosedPackingPlane(xstr_in);} //CO20191110
   bool findClosedPackingPlane(const xstructure& xstr_in){ //CO20191110
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy="pflow::findClosedPackingPlane():";
 
-    if(LDEBUG){cerr << soliloquy << " xstr_in=" << endl;cerr << xstr_in << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " xstr_in=" << endl;cerr << xstr_in << endl;}
 
     xstructure xstr_grid(xstr_in);
     xstr_grid.GenerateGridAtoms(3); //-3:3 in every direction
     const deque<_atom>& grid_atoms=xstr_grid.grid_atoms;
 
-    if(LDEBUG){cerr << soliloquy << " grid_atoms=" << endl;for(uint i=0;i<grid_atoms.size();i++){cerr << "i=" << i << ": cpos=" << grid_atoms[i].cpos << endl;}}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " grid_atoms=" << endl;for(uint i=0;i<grid_atoms.size();i++){cerr << "i=" << i << ": cpos=" << grid_atoms[i].cpos << endl;}}
 
     aurostd::xcombos xc(grid_atoms.size(),4,'C');  //need to check coplanarity: requires 4 points
     vector<int> combo;
@@ -1584,7 +1579,7 @@ namespace pflow {
       const _atom& a4=grid_atoms[combo[3]];
 
       if(LDEBUG){
-        cerr << soliloquy << " checking coplanarity of:" << endl;
+        cerr << __AFLOW_FUNC__ << " checking coplanarity of:" << endl;
         cerr << a1.cpos << endl;
         cerr << a2.cpos << endl;
         cerr << a3.cpos << endl;
@@ -1596,7 +1591,7 @@ namespace pflow {
       //use formula from https://en.wikipedia.org/wiki/Coplanarity
       if(aurostd::isequal( aurostd::scalar_product( aurostd::vector_product( a2.cpos-a1.cpos , a4.cpos-a1.cpos ) , a3.cpos-a1.cpos ) , 0.0)){
         if(LDEBUG){
-          cerr << soliloquy << " found coplanar set" << endl;
+          cerr << __AFLOW_FUNC__ << " found coplanar set" << endl;
 
 
         }
@@ -1775,17 +1770,15 @@ namespace pflow {
       vector<double>& v_intensity_smooth,
       double lambda) { //CO20190520 //CO20190620 - v_peaks_amplitude not needed
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "GetXrayPeaks():";
-    if(LDEBUG){cerr << soliloquy << " input str=" << endl;cerr << str << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " input str=" << endl;cerr << str << endl;}
     GetXray2ThetaIntensity(str,v_twotheta,v_intensity,lambda);  //v_amplitude can be grabbed later
     return GetXrayPeaks(v_twotheta,v_intensity,v_intensity_smooth);
   }
   vector<uint> GetXrayPeaks(const vector<double>& v_twotheta,const vector<double>& v_intensity,vector<double>& v_intensity_smooth) { //CO20190520 //CO20190620 - v_peaks_amplitude not needed
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "GetXrayPeaks():";
 
-    if(v_twotheta.size()<2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"v_twotheta.size()<2",_VALUE_ILLEGAL_);}
-    if(v_twotheta.size()!=v_intensity.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"v_twotheta.size()!=v_intensity.size()",_VALUE_ILLEGAL_);}
+    if(v_twotheta.size()<2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"v_twotheta.size()<2",_VALUE_ILLEGAL_);}
+    if(v_twotheta.size()!=v_intensity.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"v_twotheta.size()!=v_intensity.size()",_VALUE_ILLEGAL_);}
 
     xvector<double> xv_intensity=aurostd::vector2xvector<double>(v_intensity),xv_intensity_smooth;
     uint smoothing_iterations=4,avg_window=4;int width_maximum=1;double significance_multiplier=1.0;  //defaults
@@ -1796,10 +1789,10 @@ namespace pflow {
     double davg_window=twotheta_smoothing/twotheta_diff;
     avg_window=max(avg_window,(uint)davg_window);
     if(LDEBUG){
-      cerr << soliloquy << " twotheta_smoothing=" << twotheta_smoothing << endl;
-      cerr << soliloquy << " twotheta_diff=" << twotheta_diff << endl;
-      cerr << soliloquy << " davg_window=" << davg_window << endl;
-      cerr << soliloquy << " avg_window=" << avg_window << endl;
+      cerr << __AFLOW_FUNC__ << " twotheta_smoothing=" << twotheta_smoothing << endl;
+      cerr << __AFLOW_FUNC__ << " twotheta_diff=" << twotheta_diff << endl;
+      cerr << __AFLOW_FUNC__ << " davg_window=" << davg_window << endl;
+      cerr << __AFLOW_FUNC__ << " avg_window=" << avg_window << endl;
     }
 
     //CO COME BACK, plug in 20-120 range
@@ -1808,8 +1801,8 @@ namespace pflow {
     vector<uint> peak_indices;for(uint i=0;i<_peak_indices.size();i++){peak_indices.push_back(_peak_indices[i]-xv_intensity.lrows);} //shift indices for xvector -> vector conversion
 
     if(LDEBUG){
-      cerr << soliloquy << " _peak_indices=" << aurostd::joinWDelimiter(_peak_indices,",") << endl;
-      cerr << soliloquy << "  peak_indices=" << aurostd::joinWDelimiter(peak_indices,",") << endl;
+      cerr << __AFLOW_FUNC__ << " _peak_indices=" << aurostd::joinWDelimiter(_peak_indices,",") << endl;
+      cerr << __AFLOW_FUNC__ << "  peak_indices=" << aurostd::joinWDelimiter(peak_indices,",") << endl;
     }
 
     return peak_indices;
@@ -1841,7 +1834,7 @@ namespace pflow {
     //[CO20190620 - moved to aurostd::getPeaks()]  if(local_maximum && significant){
     //[CO20190620 - moved to aurostd::getPeaks()]    v_peaks_twotheta.push_back(v_twotheta[i-xv_intensity.lrows]);
     //[CO20190620 - moved to aurostd::getPeaks()]    v_peaks_intensity.push_back(v_intensity[i-xv_intensity.lrows]);
-    //[CO20190620 - moved to aurostd::getPeaks()]    if(LDEBUG) {cerr << soliloquy << " PEAK[two-theta=" << v_twotheta[i-xv_intensity.lrows] << "]=" << xv_intensity[i] << endl;}
+    //[CO20190620 - moved to aurostd::getPeaks()]    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " PEAK[two-theta=" << v_twotheta[i-xv_intensity.lrows] << "]=" << xv_intensity[i] << endl;}
     //[CO20190620 - moved to aurostd::getPeaks()]  }
     //[CO20190620 - moved to aurostd::getPeaks()]}
     //[CO20190620 - moved to aurostd::getPeaks()]
@@ -2160,7 +2153,6 @@ namespace pflow {
   void GetXray(const xstructure& str, vector<double>& dist,vector<double>& sf,
       vector<double>& scatt_fact, //CO20190520
       vector<double>& mass, vector<double>& twoB_vec,double lambda) {
-    string soliloquy = XPID + "pflow::GetXray():"; //CO20190322
     stringstream message; //CO20190322
     // Get data from str.
     // Set scale to 1 so you don't need to rescale coordinates.
@@ -2183,7 +2175,7 @@ namespace pflow {
       _atom& atom=sstr.atoms[i]; atom.CleanName();
       if(atom.name_is_given==FALSE || atom.cleanname.empty()){  //CO20190322
         message << "Need to provide atom names";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _VALUE_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
       }
       scatt_fact[i]=GetXrayScattFactor(atom.cleanname,lambda);
       mass[i]=GetAtomMass(atom.cleanname);
@@ -2254,6 +2246,111 @@ namespace pflow {
 // ***************************************************************************
 // Function GetRDF
 // ***************************************************************************
+namespace pflow {
+  vector<vector<int> > getvvitypesRDF(const xstructure& xstr){  //CO20220627
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    vector<vector<int> > _vvitypes,vvitypes;
+    vector<int> vitypes,vsizes;
+    uint i=0,j=0;
+    for(i=0;i<2;i++){
+      _vvitypes.push_back(vector<int>(0));
+      for(j=0;j<xstr.num_each_type.size();j++){_vvitypes.back().push_back(j);}  //initial set, not all of these are viable options
+      vsizes.push_back(xstr.num_each_type.size());
+    }
+    aurostd::xcombos xc(vsizes,'E');
+    while(xc.increment()){
+      vitypes=xc.applyCombo(_vvitypes);
+      if(vitypes[1]<vitypes[0]){continue;}  //filter so we don't get duplicates
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " vitypes=" << aurostd::joinWDelimiter(vitypes,",") << endl;}
+      vvitypes.push_back(vitypes);
+    }
+    return vvitypes;
+  }
+  void GetRDF(const xstructure& xstr_in,aurostd::xmatrix<double>& rdf_all,const double rmax,const int nbins,bool raw_counts,const double sigma,const int _window_gaussian) { //CO20220624 - new procedure
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
+    xstructure xstr(xstr_in);
+    if(xstr.species.size()==0){xstr.species=aurostd::vector2deque(pflow::getFakeElements(xstr.num_each_type.size()));}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " species=" << aurostd::joinWDelimiter(xstr.species,",") << endl;}
+    deque<_atom> atoms_cell;
+    deque<deque<uint> > i_neighbors;
+    deque<deque<double> > distances;
+    double rmin=0;
+    //SC+CO20220711 - unique_only can only be true if we scale properly by the Wyckoff multiplicity
+    //easier to brute force count
+    bool prim=true,unique_only=false;
+    xstr.GetNeighbors(atoms_cell,i_neighbors,distances,rmax,rmin,prim,unique_only);
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " atoms_cell.size()=" << atoms_cell.size() << endl;}
+    //for compound ABC, need counts for AA, AB, AC, BB, BC, CC
+    //this is bit-enumeration for sets of two (i,j) ensuring i<j
+    vector<vector<int> > vvitypes=getvvitypesRDF(xstr);
+    rdf_all=aurostd::xmatrix<double>(nbins,vvitypes.size()+1); //resize, +1 because last column will be totals
+    uint i=0;
+    //SC+CO20220711
+    //if the unit cell has more than one atom of each type, we need to average their contributions
+    //this is equivalent to adding partial contribution based on num_each_type
+    vector<double> vincrements;
+    for(i=0;i<atoms_cell.size();i++){vincrements.push_back( 1.0/xstr.num_each_type[ atoms_cell[i].type ] );}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vincrements=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(vincrements),",") << endl;}
+    int itype=0,ibin=0;
+    double dist=0.0,rad=0.0;
+    double drad=rmax/(double)nbins; //sphere shell volume=4*pi*rad^2*drad
+    vector<int> vitypes;
+    uint j=0,k=0;
+    for(i=0;i<i_neighbors.size();i++){
+      for(j=0;j<i_neighbors[i].size();j++){
+        dist=distances[i][j];
+        if(dist<rmax){
+          ibin=int((dist/rmax)*nbins)+rdf_all.lrows;
+          //need to figure out which bin to increment
+          //first create vitypes of two atoms, sort just in case
+          vitypes.clear();
+          vitypes.push_back(atoms_cell[i].type);vitypes.push_back(xstr.grid_atoms[i_neighbors[i][j]].type);
+          std::sort(vitypes.begin(),vitypes.end());
+          //search vvitypes for match
+          itype=AUROSTD_MAX_INT;
+          for(k=0;k<vvitypes.size()&&itype==AUROSTD_MAX_INT;k++){
+            if(vitypes==vvitypes[k]){itype=k;}
+          }
+          if(itype==AUROSTD_MAX_INT){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"could not find itype",_INDEX_MISMATCH_);}
+          itype+=rdf_all.lcols; //+1 because xmatrix starts with 1
+          if(LDEBUG){
+            cerr << __AFLOW_FUNC__ << " ibin=" << ibin << " (dist=" << dist << ")" << endl;
+            cerr << __AFLOW_FUNC__ << " itype=" << itype << endl;
+          }
+          rdf_all[ibin][itype]+=vincrements[i];
+          rdf_all[ibin][rdf_all.ucols]+=vincrements[i];  //last row is totals
+        }
+      }
+    }
+    if(raw_counts==false){
+      for(ibin=rdf_all.lrows;ibin<=rdf_all.urows;ibin++){
+        rad=drad*(ibin-rdf_all.lrows);
+        if(ibin==rdf_all.lrows && !aurostd::iszero(rdf_all[ibin][rdf_all.ucols],_ZERO_TOL_)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"first bin cannot be normalized (rad==0), increase nbins",_VALUE_ILLEGAL_);}
+        for(itype=rdf_all.lcols;itype<=rdf_all.ucols;itype++){
+          if(aurostd::nonZeroWithinTol(rad,_ZERO_TOL_)){rdf_all[ibin][itype]/=(4.0*PI*std::pow(rad,2.0)*drad);}
+        }
+      }
+    }
+    if(!aurostd::iszero(sigma)){  //smooth
+      aurostd::xvector<double> _xcol,xcol,filter_gaussian;
+      int window_gaussian=_window_gaussian;
+      if(window_gaussian==0){window_gaussian=aurostd::gaussian_filter_get_window(sigma);}
+      filter_gaussian=aurostd::gaussian_filter_xv(sigma,window_gaussian,rdf_all.lrows);
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " filter_gaussian[sigma=" << sigma << ",window_gaussian=" << window_gaussian << "]=" << filter_gaussian << endl;}
+      for(itype=rdf_all.lcols;itype<=rdf_all.ucols;itype++){
+        _xcol=rdf_all.getcol(itype);  //extract column
+        xcol=aurostd::convolution(_xcol,filter_gaussian,CONV_SHAPE_SAME);
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " xcol(pre)[itype=" << itype << "]=" << _xcol << endl;
+          cerr << __AFLOW_FUNC__ << " xcol(post)[itype=" << itype << "]=" << xcol << endl;
+        }
+        for(ibin=rdf_all.lrows;ibin<=rdf_all.urows;ibin++){rdf_all[ibin][itype]=xcol[ibin];}  //plug back in
+      }
+    }
+    if(LDEBUG){PrintRDF(xstr,rmax,nbins,rdf_all,cerr);}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " END" << endl;}
+  }
 // This function gets the radial distribution functions (RDF).
 // The RDF for an atom is just a binned histogram of the
 // number of atoms (possibly of a given type) a distance r away.  
@@ -2266,16 +2363,17 @@ namespace pflow {
 // lines (ntypes+1)*natoms+K+(ntypes+1)*J = type J / type K average RDF.
 //    (if row: K=ntypes then the rdf is the type I / All types RDF.)
 // Dane Morgan, Modified by Stefano Curtarolo
-namespace pflow {
-  void GetRDF(xstructure str, const double& rmax,
-      const int& nbins, aurostd::matrix<double>& rdf_all) {  //CO20200404 pflow::matrix()->aurostd::matrix()
+// CO20220627 - not working, tethered to a few old routines, will need to be rewritten (later)
+// use new procedure above GetRDF()
+  void GetRDF_20220101(const xstructure& str, const double rmax,
+      const int nbins, aurostd::matrix<double>& rdf_all) {  //CO20200404 pflow::matrix()->aurostd::matrix()
     int natoms=str.atoms.size();
     std::deque<int> num_each_type=str.num_each_type;
     int ntyp=num_each_type.size();
     rdf_all=aurostd::matrix<double> ((ntyp+1)*natoms,nbins); //CO20200404 pflow::matrix()->aurostd::matrix()
     deque<deque<_atom> > nmat;
-    // [OBSOLETE]    pflow::GetStrNeighData(str,rmax,nmat);
-    str.GetStrNeighData(rmax,nmat);   // once GetRD goes in xstructure I can remove the copy
+    // [OBSOLETE]    pflow::GetNeighData(str,rmax,nmat);  //CO20220623 - using new GetNeighData()
+    str.GetNeighData(rmax,nmat);   // once GetRD goes in xstructure I can remove the copy //CO20220623 - using new GetNeighData()
     // for(int i=0;i<nmat[0].size();i++) cout << AtomDist(nmat[0][0],nmat[0][i]) << " "; cout << endl;
     for(int I1=0;I1<(int)nmat.size();I1++) { // Each atom for which we find RDF.
       int I2=1;
@@ -2462,13 +2560,12 @@ namespace pflow {
       const aurostd::matrix<double>& rdfsh_all_B,
       const int nsh, vector<int>& best_match,
       aurostd::matrix<double>& rms_mat) {  //CO20200404 pflow::matrix()->aurostd::matrix()
-    string soliloquy=XPID+"pflow::CmpRDFShells():";
     double TOL=1e-15;
     std::deque<int> netype_A=str_A.num_each_type;
     std::deque<int> netype_B=str_B.num_each_type;
     // Exit if A and B have different numbers of any types of atoms.
     if(!pflow::VVequal(netype_A,netype_B) || netype_A.size()!=netype_B.size()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"structures A and B do not have the same number of each type of atom",_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"structures A and B do not have the same number of each type of atom",_INPUT_ILLEGAL_); //CO20200624
     }
     int nat=str_A.atoms.size();
     int nt=netype_A.size();
@@ -2546,10 +2643,10 @@ namespace pflow {
 
     deque<deque<_atom> > neigh_mat1;
     deque<deque<_atom> > neigh_mat2;
-    // [OBSOLETE] pflow::GetStrNeighData(str1,cutoff,neigh_mat1);
-    // [OBSOLETE] pflow::GetStrNeighData(str2,cutoff,neigh_mat2);
-    str1.GetStrNeighData(cutoff,neigh_mat1);
-    str2.GetStrNeighData(cutoff,neigh_mat2);
+    // [OBSOLETE] pflow::GetNeighData(str1,cutoff,neigh_mat1);  //CO20220623 - using new GetNeighData()
+    // [OBSOLETE] pflow::GetNeighData(str2,cutoff,neigh_mat2);  //CO20220623 - using new GetNeighData()
+    str1.GetNeighData(cutoff,neigh_mat1); //CO20220623 - using new GetNeighData()
+    str2.GetNeighData(cutoff,neigh_mat2); //CO20220623 - using new GetNeighData()
 
     int ntypes1=(int)str1.num_each_type.size();
     int ntypes2=(int)str2.num_each_type.size();
@@ -2969,7 +3066,6 @@ namespace pflow {
 // follows a "#".
 namespace pflow {
   void ReadInRTParams(ifstream& rtinfile, pflow::rtparams& rtp) {
-    string soliloquy=XPID+"pflow::ReadInRTParams():";
 
     // Read in all the tokens.
     string s,s_ns;
@@ -2983,7 +3079,7 @@ namespace pflow {
           string token,sval;
           int id=s.find('=');
           if(id>=(int)s.length()) {
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
           }
           token=s.substr(0,id);
           token=aurostd::RemoveSpaces(token);
@@ -3253,7 +3349,7 @@ namespace pflow {
       }// PLANECOLOR
 
       if(!found_token) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
       }
 
     } // for i
@@ -3343,7 +3439,7 @@ namespace pflow {
           a.fpos=C2F(xlat1,a.cpos);
           //	a=pflow::SetFpos(a,C2F(lat1,cpos2[cnt]));
           a=pflow::SetType(a,num_types_1+it);
-          str1.AddAtom(a);
+          str1.AddAtom(a,false);  //CO20230319 - add by type
           cnt++;
         }
       }
@@ -3756,7 +3852,6 @@ namespace pflow {
 // ***************************************************************************
 namespace pflow {
   void RayTraceManager(vector<string> argv) {
-    string soliloquy=XPID+"pflow::RayTraceManager():";
     ifstream rtinfile(argv.at(2).c_str()); // File where RT params are input.
     aurostd::InFileExistCheck("RayTraceFuncs.cc/RayTraceManager",argv.at(2),rtinfile);
     pflow::rtparams rtp; // Object that stores RT params.
@@ -3765,7 +3860,7 @@ namespace pflow {
       case 0:{ // A single file of structures.
                // Read in structure list.
                if(rtp.input_files.size()<1) {
-                 throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"must specify a structure list file to open with the token INFILE (e.g., INFILE = STRLIST)",_FILE_CORRUPT_); //CO20200624
+                 throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"must specify a structure list file to open with the token INFILE (e.g., INFILE = STRLIST)",_FILE_CORRUPT_); //CO20200624
                }
                ifstream strlist_inf(rtp.input_files[0].c_str());
                aurostd::InFileExistCheck("RayTraceFuncs.cc/RayTraceManager",rtp.input_files[0].c_str(),strlist_inf);
@@ -3841,7 +3936,7 @@ namespace pflow {
                break;
              }
       default:{
-                throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"invalid CALCTYPE = "+aurostd::utype2string(rtp.calc_type),_INPUT_ILLEGAL_); //CO20200624
+                throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"invalid CALCTYPE = "+aurostd::utype2string(rtp.calc_type),_INPUT_ILLEGAL_); //CO20200624
               }
     }//switch
   }
@@ -5033,7 +5128,6 @@ namespace pflow {
 //   will be calculated.
 namespace pflow {
   void ReadInPDOSData(const pflow::projdata& prd, pflow::pdosdata& pdd) {
-    string soliloquy=XPID+"pflow::ReadInPDOSData():";
     stringstream message;
 
     ifstream infile(pdd.PDOSinfile.c_str());
@@ -5073,7 +5167,7 @@ namespace pflow {
           string sval;
           int id=s.find('=');
           if(id>=(int)s.length()) {
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
           }
           token=s.substr(0,id);
           token=aurostd::RemoveSpaces(token);
@@ -5188,7 +5282,7 @@ namespace pflow {
       }// PRINT_PARAMS
 
       if(!found_token) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
       }
 
     } // for i
@@ -5221,7 +5315,7 @@ namespace pflow {
           message << "Error in case: " << i+1 << endl;
           message << "too low or high an atom number has been entered in entry: " << ia+1 << endl;
           message << "Bad value is: " << atp << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
       }
       for(int ik=0;ik<(int)pdd.pdos_k[i].size();ik++) {
@@ -5230,7 +5324,7 @@ namespace pflow {
           message << "Error in case: " << i+1 << endl;
           message << "too low or high a kpt number has been entered in entry: " << ik+1 << endl;
           message << "Bad value is: " << kp << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
       }
       for(int ib=0;ib<(int)pdd.pdos_b[i].size();ib++) {
@@ -5239,7 +5333,7 @@ namespace pflow {
           message << "Error in case: " << i+1 << endl;
           message << "too low or high a bnd number has been entered in entry: " << ib+1 << endl;
           message << "Bad value is: " << bp << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
       }
       for(int ilm=0;ilm<(int)pdd.pdos_lm[i].size();ilm++) {
@@ -5248,7 +5342,7 @@ namespace pflow {
           message << "Error in case: " << i+1 << endl;
           message << "too low or high an lm number has been entered in entry: " << ilm+1 << endl;
           message << "Bad value is: " << lmp << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
       }
     }
@@ -5397,7 +5491,7 @@ namespace pflow {
     message << "You have used the token ATOMS this many times: " << atom_cnt << endl;
     message << "These must be equal and >0 - the token ATOMS must precede each case and must occurr at least once. "<< endl;
     message << "This error is probably due to your having forgot to use the ATOMS token. Please type ATOMS=*** as the first line for each case."<< endl;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"pflow::AtomCntError():",message,_INPUT_ILLEGAL_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,"pflow::AtomCntError():",message,_INPUT_ILLEGAL_); //CO20200624
   }
 }
 
@@ -5417,7 +5511,6 @@ namespace pflow {
 namespace pflow {
   void ReadSumDOSParams(ifstream& infile, pflow::pdosdata& pdd) {
     // Defaults (emin,emax,nbins,smooth_sigma,print_params,efermi)
-    string soliloquy=XPID+"pflow::ReadSumDOSParams():";
     stringstream message;
     pdd.emin=0.0;
     pdd.emax=0.0;
@@ -5441,7 +5534,7 @@ namespace pflow {
           string sval;
           int id=s.find('=');
           if(id>=(int)s.length()) {
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"the following token is incorrectly formatted: "+s,_INPUT_ILLEGAL_); //CO20200624
           }
           token=s.substr(0,id);
           token=aurostd::RemoveSpaces(token);
@@ -5523,7 +5616,7 @@ namespace pflow {
         found_token=1;
       }// NLM
       if(!found_token) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"token is not recognized: "+tok,_INPUT_ILLEGAL_); //CO20200624
       }
     } // for i over tokens
 
@@ -5535,7 +5628,7 @@ namespace pflow {
           message << "Error in case: " << i+1 << endl;
           message << "You have entered too low or high an lm number in entry: " << ilm+1 << endl;
           message << "Bad value is: " << lmp << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
       }
     }
@@ -5613,7 +5706,6 @@ namespace pflow {
 // Sums the PDOS accoring to the parameters specified.
 namespace pflow {
   void SumPDOS(const aurostd::matrix<aurostd::matrix<double> >& allpdos, pflow::pdosdata& pdd) { //CO20200404 pflow::matrix()->aurostd::matrix()
-    string soliloquy=XPID+"pflow::SumPDOS():";
     stringstream message;
     if(pdd.spin==1) {
       pdd.pdos = aurostd::matrix<double> (pdd.nbins,3);  //CO20200404 pflow::matrix()->aurostd::matrix()
@@ -5635,7 +5727,7 @@ namespace pflow {
           message << "You have entered too low or high an atom number in entry: " << ida+1 << endl;
           message << "Min/Max allowed values are: " << "1 / " << pdd.natoms << endl;
           message << "Bad value is: " << ia+1 << endl;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
         }
         // Loop over each lm
         for(int idlm=0;idlm<(int)pdd.pdos_lm[ic].size();idlm++) {
@@ -5646,7 +5738,7 @@ namespace pflow {
             message << "You have entered too low or high an lm number in entry: " << idlm+1 << endl;
             message << "Min/Max allowed values are: " << "1 / " << pdd.nlm << endl;
             message << "Bad value is: " << ilm << endl;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
           }
           // Loop over each bin
           for(int ib=0;ib<pdd.nbins;ib++) {
@@ -5668,7 +5760,7 @@ namespace pflow {
                      message << "ERROR: You have entered too low or high an spin number" << endl;
                      message << "ERROR: Min/Max allowed values are: " << "1 / 2" << endl;
                      message << "ERROR: Bad value is: " << pdd.spin << endl;
-                     throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+                     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
             } // switch spin
           } // bin
         } // lm
@@ -6231,11 +6323,10 @@ namespace pflow {
     //      Natom lines, each with 4 fields, with a newline after each one
     //      Natom entries (grouped by 5). // I don't think these are actually in the CHGCAR.
 
-    string soliloquy = XPID + "pflow::ReadCHGCAR():  ";    // so you know who's talking
 
     // DEBUG
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    if(LDEBUG) oss << soliloquy << "BEGIN" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "BEGIN" << endl;
 
     string content,line, keyword="augmentation";
     vector<string> vcontent, sum_tokens, line_tokens;
@@ -6247,33 +6338,33 @@ namespace pflow {
     int grid_point=0;
     uint natoms=0, linecount=0, npts=1, npts_compare=1, numcolumns=0, num_skip=0;
     bool got_chgtot=false;      //so we know that we're now reading chgdiff
-    if(LDEBUG) oss << soliloquy << "CHECKING FORMAT OF SYSTEM NAME AND SCALING FACTOR" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "CHECKING FORMAT OF SYSTEM NAME AND SCALING FACTOR" << endl;
     //do some quick checks to make sure it's format correctly, otherwise kill the script
     //first line is comment line, skip check
     //next line contains scaling factor
     aurostd::string2tokens(vcontent.at(1),line_tokens," ");
     if(line_tokens.size()!=1) {
       oss << endl;
-      oss << soliloquy << "ERROR: Unrecognized CHGCAR header format (scaling factor)." << endl;
+      oss << __AFLOW_FUNC__ << "ERROR: Unrecognized CHGCAR header format (scaling factor)." << endl;
       oss << endl;
       return FALSE;
     }
     line_tokens.clear();
-    if(LDEBUG) oss << soliloquy << "FORMAT FOR SCALING FACTOR LOOKS OK" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "FORMAT FOR SCALING FACTOR LOOKS OK" << endl;
 
     //next three lines should contain lattice vectors
-    if(LDEBUG) oss << soliloquy << "CHECKING FORMAT FOR LATTICE VECTORS" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "CHECKING FORMAT FOR LATTICE VECTORS" << endl;
     for(uint i=2;i<5;i++) {
       aurostd::string2tokens(vcontent.at(i),line_tokens," ");
       if(line_tokens.size()!=3) {
         oss << endl;
-        oss << soliloquy << "ERROR: Unrecognized CHGCAR header format (lattice vectors)." << endl;
+        oss << __AFLOW_FUNC__ << "ERROR: Unrecognized CHGCAR header format (lattice vectors)." << endl;
         oss << endl;
         return FALSE;
       }
     }
     line_tokens.clear();
-    if(LDEBUG) oss << soliloquy << "FORMAT FOR LATTICE VECTORS LOOKS OK" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "FORMAT FOR LATTICE VECTORS LOOKS OK" << endl;
 
     //DX20190618 - check for VASP5 - START
     //mirrors check in aflow_xatom.cpp
@@ -6289,12 +6380,12 @@ namespace pflow {
       species_line_number = 6; // then VASP5
     }
     line_tokens.clear();
-    if(LDEBUG) oss << soliloquy << "IS VASP4 FORMAT = " << is_vasp_4_poscar << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "IS VASP4 FORMAT = " << is_vasp_4_poscar << endl;
     //DX20190618 - check for VASP5 - END
 
     //if we get here, assume CHGCAR is formatted correctly for now
     //read in header, scaling factor, lattice vectors, number of atoms, coordinate type
-    if(LDEBUG) oss << soliloquy << "READING POSCAR" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "READING POSCAR" << endl;
     //DX20190618 [OBSOLETE] for(uint i=0;i<7;i++)
     for(uint i=0;i<poscar_header_count;i++) //DX20190618
     { //CO20200106 - patching for auto-indenting
@@ -6316,23 +6407,23 @@ namespace pflow {
       linecount++;
     }
     //define xstruture
-    if(LDEBUG) oss << soliloquy << "DEFINE XSTRUCTURE" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "DEFINE XSTRUCTURE" << endl;
     str=poscar;
     if(LDEBUG) oss << str << endl;
     //skip empty line
     linecount++;
     //now we get chg_tot and chg_diff (if it exists)
-    if(LDEBUG) oss << soliloquy << "READ CHG VALUES" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "READ CHG VALUES" << endl;
     while(vcontent.size()>linecount) {
       //see if it's augmentation occupancies that we're reading, and skip appropriate number of lines
       if(vcontent.at(linecount).compare(0,12,keyword)==0) {
-        if(LDEBUG) oss << soliloquy << "GET FORMAT FOR AUGMENTATION OCCUPANCIES" << endl;
+        if(LDEBUG) oss << __AFLOW_FUNC__ << "GET FORMAT FOR AUGMENTATION OCCUPANCIES" << endl;
         for(uint i=0;i<natoms;i++) {
           //check formatting of line first, 'augmentation occupancies natom npts'
           aurostd::string2tokens(vcontent.at(linecount),line_tokens," ");
           if(line_tokens.size()!=4) {
             oss << endl;
-            oss << soliloquy << "ERROR: Unrecognized CHGCAR format (augmentation occupancies)." << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: Unrecognized CHGCAR format (augmentation occupancies)." << endl;
             oss << endl;
             return FALSE;
           }
@@ -6345,7 +6436,7 @@ namespace pflow {
           format_dim.push_back(numcolumns);
           num_skip=(uint)(std::ceil((double)npts/(double)numcolumns));    //skip right number of liens
           linecount+=num_skip+1;  //+1 to get to next augmentation line
-          if(LDEBUG) oss << soliloquy << "SUCCESSFULLY GATHERED FORMAT FOR AUGMENTATION OCCUPANCIES" << endl;
+          if(LDEBUG) oss << __AFLOW_FUNC__ << "SUCCESSFULLY GATHERED FORMAT FOR AUGMENTATION OCCUPANCIES" << endl;
         }
       } else {    //must be chg_tot or chg_diff
         npts=1; ngrid.clear();      //clear for next round
@@ -6360,7 +6451,7 @@ namespace pflow {
         //check formatting, this line should contain npts
         if(sum_tokens.size()!=3) {
           oss << endl;
-          oss << soliloquy << "ERROR: Unrecognized CHGCAR format (number of grid points)." << endl;
+          oss << __AFLOW_FUNC__ << "ERROR: Unrecognized CHGCAR format (number of grid points)." << endl;
           oss << endl;
           return FALSE;
         }
@@ -6371,29 +6462,29 @@ namespace pflow {
         }
         //initialize once
         if(!got_chgtot) {
-          if(LDEBUG) oss << soliloquy << "READING CHG_DIFF" << endl;
+          if(LDEBUG) oss << __AFLOW_FUNC__ << "READING CHG_DIFF" << endl;
           //now with npts, initialize chg_tot and chg_diff
           chg_tot=vector<double>(npts,0.0);
           ngrid_compare=ngrid;
           npts_compare=npts;  //save for comparison later with chg_diff
         } else {
-          if(LDEBUG) oss << soliloquy << "READING CHG_TOT" << endl;
+          if(LDEBUG) oss << __AFLOW_FUNC__ << "READING CHG_TOT" << endl;
           chg_diff=vector<double>(npts,1.0);
           if(npts!=npts_compare) {    //chg_tot and chg_diff have different number of points
             oss << endl;
-            oss << soliloquy << "ERROR: Number of grid points for CHG_tot and CHG_diff do not match. " << endl;
-            oss << soliloquy << "ERROR: npts_total: " << npts << endl;
-            oss << soliloquy << "ERROR: npts_diff: " << npts_compare << endl;
-            oss << soliloquy << "ERROR: This will give nonsense!! " << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: Number of grid points for CHG_tot and CHG_diff do not match. " << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: npts_total: " << npts << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: npts_diff: " << npts_compare << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: This will give nonsense!! " << endl;
             oss << endl;
             return FALSE;
           }
           if(ngrid!=ngrid_compare) {  //chg_tot and chg_diff have different grid
             oss << endl;
-            oss << soliloquy << "ERROR: Grids for CHG_tot and CHG_diff do not match. " << endl;
-            oss << soliloquy << "ERROR: ngrid_total: " << ngrid.at(0) << " " << ngrid.at(1) << " " << ngrid.at(2) << endl;
-            oss << soliloquy << "ERROR: ngrid_diff: " << ngrid_compare.at(0) << " " << ngrid_compare.at(1) << " " << ngrid_compare.at(2) << endl;
-            oss << soliloquy << "ERROR: This will give nonsense!! " << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: Grids for CHG_tot and CHG_diff do not match. " << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: ngrid_total: " << ngrid.at(0) << " " << ngrid.at(1) << " " << ngrid.at(2) << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: ngrid_diff: " << ngrid_compare.at(0) << " " << ngrid_compare.at(1) << " " << ngrid_compare.at(2) << endl;
+            oss << __AFLOW_FUNC__ << "ERROR: This will give nonsense!! " << endl;
             oss << endl;
             return FALSE;
           }
@@ -6422,10 +6513,10 @@ namespace pflow {
           got_chgtot=true;
         }
         line_tokens.clear();
-        if(LDEBUG) oss << soliloquy << "SUCCESSFULLY READ CHG VALUES" << endl;
+        if(LDEBUG) oss << __AFLOW_FUNC__ << "SUCCESSFULLY READ CHG VALUES" << endl;
       }
     }
-    if(LDEBUG) oss << soliloquy << "DONE" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "DONE" << endl;
     return TRUE;
   }
 } // namespace pflow
@@ -6608,7 +6699,6 @@ namespace pflow {
 namespace pflow {
 
   void ReadPlaneDensParams(const xstructure& str, pd_params& pdp, istream& infile) {
-    string soliloquy=XPID+"pflow::ReadPlaneDensParams():";
     // Note that this converts everything to direct coordinates.
     string s;
     double TOL=1e-7;
@@ -6642,7 +6732,7 @@ namespace pflow {
       pdp.dpts[2]=pflow::CompAperpB(pdp.dpts[2],pdp.dpts[1]);
       double norm_new=norm(pdp.dpts[2]);
       if(norm_new<TOL) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"two axis are parallel and no plane can be determined",_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"two axis are parallel and no plane can be determined",_INPUT_ILLEGAL_); //CO20200624
       }
       pdp.dpts[2]=SVprod(norm_orig/norm_new,pdp.dpts[2]);
     }
@@ -7294,19 +7384,18 @@ namespace pflow {
   string prettyPrintCompound(const vector<string>& vspecies,const xvector<double>& vcomposition,vector_reduction_type vred,bool exclude1,filetype ftype) {  // main function //char mode //CO20190629
     // 2-D, we usually want vred=gcd_vrt true for convex points, and no_vrt elsewhere
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy = XPID + "pflow::prettyPrintCompound():";
     stringstream message;
     uint precision=COEF_PRECISION;
     stringstream output;output.precision(precision);
     if(LDEBUG){
-      cerr << soliloquy << " vspecies=" << aurostd::joinWDelimiter(vspecies,",") << endl;
-      cerr << soliloquy << " vcomposition=" << aurostd::joinWDelimiter(aurostd::xvecDouble2vecString(vcomposition),",") << endl;
+      cerr << __AFLOW_FUNC__ << " vspecies=" << aurostd::joinWDelimiter(vspecies,",") << endl;
+      cerr << __AFLOW_FUNC__ << " vcomposition=" << aurostd::joinWDelimiter(aurostd::xvecDouble2vecString(vcomposition),",") << endl;
     }
     if(vspecies.size()!=(uint)vcomposition.rows) {
       message << "vspecies.size() != vcomposition.rows" << endl;
       message << "vspecies=" << aurostd::joinWDelimiter(vspecies,",") << endl;
       message << "vcomposition=" << aurostd::joinWDelimiter(aurostd::xvecDouble2vecString(vcomposition),",") << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message, _INDEX_MISMATCH_);
     }
     // special case, unary
     if(vspecies.size() == 1) {
@@ -7320,8 +7409,8 @@ namespace pflow {
     if(vred==gcd_vrt){aurostd::reduceByGCD(comp,final_comp,ZERO_TOL);} //DX20191125 - new function form
     else if(vred==frac_vrt){final_comp=aurostd::normalizeSumToOne(comp,ZERO_TOL);}
     else if(vred==no_vrt){;}
-    else {throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy,"Unknown reduce mode",_INPUT_UNKNOWN_);}
-    if(std::abs(aurostd::sum(final_comp)) < ZERO_TOL){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Empty composition");}
+    else {throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__,"Unknown reduce mode",_INPUT_UNKNOWN_);}
+    if(std::abs(aurostd::sum(final_comp)) < ZERO_TOL){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Empty composition");}
     for(uint i=0,fl_size_i=vspecies.size();i<fl_size_i;i++) {
       output << vspecies[i];
       if(!(exclude1 && aurostd::identical(final_comp[i+final_comp.lrows],1.0,ZERO_TOL))) {
@@ -7402,22 +7491,21 @@ namespace pflow {
   }
   bool ANode::isStatus(const node_status& status) const {
     //[keep silent]bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    //[keep silent]string soliloquy=XPID+"pflow::ANode::isStatus():";
     //[keep silent]if(LDEBUG){
     //[keep silent]  //status
-    //[keep silent]  if(status==NODE_FREE){cerr << soliloquy << " status==NODE_FREE" << endl;}
-    //[keep silent]  else if(status==NODE_OCCUPIED){cerr << soliloquy << " status==NODE_OCCUPIED" << endl;}
-    //[keep silent]  else if(status==NODE_FULL){cerr << soliloquy << " status==NODE_FULL" << endl;}
-    //[keep silent]  else if(status==NODE_DOWN){cerr << soliloquy << " status==NODE_DOWN" << endl;}
-    //[keep silent]  else if(status==NODE_OFFLINE){cerr << soliloquy << " status==NODE_OFFLINE" << endl;}
-    //[keep silent]  else if(status==NODE_OPERATIONAL){cerr << soliloquy << " status==NODE_OPERATIONAL" << endl;}
-    //[keep silent]  else if(status==NODE_NONOPERATIONAL){cerr << soliloquy << " status==NODE_NONOPERATIONAL" << endl;}
+    //[keep silent]  if(status==NODE_FREE){cerr << __AFLOW_FUNC__ << " status==NODE_FREE" << endl;}
+    //[keep silent]  else if(status==NODE_OCCUPIED){cerr << __AFLOW_FUNC__ << " status==NODE_OCCUPIED" << endl;}
+    //[keep silent]  else if(status==NODE_FULL){cerr << __AFLOW_FUNC__ << " status==NODE_FULL" << endl;}
+    //[keep silent]  else if(status==NODE_DOWN){cerr << __AFLOW_FUNC__ << " status==NODE_DOWN" << endl;}
+    //[keep silent]  else if(status==NODE_OFFLINE){cerr << __AFLOW_FUNC__ << " status==NODE_OFFLINE" << endl;}
+    //[keep silent]  else if(status==NODE_OPERATIONAL){cerr << __AFLOW_FUNC__ << " status==NODE_OPERATIONAL" << endl;}
+    //[keep silent]  else if(status==NODE_NONOPERATIONAL){cerr << __AFLOW_FUNC__ << " status==NODE_NONOPERATIONAL" << endl;}
     //[keep silent]  //m_status
-    //[keep silent]  if(m_status==NODE_FREE){cerr << soliloquy << " m_status==NODE_FREE" << endl;}
-    //[keep silent]  else if(m_status==NODE_OCCUPIED){cerr << soliloquy << " m_status==NODE_OCCUPIED" << endl;}
-    //[keep silent]  else if(m_status==NODE_FULL){cerr << soliloquy << " m_status==NODE_FULL" << endl;}
-    //[keep silent]  else if(m_status==NODE_DOWN){cerr << soliloquy << " m_status==NODE_DOWN" << endl;}
-    //[keep silent]  else if(m_status==NODE_OFFLINE){cerr << soliloquy << " m_status==NODE_OFFLINE" << endl;}
+    //[keep silent]  if(m_status==NODE_FREE){cerr << __AFLOW_FUNC__ << " m_status==NODE_FREE" << endl;}
+    //[keep silent]  else if(m_status==NODE_OCCUPIED){cerr << __AFLOW_FUNC__ << " m_status==NODE_OCCUPIED" << endl;}
+    //[keep silent]  else if(m_status==NODE_FULL){cerr << __AFLOW_FUNC__ << " m_status==NODE_FULL" << endl;}
+    //[keep silent]  else if(m_status==NODE_DOWN){cerr << __AFLOW_FUNC__ << " m_status==NODE_DOWN" << endl;}
+    //[keep silent]  else if(m_status==NODE_OFFLINE){cerr << __AFLOW_FUNC__ << " m_status==NODE_OFFLINE" << endl;}
     //[keep silent]}
     if(status==NODE_OPERATIONAL && (m_status==NODE_FREE||m_status==NODE_OCCUPIED||m_status==NODE_FULL)){return true;}
     else if(status==NODE_NONOPERATIONAL && (m_status==NODE_DOWN||m_status==NODE_OFFLINE)){return true;}
@@ -7545,32 +7633,29 @@ namespace pflow {
     return ncpus;
   }
   uint AQueue::getNCPUS(const string& user,const string& partition,const job_status& status) const {
-    string soliloquy=XPID+"pflow::AQueue::getNCPUS():";
     uint ipartition=partitionName2Index(partition);
-    if(ipartition>m_partitions.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
+    if(ipartition>m_partitions.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
     return getNCPUS(user,m_partitions[ipartition],status);
   }
   uint AQueue::getNCPUS(const string& user,const APartition& partition,const job_status& status) const {
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::getNCPUS():";
     uint ncpus=0;
     uint ijob=0;
-    if(LDEBUG){cerr << soliloquy << " partition=" << partition.m_name << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " partition=" << partition.m_name << endl;}
     for(uint i=0;i<partition.m_vijobs.size();i++){
       ijob=partition.m_vijobs[i];
-      if(ijob>m_jobs.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ijob>m_jobs.size()-1",_INDEX_BOUNDS_);}
+      if(ijob>m_jobs.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ijob>m_jobs.size()-1",_INDEX_BOUNDS_);}
       const AJob& job=m_jobs[ijob];
       if(job.m_user==user && job.m_status==status){
-        if(LDEBUG){cerr << soliloquy << " job=" << job.m_id << " ncpus=" << job.m_ncpus << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " job=" << job.m_id << " ncpus=" << job.m_ncpus << endl;}
         ncpus+=job.m_ncpus;
       }
     }
     return ncpus;
   }
   double AQueue::getPercentage(const string& user,const string& partition,const job_status& status) const {
-    string soliloquy=XPID+"pflow::AQueue::getPercentage():";
     uint ipartition=partitionName2Index(partition);
-    if(ipartition>m_partitions.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
+    if(ipartition>m_partitions.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
     return getPercentage(user,m_partitions[ipartition],status);
   }
   double AQueue::getPercentage(const string& user,const APartition& partition,const job_status& status) const {
@@ -7580,44 +7665,40 @@ namespace pflow {
   }
 
   uint AQueue::nodeName2Index(const string& name) const {
-    string soliloquy=XPID+"pflow::AQueue::nodeName2Index():";
     for(uint inode=0;inode<m_nodes.size();inode++){
       if(m_nodes[inode].m_name==name){
         return inode;
       }
     }
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No node found with name="+name,_INPUT_UNKNOWN_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No node found with name="+name,_INPUT_UNKNOWN_);
   }
   uint AQueue::partitionName2Index(const string& name) const {
-    string soliloquy=XPID+"pflow::AQueue::partitionName2Index():";
     for(uint ipartition=0;ipartition<m_partitions.size();ipartition++){
       if(m_partitions[ipartition].m_name==name){
         return ipartition;
       }
     }
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No partition found with name="+name,_INPUT_UNKNOWN_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No partition found with name="+name,_INPUT_UNKNOWN_);
   }
 
   uint getTORQUEIDFromString(const string& torqueid_str) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::getTORQUEIDFromString():";
     string tmp="";
     vector<string> tokens;
     aurostd::string2tokens(torqueid_str,tokens,".");
-    if(tokens.size()==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens.size()==0 [1]",_RUNTIME_ERROR_);}
+    if(tokens.size()==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens.size()==0 [1]",_RUNTIME_ERROR_);}
     tmp=tokens[0];
     aurostd::string2tokens(tmp,tokens,"/");
     if(tokens.size()==1){tmp=tokens[0];}  //no '/' found
     else if(tokens.size()==2){tmp=tokens[1];}
-    else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens.size()!=1||2",_RUNTIME_ERROR_);}
-    if(!aurostd::isfloat(tmp)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!aurostd::isfloat(tmp)",_RUNTIME_ERROR_);}
-    if(LDEBUG){cerr << soliloquy << " id=" << tmp << endl;}
+    else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens.size()!=1||2",_RUNTIME_ERROR_);}
+    if(!aurostd::isfloat(tmp)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!aurostd::isfloat(tmp)",_RUNTIME_ERROR_);}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " id=" << tmp << endl;}
     return aurostd::string2utype<uint>(tmp);
   }
 
   bool AQueue::addJob(const AJob& _job){  //add job to m_jobs
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::addJob():";
     bool job_added=false;
     bool found_job=false,found_node=false;
     uint i=0,j=0;
@@ -7625,29 +7706,29 @@ namespace pflow {
       if(m_jobs[i].m_id==_job.m_id){
         //job found
         AJob& job=m_jobs[i];
-        if(job.m_status!=_job.m_status){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"job.m_status!=_job.m_status",_RUNTIME_ERROR_);}  //mismatch in statuses
+        if(job.m_status!=_job.m_status){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"job.m_status!=_job.m_status",_RUNTIME_ERROR_);}  //mismatch in statuses
         const job_status& jstat=job.m_status;
         if(jstat==JOB_RUNNING && _job.m_vinodes.size()==0){ //then where is it running? we should have node information (m_vinodes and m_vncpus)
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"RUNNING job="+aurostd::utype2string(_job.m_id)+" has not been assigned to a node",_RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"RUNNING job="+aurostd::utype2string(_job.m_id)+" has not been assigned to a node",_RUNTIME_ERROR_);
         }
         if(_job.m_vinodes.size()>0){  //node information is available for mapping to a node
           //to add a job, its record should have been taken from one node (at a time)
-          if(_job.m_vinodes.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"_job.m_vinodes.size()!=1",_RUNTIME_ERROR_);}
-          if(_job.m_vncpus.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"_job.m_vncpus.size()!=1",_RUNTIME_ERROR_);}
-          if(_job.m_vinodes.size()!=_job.m_vncpus.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"_job.m_vinodes.size()!=_job.m_vncpus.size()",_RUNTIME_ERROR_);}
+          if(_job.m_vinodes.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"_job.m_vinodes.size()!=1",_RUNTIME_ERROR_);}
+          if(_job.m_vncpus.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"_job.m_vncpus.size()!=1",_RUNTIME_ERROR_);}
+          if(_job.m_vinodes.size()!=_job.m_vncpus.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"_job.m_vinodes.size()!=_job.m_vncpus.size()",_RUNTIME_ERROR_);}
           const uint inode=_job.m_vinodes[0];
           const uint ncpus=_job.m_vncpus[0];
           found_node=false;
           for(j=0;j<job.m_vinodes.size()&&found_node==false;j++){
             if(job.m_vinodes[j]==inode){
-              if(LDEBUG){cerr << soliloquy << " adding " << ncpus << " cpus to job=" << job.m_id << ",inode=" << job.m_vinodes[j] << endl;}
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding " << ncpus << " cpus to job=" << job.m_id << ",inode=" << job.m_vinodes[j] << endl;}
               job.m_ncpus+=ncpus;
               job.m_vncpus[j]+=ncpus;
               found_node=true;
             }
           }
           if(!found_node){
-            if(LDEBUG){cerr << soliloquy << " job=" << job.m_id << " is also running on inode=" << inode << " with " << ncpus << " cpus" << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " job=" << job.m_id << " is also running on inode=" << inode << " with " << ncpus << " cpus" << endl;}
             job.m_ncpus+=ncpus;
             job.m_vinodes.push_back(inode);
             job.m_vncpus.push_back(ncpus);
@@ -7658,14 +7739,13 @@ namespace pflow {
     }
     if(!found_job){
       m_jobs.push_back(_job);m_jobs.back().m_index=m_jobs.size()-1;job_added=true;
-      if(LDEBUG){cerr << soliloquy << " adding NEW job=" << m_jobs.back().m_id << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding NEW job=" << m_jobs.back().m_id << endl;}
     }
     return job_added;
   }
 
   bool AQueue::addPartition(const APartition& _partition){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::addPartition():";
     uint i=0;
     for(i=0;i<m_partitions.size();i++){
       if(m_partitions[i].m_name==_partition.m_name){return false;}
@@ -7673,17 +7753,17 @@ namespace pflow {
     bool partition_added=false;
     m_partitions.push_back(_partition);m_partitions.back().m_index=m_partitions.size()-1;partition_added=true;
     APartition& partition=m_partitions.back();
-    if(LDEBUG){cerr << soliloquy << " adding partition=" << partition.m_name << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding partition=" << partition.m_name << endl;}
     if(partition.m_properties_node.empty()){  //only available if user is root
       partition.m_properties_node=partition.m_name; //default string to search
-      //[resort to default]throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Not sure how to define partitions for HOST="+XHOST.hostname,_RUNTIME_ERROR_);
+      //[resort to default]throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Not sure how to define partitions for HOST="+XHOST.hostname,_RUNTIME_ERROR_);
       if(XHOST.hostname=="qrats.materials.duke.edu"){ //protection, ideally the aflow user would be "root"
         //hack
         if(partition.m_name=="priority"){partition.m_properties_node="sharedCompute";}
         else if(partition.m_name=="debug"){partition.m_properties_node="debug";}
         else if(partition.m_name=="batch"){partition.m_properties_node="sharedCompute";}
         else if(partition.m_name=="research"){partition.m_properties_node="sharedCompute";}
-        else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown queue="+partition.m_name,_RUNTIME_ERROR_);}
+        else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown queue="+partition.m_name,_RUNTIME_ERROR_);}
       }
     }
     return partition_added;
@@ -7693,7 +7773,6 @@ namespace pflow {
 
   bool AQueue::addNode(const ANode& _node){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::addNode():";
     uint inode=0;
     for(inode=0;inode<m_nodes.size();inode++){
       if(m_nodes[inode].m_name==_node.m_name){
@@ -7710,7 +7789,7 @@ namespace pflow {
           tokens.push_back(_node.m_properties);
           std::sort(tokens.begin(),tokens.end());
           node.m_properties=aurostd::joinWDelimiter(tokens,DELIM_PROPERTIES_NODE);
-          if(LDEBUG){cerr << soliloquy << " adding properties=\"" << _node.m_properties << "\" to node=" << node.m_name << " properties (NEW properties=" << node.m_properties << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding properties=\"" << _node.m_properties << "\" to node=" << node.m_name << " properties (NEW properties=" << node.m_properties << ")" << endl;}
         }
         return false;
       }
@@ -7722,13 +7801,13 @@ namespace pflow {
     if(node.m_status==NODE_FREE && node.m_ncpus_occupied>0){node.m_status=NODE_OCCUPIED;}
     if(node.m_status==NODE_OCCUPIED && node.m_ncpus_occupied>=node.m_ncpus){node.m_status=NODE_FULL;}
     if(LDEBUG){
-      cerr << soliloquy << " adding ";
+      cerr << __AFLOW_FUNC__ << " adding ";
       if(node.m_status==NODE_FREE){cerr << "FREE";}
       else if(node.m_status==NODE_OCCUPIED){cerr << "OCCUPIED";}
       else if(node.m_status==NODE_FULL){cerr << "FULL";}
       else if(node.m_status==NODE_DOWN){cerr << "DOWN";}
       else if(node.m_status==NODE_OFFLINE){cerr << "OFFLINE";}
-      else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown node.status",_RUNTIME_ERROR_);}
+      else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown node.status",_RUNTIME_ERROR_);}
       cerr << " node=" << node.m_name << endl;
     }
     return node_added;
@@ -7736,7 +7815,6 @@ namespace pflow {
 
   void AQueue::nodePartitionMapping(ANode& node){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::nodePartitionMapping():";
     //get partition
     bool found=false;
     node.m_vipartitions.clear();
@@ -7752,7 +7830,7 @@ namespace pflow {
           partition.m_inodes.push_back(node.m_index);
           node.m_vipartitions.push_back(ipartition);
           found=true;
-          if(LDEBUG){cerr << soliloquy << " mapping node=" << node.m_name << " to partition=" << partition.m_name << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " mapping node=" << node.m_name << " to partition=" << partition.m_name << endl;}
         }
       }
     }
@@ -7760,53 +7838,52 @@ namespace pflow {
       APartition _partition;_partition.free();
       _partition.m_name=node.m_properties;
       //set m_properties_node inside addPartition()
-      if(!addPartition(_partition)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Partition already exists",_RUNTIME_ERROR_);}
+      if(!addPartition(_partition)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Partition already exists",_RUNTIME_ERROR_);}
       ipartition=m_partitions.size()-1;
       APartition& partition=m_partitions[ipartition];
       partition.m_inodes.push_back(node.m_index);
       node.m_vipartitions.push_back(ipartition);
-      if(LDEBUG){cerr << soliloquy << " mapping node=" << node.m_name << " to partition=" << partition.m_name << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " mapping node=" << node.m_name << " to partition=" << partition.m_name << endl;}
     }
   }
 
   void AQueue::jobMapping(AJob& job){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::jobMapping():";
     uint i=0,ipartition=0;
     //map job to partition
     //mapping MUST have happened upon adding the job, just checking and verbose
-    if(job.m_vipartitions.size()==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"job="+aurostd::utype2string(job.m_id)+" has not been assigned a partition",_INPUT_ERROR_);}
+    if(job.m_vipartitions.size()==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"job="+aurostd::utype2string(job.m_id)+" has not been assigned a partition",_INPUT_ERROR_);}
     for(i=0;i<job.m_vipartitions.size();i++){
       ipartition=job.m_vipartitions[i];
-      if(ipartition>m_partitions.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
+      if(ipartition>m_partitions.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
       APartition& partition=m_partitions[ipartition];
       partition.m_vijobs.push_back(job.m_index);
-      if(LDEBUG){cerr << soliloquy << " mapping job=" << job.m_id << " to partition=" << partition.m_name << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " mapping job=" << job.m_id << " to partition=" << partition.m_name << endl;}
     }
     //map RUNNING job to node
     if(job.m_status==JOB_RUNNING && job.m_vinodes.size()==0){ //then where is it running? we should have node information (m_vinodes and m_vncpus)
       //it's possible that, in the non-zero amount of time between processing pbsnodes and qstat, a job status changes from 'Q' or 'H' to 'R'
       //this "transition state' is always possible when the commands are not run at the exact same time
       //therefore, it is better to sleep for a few seconds, and re-reun the whole processing script again
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"RUNNING job="+aurostd::utype2string(job.m_id)+" has not been assigned a node",_RUNTIME_EXTERNAL_FAIL_); //this will issue a re-run
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"RUNNING job="+aurostd::utype2string(job.m_id)+" has not been assigned a node",_RUNTIME_EXTERNAL_FAIL_); //this will issue a re-run
     }
     if(job.m_vinodes.size()>0){
       uint inode=0;
       for(i=0;i<job.m_vinodes.size();i++){
         inode=job.m_vinodes[i];
-        if(inode>m_nodes.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"inode>m_nodes.size()-1",_INDEX_BOUNDS_);}
+        if(inode>m_nodes.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"inode>m_nodes.size()-1",_INDEX_BOUNDS_);}
         ANode& node=m_nodes[inode];
         node.m_vijobs.push_back(job.m_index);
-        if(LDEBUG){cerr << soliloquy << " mapping job=" << job.m_id << " to node=" << node.m_name << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " mapping job=" << job.m_id << " to node=" << node.m_name << endl;}
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]if(node.m_vipartitions.size()==0){nodePartitionMapping(node);}  //safety
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]//we could check that ALL nodes belong to a partition, but we might have a separate node...
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]for(j=0;j<node.m_vipartitions.size();j++){
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  ipartition=node.m_vipartitions[j];
-        //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  if(ipartition>m_partitions.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
+        //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  if(ipartition>m_partitions.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ipartition>m_partitions.size()-1",_INDEX_BOUNDS_);}
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  APartition& partition=m_partitions[ipartition];
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  partition.m_vijobs.push_back(job.m_index);
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  job.m_vipartitions.push_back(ipartition);
-        //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  if(LDEBUG){cerr << soliloquy << " mapping job=" << job.m_id << " to partition=" << partition.m_name << endl;}
+        //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " mapping job=" << job.m_id << " to partition=" << partition.m_name << endl;}
         //[WRONG - job maps to node and node to partitions, but job maps to 1 (usually) partition]}
       }
     }
@@ -7815,7 +7892,6 @@ namespace pflow {
 #define ATTEMPTS_GETQUEUE_MAX 10
   void AQueue::getQueue() {
     bool LDEBUG=(TRUE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::getQueue():";
 
     bool SUCCESS=false;
     uint attempts=0;
@@ -7825,7 +7901,7 @@ namespace pflow {
         SUCCESS=false;
         if(err.whatCode()!=_RUNTIME_EXTERNAL_FAIL_){attempts=ATTEMPTS_GETQUEUE_MAX;}
         if(attempts<ATTEMPTS_GETQUEUE_MAX){
-          if(LDEBUG){cerr << soliloquy << " failed attempt, trying to process queue again" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " failed attempt, trying to process queue again" << endl;}
           aurostd::Sleep(2);
         }
         else{
@@ -7839,7 +7915,6 @@ namespace pflow {
 
   void AQueue::readNodesPartitionsSLURM(){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::readNodesPartitionsSLURM():";
 
     vector<string> lines,tokens,tokens2;
     uint iline=0;
@@ -7848,7 +7923,7 @@ namespace pflow {
     //run sinfo
     //https://slurm.schedmd.com/sinfo.html
     if(!aurostd::IsCommandAvailable("sinfo")){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no sinfo command found for SLURM configuration",_RUNTIME_EXTERNAL_MISS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no sinfo command found for SLURM configuration",_RUNTIME_EXTERNAL_MISS_);
     }
     lines=aurostd::string2vectorstring(aurostd::execute2string(XHOST.command("sinfo")+" -N -l"));
     APartition _partition;_partition.free();
@@ -7857,10 +7932,10 @@ namespace pflow {
       if(lines[iline].find("NODELIST")!=string::npos){continue;}  //skip date and header
       line=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(lines[iline]);
       if(line.empty()){continue;}
-      if(LDEBUG){cerr << soliloquy << " line=\"" << line << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " line=\"" << line << "\"" << endl;}
       _node.free();
       aurostd::string2tokens(line,tokens," ");
-      if(tokens.size()<11){continue;}   //skip date and header //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens.size()<11",_RUNTIME_ERROR_);
+      if(tokens.size()<11){continue;}   //skip date and header //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens.size()<11",_RUNTIME_ERROR_);
       _node.m_name=tokens[0];
       //tokens[2] is partition, addPartition() takes care of checking that it's not already in the list
       _partition.free();
@@ -7886,17 +7961,16 @@ namespace pflow {
           tokens[3]=="no_respond"||
           FALSE){_node.m_status=NODE_DOWN;} //leave for last, many variants to consider
       //tokens[4] is ncpus
-      if(!aurostd::isfloat(tokens[4])){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens[4] is NOT a float (ncpus)",_RUNTIME_ERROR_);}
+      if(!aurostd::isfloat(tokens[4])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens[4] is NOT a float (ncpus)",_RUNTIME_ERROR_);}
       _node.m_ncpus=aurostd::string2utype<double>(tokens[4]);
       addNode(_node);
     }
-    if(LDEBUG){cerr << soliloquy << " found " << m_partitions.size() << " partitions" << endl;}
-    if(LDEBUG){cerr << soliloquy << " found " << m_nodes.size() << " nodes" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " found " << m_partitions.size() << " partitions" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " found " << m_nodes.size() << " nodes" << endl;}
   }
 
   void AQueue::readJobsSLURM(){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::readJobsSLURM():";
 
     vector<string> lines,tokens,tokens2;
     uint iline=0,i=0;
@@ -7904,7 +7978,7 @@ namespace pflow {
 
     //run squeue
     if(!aurostd::IsCommandAvailable("squeue")){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no squeue command found for SLURM configuration",_RUNTIME_EXTERNAL_MISS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no squeue command found for SLURM configuration",_RUNTIME_EXTERNAL_MISS_);
     }
     lines=aurostd::string2vectorstring(aurostd::execute2string(XHOST.command("squeue")+" --format=\"\%.18i %.9P %.8j \%.8u %.2t %.10M \%.6D \%C \%R\"")); //man squeue
     AJob _job;_job.free();
@@ -7912,10 +7986,10 @@ namespace pflow {
       if(lines[iline].find("JOBID")!=string::npos){continue;}  //skip date and header
       line=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(lines[iline]);
       if(line.empty()){continue;}
-      if(LDEBUG){cerr << soliloquy << " line=\"" << line << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " line=\"" << line << "\"" << endl;}
       aurostd::string2tokens(line,tokens," ");
       //tokens[0] is job id
-      if(!aurostd::isfloat(tokens[0])){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!aurostd::isfloat(tokens[0])",_RUNTIME_ERROR_);}
+      if(!aurostd::isfloat(tokens[0])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!aurostd::isfloat(tokens[0])",_RUNTIME_ERROR_);}
       _job.free();
       _job.m_id=aurostd::string2utype<uint>(tokens[0]);
       //tokens[1] is partition
@@ -7932,9 +8006,9 @@ namespace pflow {
           tokens[4]=="F"||
           tokens[4]=="PR"||
           FALSE){_job.m_status=JOB_DONE;}
-      else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown job status="+tokens[4],_RUNTIME_ERROR_);}
+      else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown job status="+tokens[4],_RUNTIME_ERROR_);}
       //tokens[7] is ncpus
-      if(!aurostd::isfloat(tokens[7])){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!aurostd::isfloat(tokens[7])",_RUNTIME_ERROR_);}
+      if(!aurostd::isfloat(tokens[7])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!aurostd::isfloat(tokens[7])",_RUNTIME_ERROR_);}
       _job.m_ncpus=aurostd::string2utype<uint>(tokens[7]);
       //tokens[8] is node if running
       if(_job.m_status==JOB_RUNNING){
@@ -7947,7 +8021,6 @@ namespace pflow {
 
   void AQueue::readPartitionsTORQUE(){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::readPartitionsTORQUE():";
 
     vector<string> lines,tokens,tokens2;
     uint iline=0;
@@ -7955,7 +8028,7 @@ namespace pflow {
 
     //run qstat -f -Q
     if(!aurostd::IsCommandAvailable("qstat")){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no qstat command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no qstat command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
     }
     //'qstat -f' gives FULL job information, but takes a long time
     lines=aurostd::string2vectorstring(aurostd::execute2string(XHOST.command("qstat")+" -f -Q"));
@@ -7965,30 +8038,29 @@ namespace pflow {
     for(iline=0;iline<lines.size();iline++){
       line=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(lines[iline]);
       if(line.empty()){continue;}
-      if(LDEBUG){cerr << soliloquy << " line=\"" << line << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " line=\"" << line << "\"" << endl;}
       if(line.find("Queue:")!=string::npos){
         if(!_partition.m_name.empty()){addPartition(_partition);}
         aurostd::string2tokens(line,tokens,":");
-        if(tokens.size()!=2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens.size()!=2",_RUNTIME_ERROR_);}
+        if(tokens.size()!=2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens.size()!=2",_RUNTIME_ERROR_);}
         _partition.free(); //reset
         _partition.m_name=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(tokens[1]);
       }
       else{
         aurostd::string2tokens(line,tokens,"=");
-        if(tokens.size()!=2){continue;}   //sometimes we get garbage lines like 'lete:0' //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!tokens.size()",_RUNTIME_ERROR_);
+        if(tokens.size()!=2){continue;}   //sometimes we get garbage lines like 'lete:0' //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!tokens.size()",_RUNTIME_ERROR_);
         key=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(tokens[0]);
         value=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(tokens[1]);
-        if(LDEBUG){cerr << soliloquy << " key=" << key << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " key=" << key << endl;}
         if(key=="resources_default.neednodes"){_partition.m_properties_node=value;}  //really only works for root, but we leave here for now
       }
     }
     if(!_partition.m_name.empty()){addPartition(_partition);}
-    if(LDEBUG){cerr << soliloquy << " found " << m_partitions.size() << " partitions" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " found " << m_partitions.size() << " partitions" << endl;}
   }
 
   void AQueue::readNodesJobsTORQUE(){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::readNodesJobsTORQUE():";
 
     vector<string> lines,tokens,tokens2;
     uint iline=0,i=0;
@@ -7996,7 +8068,7 @@ namespace pflow {
 
     //run pbsnodes
     if(!aurostd::IsCommandAvailable("pbsnodes")){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no pbsnodes command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no pbsnodes command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
     }
     lines=aurostd::string2vectorstring(aurostd::execute2string(XHOST.command("pbsnodes")));
     ANode _node;_node.free();
@@ -8004,7 +8076,7 @@ namespace pflow {
     for(iline=0;iline<lines.size();iline++){
       line=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(lines[iline]);
       if(line.empty()){continue;}
-      if(LDEBUG){cerr << soliloquy << " line=\"" << line << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " line=\"" << line << "\"" << endl;}
       if(line.find('=')==string::npos){
         if(!_node.m_properties.empty()){addNode(_node);} //we have node information loaded up
         _node.free();  //reset node
@@ -8013,10 +8085,10 @@ namespace pflow {
       }
       else{
         aurostd::string2tokens(line,tokens,"=");
-        if(tokens.size()!=2){continue;}   //sometimes we get garbage lines like 'lete:0' //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!tokens.size()",_RUNTIME_ERROR_);
+        if(tokens.size()!=2){continue;}   //sometimes we get garbage lines like 'lete:0' //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!tokens.size()",_RUNTIME_ERROR_);
         key=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(tokens[0]);
         value=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(tokens[1]);
-        if(LDEBUG){cerr << soliloquy << " key=" << key << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " key=" << key << endl;}
         if(key=="state"){
           //possible states: http://docs.adaptivecomputing.com/torque/4-0-2/Content/topics/commands/pbsnodes.htm
           //"active", "all", "busy", "down", "free", "job-exclusive", "job-sharing", "offline", "reserve", "state-unknown", "time-shared", and "up"
@@ -8025,7 +8097,7 @@ namespace pflow {
           else if(value.find("job-exclusive")!=string::npos){_node.m_status=NODE_OCCUPIED;}
           else if(value.find("free")!=string::npos){_node.m_status=NODE_FREE;}
           else{
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"unknown state from pbsnodes: state=\""+value+"\"",_RUNTIME_ERROR_);  //more states to account for
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"unknown state from pbsnodes: state=\""+value+"\"",_RUNTIME_ERROR_);  //more states to account for
           }
         }
         else if(key=="np"){_node.m_ncpus=aurostd::string2utype<uint>(value);}
@@ -8048,12 +8120,11 @@ namespace pflow {
       }
     }
     if(!_node.m_properties.empty()){addNode(_node);} //we have node information loaded up
-    if(LDEBUG){cerr << soliloquy << " found " << m_nodes.size() << " nodes" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " found " << m_nodes.size() << " nodes" << endl;}
   }
 
   void AQueue::readJobsTORQUE(){
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::readJobsTORQUE():";
 
     vector<string> lines,tokens,tokens2;
     uint iline=0,i=0;
@@ -8064,7 +8135,7 @@ namespace pflow {
 
     //get jobs user
     if(!aurostd::IsCommandAvailable("qstat")){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no qstat command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no qstat command found for TORQUE configuration",_RUNTIME_EXTERNAL_MISS_);
     }
     //'qstat -f' gives FULL job information, but takes a long time
     lines=aurostd::string2vectorstring(aurostd::execute2string(XHOST.command("qstat")+" -a"));
@@ -8072,9 +8143,9 @@ namespace pflow {
       if(lines[iline].find("Job ID")!=string::npos){continue;}  //skip header lines
       line=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(lines[iline]);
       if(line.empty()){continue;}
-      if(LDEBUG){cerr << soliloquy << " line=\"" << line << "\"" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " line=\"" << line << "\"" << endl;}
       aurostd::string2tokens(line,tokens," ");
-      if(tokens.size()<11){continue;}   //skip date and header //throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"tokens.size()<11",_RUNTIME_ERROR_);
+      if(tokens.size()<11){continue;}   //skip date and header //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"tokens.size()<11",_RUNTIME_ERROR_);
       //tokens[0] has job id
       tmp=tokens[0];
       if(tmp.find("---")!=string::npos){continue;}  //skip header //must be longer than 2 --, see 'Req'd Memory'
@@ -8085,7 +8156,7 @@ namespace pflow {
         if(m_jobs[i].m_id==id){
           //get user: tokens[1]
           m_jobs[i].m_user=tokens[1];
-          if(LDEBUG){cerr << soliloquy << " adding user=" << m_jobs[i].m_user << " to job=" << m_jobs[i].m_id << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding user=" << m_jobs[i].m_user << " to job=" << m_jobs[i].m_id << endl;}
           //get partition: tokens[2]
           m_jobs[i].m_vipartitions.push_back(partitionName2Index(tokens[2]));
           found=true;
@@ -8098,7 +8169,7 @@ namespace pflow {
         //tokens[2] has queue, very important for non-running jobs
         _job.m_vipartitions.push_back(partitionName2Index(tokens[2]));
         //tokens[6] has ncpus
-        if(!aurostd::isfloat(tokens[6])){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"!aurostd::isfloat(tokens[6])",_RUNTIME_ERROR_);}
+        if(!aurostd::isfloat(tokens[6])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"!aurostd::isfloat(tokens[6])",_RUNTIME_ERROR_);}
         _job.m_ncpus=aurostd::string2utype<uint>(tokens[6]);
         //tokens[9] has job status
         //http://docs.adaptivecomputing.com/torque/4-1-4/Content/topics/commands/qstat.htm
@@ -8106,7 +8177,7 @@ namespace pflow {
         else if(tokens[9]=="R"){_job.m_status=JOB_RUNNING;}
         else if(tokens[9]=="H"||tokens[9]=="S"){_job.m_status=JOB_HELD;}
         else if(tokens[9]=="C"||tokens[9]=="E"||tokens[9]=="W"){_job.m_status=JOB_DONE;} //not sure about W...
-        else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown job status="+tokens[9],_RUNTIME_ERROR_);} //T?
+        else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown job status="+tokens[9],_RUNTIME_ERROR_);} //T?
         addJob(_job);
       }
     }
@@ -8114,16 +8185,15 @@ namespace pflow {
 
   void AQueue::processQueue() {
     bool LDEBUG=(FALSE || _AQUEUE_DEBUG_ || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AQueue::processQueue():";
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     if(aurostd::IsCommandAvailable("squeue")){m_qsys=QUEUE_SLURM;}
     else if(aurostd::IsCommandAvailable("pbsnodes")){m_qsys=QUEUE_TORQUE;}
-    else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"cannot identify queuing system",_RUNTIME_ERROR_);}
+    else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"cannot identify queuing system",_RUNTIME_ERROR_);}
 
     if(LDEBUG){
-      cerr << soliloquy << " m_qsys=";
+      cerr << __AFLOW_FUNC__ << " m_qsys=";
       if(m_qsys==QUEUE_SLURM){cerr << "SLURM";}
       if(m_qsys==QUEUE_TORQUE){cerr << "TORQUE";}
       cerr << endl;
@@ -8139,7 +8209,7 @@ namespace pflow {
       readJobsTORQUE();  //get job users here, validate information from readNodesJobsTORQUE()
 
       //may need showq later for node-specific submission
-      //if(LDEBUG){cerr << soliloquy << " XHOST.command(\"showq\")=" << XHOST.command("showq") << endl;}
+      //if(LDEBUG){cerr << __AFLOW_FUNC__ << " XHOST.command(\"showq\")=" << XHOST.command("showq") << endl;}
     }
 
     //get mappings now - clear first START
@@ -8171,10 +8241,10 @@ namespace pflow {
       uint ijob=0;
       for(uint inode=0;inode<m_nodes.size();inode++){
         ANode& node=m_nodes[inode];
-        cerr << soliloquy << " node=" << node.m_name << " has jobs=";
+        cerr << __AFLOW_FUNC__ << " node=" << node.m_name << " has jobs=";
         for(uint i=0;i<node.m_vijobs.size();i++){
           ijob=node.m_vijobs[i];
-          if(ijob>m_jobs.size()-1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ijob>m_jobs.size()-1",_INDEX_BOUNDS_);}
+          if(ijob>m_jobs.size()-1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ijob>m_jobs.size()-1",_INDEX_BOUNDS_);}
           AJob& job=m_jobs[ijob];
           cerr << job.m_id << (i<node.m_vijobs.size()-1?",":"");
         }
@@ -8183,11 +8253,11 @@ namespace pflow {
     }
 
     if(LDEBUG){
-      cerr << soliloquy << " " << XHOST.hostname << " has " << getNNodes() << " nodes (" << getNCPUS() << " cpus)" << endl;
+      cerr << __AFLOW_FUNC__ << " " << XHOST.hostname << " has " << getNNodes() << " nodes (" << getNCPUS() << " cpus)" << endl;
       bool add_comma=false;
       for(uint i=0;i<m_partitions.size();i++){
         add_comma=false;
-        cerr << soliloquy << " " << m_partitions[i].m_name << ":";
+        cerr << __AFLOW_FUNC__ << " " << m_partitions[i].m_name << ":";
         if(getNCPUS(m_partitions[i],NODE_FREE)>0){cerr << (add_comma?",":"") << " " << getNNodes(m_partitions[i],NODE_FREE) << " free nodes (" << getNCPUS(m_partitions[i],NODE_FREE) << " cpus)";if(add_comma==false){add_comma=true;}}
         if(getNCPUS(m_partitions[i],NODE_OCCUPIED)>0){cerr << (add_comma?",":"") << " " << getNNodes(m_partitions[i],NODE_OCCUPIED) << " occupied nodes (" << getNCPUS(m_partitions[i],NODE_OCCUPIED,CPUS_FREE) << " cpus free, " << getNCPUS(m_partitions[i],NODE_OCCUPIED,CPUS_OCCUPIED) << " cpus occupied)";if(add_comma==false){add_comma=true;}}
         if(getNCPUS(m_partitions[i],NODE_FULL)>0){cerr << (add_comma?",":"") << " " << getNNodes(m_partitions[i],NODE_FULL) << " full nodes (" << getNCPUS(m_partitions[i],NODE_FULL) << " cpus)";if(add_comma==false){add_comma=true;}}
@@ -8220,10 +8290,9 @@ namespace pflow{
     // Return vector of fake elements
     // Useful for determining "elements" for prototypes
 
-    string function_name = XPID + "pflow::getFakeElements():";
 
     if(nspecies>26){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"There are more than 26 species, this function must be modified to include more fake elements.",_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"There are more than 26 species, this function must be modified to include more fake elements.",_RUNTIME_ERROR_);
     }
 
     vector<string> elements;
@@ -8246,7 +8315,6 @@ namespace pflow{
     // Uses xelement
 
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string function_name = XPID + "pflow::hasRealElements():";
     stringstream message;
 
     if(xstr.species.size() > 0){
@@ -8257,13 +8325,13 @@ namespace pflow{
           element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr.species[i]));
         }
         catch(aurostd::xerror& re){
-          if(LDEBUG){ cerr << function_name << xstr.species[i] << " is not a real element." << endl; }
+          if(LDEBUG){ cerr << __AFLOW_FUNC__ << xstr.species[i] << " is not a real element." << endl; }
           return false;
         }
       }
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"The species are empty.",_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"The species are empty.",_INPUT_NUMBER_);
     }
 
     return true;
@@ -8282,7 +8350,6 @@ namespace pflow{
     //  2) loose = min_nn_dist/10
     //  3) number = user defined (Angstroms)
 
-    string function_name = XPID + "pflow::getSymmetryTolerance():";
     stringstream message;
 
     double default_tolerance=SYM::defaultTolerance(xstr);
@@ -8303,7 +8370,7 @@ namespace pflow{
     }
     if(tolerance < 1e-10){
       message << "Tolerance cannot be zero (i.e. less than 1e-10): tol=" << tolerance << ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_VALUE_RANGE_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_RANGE_);
     }
 
     return tolerance;
@@ -8319,7 +8386,6 @@ namespace pflow{
     // Return the symmetry tolerance spectrum
     // Expected input: "start:end:step"
 
-    string function_name = XPID + "pflow::getSymmetryToleranceSpectrum():";
     stringstream message;
 
     vector<double> tolerance_spectrum;
@@ -8331,14 +8397,14 @@ namespace pflow{
       uint nsteps = aurostd::string2utype<uint>(tokens[2])-1;
       if(end<start){
         message << "End of the range cannot be less than the beginning of the range: start=" << start << ", end=" << end;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
       }
       double interval = (end-start)/(double)nsteps;
       for(uint i=0;i<=nsteps;i++){ tolerance_spectrum.push_back(start+((double)i*interval)); }
     }
     else{
       message << "Expected three inputs: first=range_start:second=range_end:third=nsteps.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     return tolerance_spectrum;
@@ -8361,8 +8427,7 @@ namespace pflow {
   /// Feature request: analyse a structure file directly
   void outputAtomicEnvironment(const string &auid, uint aeMode, double radius) {
     bool LDEBUG = (false || XHOST.DEBUG);
-    string soliloquy = XPID + "pflow::outputAtomicEnvironment():";
-    if (LDEBUG) cerr << soliloquy << " Start" << endl;
+    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Start" << endl;
 
     // for FUTURE use
     if (radius == 0){}
@@ -8377,7 +8442,7 @@ namespace pflow {
       aurl = aurostd::execute2string(XHOST.command("aflow_data") + " vLIBS | grep -B1 \"" + auid + "\" | head -n 1");
     // Fallback if quick search failed
     if (!auid.empty() && aurl.empty()) {
-      cerr << soliloquy << " Quick search failed! Trying standard methode." << endl;
+      cerr << __AFLOW_FUNC__ << " Quick search failed! Trying standard methode." << endl;
       aflowlib::AflowlibLocator(auid, aurl, "AFLOWLIB_AUID2AURL");
     }
 
@@ -8388,10 +8453,10 @@ namespace pflow {
       meta_data["aurl"] = aurl;
       meta_data["auid"] = auid;
       str = entry.vstr.back();
-      if (LDEBUG) cerr << soliloquy << " AUID: " << auid << endl;
-      if (LDEBUG) cerr << soliloquy << " AURL: " << aurl << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " AUID: " << auid << endl;
+      if (LDEBUG) cerr << __AFLOW_FUNC__ << " AURL: " << aurl << endl;
     } else {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, "could not load a structure", _INPUT_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "could not load a structure", _INPUT_ERROR_);
     }
 
     vector <AtomEnvironment> AE = getAtomEnvironments(str, aeMode);
@@ -8413,7 +8478,6 @@ namespace pflow{
     //  3) 3 (SG_SETTING_ANRL) = rhomobhedral: rhl setting, monoclinic: unique-axis b, centrosymmetric: origin on inversion site 
     // The mode_default variable is an optional input: --prototype command defaults to the AFLOW setting, while everything else defaults to SG_SETTING_1
 
-    string function_name = XPID + "pflow::getSpaceGroupSetting():";
     stringstream message;
 
     uint setting = mode_default; //default
@@ -8428,7 +8492,7 @@ namespace pflow{
         if(setting_num==1){setting=SG_SETTING_1;}
         else if(setting_num==2){setting=SG_SETTING_2;}
         if(setting_num!=SG_SETTING_1 && setting_num!=SG_SETTING_2){
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Setting must be 1, 2, or \"aflow\" (for rhombohedral systems: 1=rhl setting and 2=hex setting; for monoclinic systems: 1=unique axis-b and 2=unique axis-c).",_INPUT_ILLEGAL_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Setting must be 1, 2, or \"aflow\" (for rhombohedral systems: 1=rhl setting and 2=hex setting; for monoclinic systems: 1=unique axis-b and 2=unique axis-c).",_INPUT_ILLEGAL_);
         }
       }
     }
@@ -8439,7 +8503,7 @@ namespace pflow{
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 #endif

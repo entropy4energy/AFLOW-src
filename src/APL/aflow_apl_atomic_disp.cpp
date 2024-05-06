@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow PINKU NATH - Duke University 2014-2016             *
 // *                 Aflow MARCO ESTERS - Duke University 2020               *
 // *                                                                         *
@@ -139,7 +139,7 @@ namespace apl {
     string message = "";
     if (!_pc_set) {
       message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     _qpoints.clear();
     _temperatures.clear();
@@ -147,13 +147,13 @@ namespace apl {
     QMesh& _qm = _pc->getQMesh();
     if (!_qm.initialized()) {
       message = "q-point mesh is not initialized.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     _qpoints = _pc->getQMesh().getPoints();
 
     if (Tstart > Tend) {
       message = "Tstart cannot be higher than Tend.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     for (double T = Tstart; T <= Tend; T += Tstep) _temperatures.push_back(T);
 
@@ -162,7 +162,7 @@ namespace apl {
 
   void AtomicDisplacements::calculateMeanSquareDisplacementMatrices() {
     string message = "Calculating mean square displacement matrices.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     _displacement_matrices.clear();
     _displacement_modes.clear();
     calculateEigenvectors();
@@ -208,7 +208,7 @@ namespace apl {
   void AtomicDisplacements::calculateModeDisplacements(const vector<xvector<double> >& qpts, bool coords_are_fractional) {
     if (!_pc_set) {
       string message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     _qpoints.clear();
     uint nq = qpts.size();
@@ -316,11 +316,11 @@ namespace apl {
   void AtomicDisplacements::writeMeanSquareDisplacementsToFile(string filename) {
     if (!_pc_set) {
       string message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     filename = aurostd::CleanFileName(filename);
     string message = "Writing mean square displacements into file " + filename + ".";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
     vector<vector<xvector<double> > > disp_vec = getDisplacementVectors();
     stringstream output;
     string tag = "[APL_DISPLACEMENTS]";
@@ -345,7 +345,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       message = "Could not write to file " + filename + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -355,11 +355,11 @@ namespace apl {
   void AtomicDisplacements::writeSceneFileXcrysden(string filename, const xstructure& scell, const vector<vector<vector<double> > >& disp, int nperiods) {
     if (!_pc_set) {
       string message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     filename = aurostd::CleanFileName(filename);
     string message = "Writing atomic displacements in XCRYSDEN format into file " + filename + ".";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(),*_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(),*_pc->getOSS());
 
     uint nsteps = disp.size();
     uint natoms = scell.atoms.size();
@@ -389,7 +389,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       message = "Could not write to file " + filename + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -400,11 +400,11 @@ namespace apl {
       const vector<vector<vector<xvector<xcomplex<double> > > > >& displacements) {
     if (!_pc_set) {
       string message = "PhononCalculator pointer not set.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_INIT_);
     }
     filename = aurostd::CleanFileName(filename);
     string message = "Writing atomic displacements in V_SIM format into file " + filename + ".";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, _pc->getDirectory(), *_pc->getOFStream(), *_pc->getOSS());
 
     stringstream output;
     // Lattice
@@ -442,7 +442,7 @@ namespace apl {
     aurostd::stringstream2file(output, filename);
     if (!aurostd::FileExist(filename)) {
       message = "Could not write to file " + filename + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -479,7 +479,7 @@ namespace apl {
     aurostd::string2tokens(allowed_formats_str, allowed_formats, ",");
     if (!aurostd::WithinList(allowed_formats, format)) {
       message = "Unrecognized format " + format + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
     }
 
     // Amplitude
@@ -489,7 +489,7 @@ namespace apl {
     else amplitude = aurostd::string2utype<double>(amplitude_str);
     if (amplitude < _FLOAT_TOL_) {
       message = "Amplitude must be positive.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
     }
 
     // Number of steps per period
@@ -500,7 +500,7 @@ namespace apl {
       else nsteps = aurostd::string2utype<int>(nsteps_str);
       if (nsteps < 1) {
         message = "Number of steps must be a positive integer";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
       }
     }
 
@@ -512,7 +512,7 @@ namespace apl {
       else nperiods = aurostd::string2utype<int>(nperiods_str);
       if (nperiods < 1) {
         message = "Number of periods must be a positive integer";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
       }
     }
 
@@ -529,7 +529,7 @@ namespace apl {
           sc_dim = aurostd::vector2xvector(tokens);
         } else {
           message = "Broken supercell format.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
         }
       }
     }
@@ -540,7 +540,7 @@ namespace apl {
     if (format != "V_SIM") {
       if (branches_str.empty()) {
         message = "No branches selected. Displacements will be calculated for all modes.";
-        pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, directory, mf, oss);
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, directory, mf, oss);
       } else {
         aurostd::string2tokens(branches_str, branches, ",");
         // Branch index is based on 1, not 0
@@ -553,7 +553,7 @@ namespace apl {
     vector<xvector<double> > qpoints;
     if (qpoints_str.empty()) {
       message = "No q-points given.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_MISSING_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_MISSING_);
     } else {
       vector<string> tokens;
       aurostd::string2tokens(qpoints_str, tokens, ",");
@@ -565,7 +565,7 @@ namespace apl {
         }
       } else {
         message = "Broken q-points format.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ILLEGAL_);
       }
     }
 
@@ -579,7 +579,7 @@ namespace apl {
     // Must project to primitive or the vibrations will be incorrect
     if (!sc_pcalc.projectToPrimitive()) {
       message = "Could not project to the primitive structure.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     // Check branches
     int nbr = (int) branches.size();
@@ -591,7 +591,7 @@ namespace apl {
       for (int br = 0; br < nbr; br++) {
         if (branches[br] >= nbranches || branches[br] < 0) {
           message = "Index " + aurostd::utype2string<int>(branches[br] + 1) + " out of range.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_BOUNDS_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_BOUNDS_);
         }
       }
     }
@@ -607,7 +607,7 @@ namespace apl {
       scell.build(sc_dim, false);
       if (!scell.projectToPrimitive()) {
         message = "Could not project to primitive structure.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
 
       vector<vector<vector<double> > > disp;
@@ -737,7 +737,7 @@ namespace apl {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow PINKU NATH - Duke University 2014-2016             *
 // *            Aflow MARCO ESTERS - Duke University 2020                    *
 // *                                                                         *

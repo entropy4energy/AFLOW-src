@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo - 2009 Duke
@@ -37,17 +37,16 @@ int MiscibilityExperimentsCheck(string speciesA,string speciesB) {// aflow_mix.c
 // ***************************************************************************
 // Miedema
 int MiscibilityMiedemaCheck(int speciesA,int speciesB) {// aflow_mix.cpp
-  string soliloquy=XPID+"MiscibilityMiedemaCheck():";
   double ratio;
   // cerr << endl << "DEBUG " << speciesA << " " << speciesB << endl;
   // cerr << "DEBUG " << GetAtomSymbol(speciesA) << " " << GetAtomSymbol(speciesB) << endl;
   // cerr << "DEBUG " << GetAtomName(speciesA) << " " << GetAtomName(speciesB) << endl;
   //  cerr << speciesA << " " << speciesB << endl;
   if(speciesA==speciesB) return MISCIBILITY_SYSTEM_MISCIBLE; // A is obviously miscibile with itself
-  if(vatom_miedema_phi_star.at(speciesA)==NNN) {throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vatom_miedema_phi_star.at(speciesA) undefined",_INPUT_ILLEGAL_);} //CO20200624
-  if(vatom_miedema_phi_star.at(speciesB)==NNN) {throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vatom_miedema_phi_star.at(speciesB) undefined",_INPUT_ILLEGAL_);} //CO20200624
-  if(vatom_miedema_nws.at(speciesA)==NNN) {throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vatom_miedema_nws.at(speciesA) undefined",_INPUT_ILLEGAL_);} //CO20200624
-  if(vatom_miedema_nws.at(speciesB)==NNN) {throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vatom_miedema_nws.at(speciesB) undefined",_INPUT_ILLEGAL_);} //CO20200624
+  if(vatom_miedema_phi_star.at(speciesA)==NNN) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vatom_miedema_phi_star.at(speciesA) undefined",_INPUT_ILLEGAL_);} //CO20200624
+  if(vatom_miedema_phi_star.at(speciesB)==NNN) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vatom_miedema_phi_star.at(speciesB) undefined",_INPUT_ILLEGAL_);} //CO20200624
+  if(vatom_miedema_nws.at(speciesA)==NNN) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vatom_miedema_nws.at(speciesA) undefined",_INPUT_ILLEGAL_);} //CO20200624
+  if(vatom_miedema_nws.at(speciesB)==NNN) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vatom_miedema_nws.at(speciesB) undefined",_INPUT_ILLEGAL_);} //CO20200624
   ratio=(vatom_miedema_phi_star.at(speciesA)-vatom_miedema_phi_star.at(speciesB))/(vatom_miedema_nws.at(speciesA)-vatom_miedema_nws.at(speciesB));
   // cerr << "DEBUG " << vatom_miedema_phi_star.at(speciesA) << " " << vatom_miedema_phi_star.at(speciesB) << endl;
   // cerr << "DEBUG " << vatom_miedema_nws.at(speciesA) << " " << vatom_miedema_nws.at(speciesB) << endl;
@@ -100,6 +99,6 @@ int MiscibilityHumeRotheryCheck(string system_in) {  // (nomix,unknown,mix)
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

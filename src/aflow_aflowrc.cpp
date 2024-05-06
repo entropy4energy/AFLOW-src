@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by SC 2017-2018
@@ -491,6 +491,10 @@
 #define         DEFAULT_UFF_ENERGY_TOLERANCE                      XHOST.adefault.getattachedutype<double>("DEFAULT_UFF_ENERGY_TOLERANCE")
 #define AFLOWRC_DEFAULT_UFF_CLUSTER_RADIUS                        10
 #define         DEFAULT_UFF_CLUSTER_RADIUS                        XHOST.adefault.getattachedutype<double>("DEFAULT_UFF_CLUSTER_RADIUS")
+#define AFLOWRC_DEFAULT_POCC_RDF_RMAX                             50
+#define         DEFAULT_POCC_RDF_RMAX                             XHOST.adefault.getattachedutype<double>("DEFAULT_POCC_RDF_RMAX")
+#define AFLOWRC_DEFAULT_POCC_RDF_NBINS                            50
+#define         DEFAULT_POCC_RDF_NBINS                            XHOST.adefault.getattachedutype<double>("DEFAULT_POCC_RDF_NBINS")
 #define AFLOWRC_DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON  FALSE
 #define         DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON  XHOST.adefault.getattachedutype<bool>("DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON")
 #define AFLOWRC_DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS             TRUE
@@ -870,6 +874,28 @@
 #define AFLOWRC_DEFAULT_AGL_PLOT_RESULTS                      FALSE
 #define         DEFAULT_AGL_PLOT_RESULTS                      XHOST.adefault.getattachedutype<bool>("DEFAULT_AGL_PLOT_RESULTS")
 
+//// DEFAULT QCA
+#define AFLOWRC_DEFAULT_QCA_MIN_SLEEP_SECONDS                 60 // seconds
+#define         DEFAULT_QCA_MIN_SLEEP_SECONDS                 XHOST.adefault.getattachedutype<int>("DEFAULT_QCA_MIN_SLEEP_SECONDS")
+#define AFLOWRC_DEFAULT_QCA_MAX_NUM_ATOMS                     8
+#define         DEFAULT_QCA_MAX_NUM_ATOMS                     XHOST.adefault.getattachedutype<int>("DEFAULT_QCA_MAX_NUM_ATOMS")
+#define AFLOWRC_DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS               4
+#define         DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS               XHOST.adefault.getattachedutype<int>("DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS")
+#define AFLOWRC_DEFAULT_QCA_CV_CUTOFF                         0.05
+#define         DEFAULT_QCA_CV_CUTOFF                         XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_CV_CUTOFF")
+#define AFLOWRC_DEFAULT_QCA_CONC_NPTS                         20
+#define         DEFAULT_QCA_CONC_NPTS                         XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_CONC_NPTS")
+#define AFLOWRC_DEFAULT_QCA_TEMP_NPTS                         150
+#define         DEFAULT_QCA_TEMP_NPTS                         XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_TEMP_NPTS")
+#define AFLOWRC_DEFAULT_QCA_TEMP_MIN                          300 // K
+#define         DEFAULT_QCA_TEMP_MIN                          XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_TEMP_MIN")
+#define AFLOWRC_DEFAULT_QCA_TEMP_MAX                          5000 // K
+#define         DEFAULT_QCA_TEMP_MAX                          XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_TEMP_MAX")
+#define AFLOWRC_DEFAULT_QCA_TEMP_MIN_LIMIT                    10000 // K
+#define         DEFAULT_QCA_TEMP_MIN_LIMIT                    XHOST.adefault.getattachedutype<double>("DEFAULT_QCA_TEMP_MIN_LIMIT")
+#define AFLOWRC_DEFAULT_QCA_PRINT                             string("txt")
+#define         DEFAULT_QCA_PRINT                             XHOST.adefault.getattachedscheme("DEFAULT_QCA_PRINT")
+
 //RF20200413 START
 // DEFAULT CCE
 #define AFLOWRC_DEFAULT_CCE_OX_METHOD                         1
@@ -997,12 +1023,30 @@
 #define         MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI             XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI")
 
 //CO20201220 X START
-#define AFLOWRC_MPI_OPTIONS_DUKE_X                            string("ulimit -s unlimited ") // DUKE_X_MPICH
-#define         MPI_OPTIONS_DUKE_X                            XHOST.adefault.getattachedscheme("MPI_OPTIONS_DUKE_X")
-#define AFLOWRC_MPI_COMMAND_DUKE_X                            string("mpirun -n") // DUKE_X_MPICH
-#define         MPI_COMMAND_DUKE_X                            XHOST.adefault.getattachedscheme("MPI_COMMAND_DUKE_X")
-#define AFLOWRC_MPI_BINARY_DIR_DUKE_X                         string("/home/bin/") // DUKE_X_MPICH
-#define         MPI_BINARY_DIR_DUKE_X                         XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_X")
+#define AFLOWRC_MPI_OPTIONS_DUKE_X_X                          string("ulimit -s unlimited ") // DUKE_X_X_MPICH
+#define         MPI_OPTIONS_DUKE_X_X                          XHOST.adefault.getattachedscheme("MPI_OPTIONS_DUKE_X_X")
+#define AFLOWRC_MPI_COMMAND_DUKE_X_X                          string("srun --mpi=pmix --cpus-per-task") // DUKE_X_X_MPICH
+#define         MPI_COMMAND_DUKE_X_X                          XHOST.adefault.getattachedscheme("MPI_COMMAND_DUKE_X_X")
+#define AFLOWRC_MPI_BINARY_DIR_DUKE_X_X                       string("~/bin/x/") // DUKE_X_X_MPICH
+#define         MPI_BINARY_DIR_DUKE_X_X                       XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_X_X")
+#define AFLOWRC_MPI_OPTIONS_DUKE_X_CRAY                       string("ulimit -s unlimited ") // DUKE_X_CRAY_MPICH
+#define         MPI_OPTIONS_DUKE_X_CRAY                       XHOST.adefault.getattachedscheme("MPI_OPTIONS_DUKE_X_CRAY")
+#define AFLOWRC_MPI_COMMAND_DUKE_X_CRAY                       string("srun --mpi=pmix --cpus-per-task") // DUKE_X_CRAY_MPICH
+#define         MPI_COMMAND_DUKE_X_CRAY                       XHOST.adefault.getattachedscheme("MPI_COMMAND_DUKE_X_CRAY")
+#define AFLOWRC_MPI_BINARY_DIR_DUKE_X_CRAY                    string("~/bin/cray/") // DUKE_X_CRAY_MPICH
+#define         MPI_BINARY_DIR_DUKE_X_CRAY                    XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_X_CRAY")
+#define AFLOWRC_MPI_OPTIONS_DUKE_X_OLDCRAY                    string("ulimit -s unlimited ") // DUKE_X_OLDCRAY_MPICH
+#define         MPI_OPTIONS_DUKE_X_OLDCRAY                    XHOST.adefault.getattachedscheme("MPI_OPTIONS_DUKE_X_OLDCRAY")
+#define AFLOWRC_MPI_COMMAND_DUKE_X_OLDCRAY                    string("srun --mpi=pmix --cpus-per-task") // DUKE_X_OLDCRAY_MPICH
+#define         MPI_COMMAND_DUKE_X_OLDCRAY                    XHOST.adefault.getattachedscheme("MPI_COMMAND_DUKE_X_OLDCRAY")
+#define AFLOWRC_MPI_BINARY_DIR_DUKE_X_OLDCRAY                 string("~/bin/oldcray/") // DUKE_X_OLDCRAY_MPICH
+#define         MPI_BINARY_DIR_DUKE_X_OLDCRAY                 XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_X_OLDCRAY")
+#define AFLOWRC_MPI_OPTIONS_DUKE_X_SMB                        string("ulimit -s unlimited ") // DUKE_X_SMB_MPICH
+#define         MPI_OPTIONS_DUKE_X_SMB                        XHOST.adefault.getattachedscheme("MPI_OPTIONS_DUKE_X_SMB")
+#define AFLOWRC_MPI_COMMAND_DUKE_X_SMB                        string("srun --mpi=pmix --cpus-per-task") // DUKE_X_SMB_MPICH
+#define         MPI_COMMAND_DUKE_X_SMB                        XHOST.adefault.getattachedscheme("MPI_COMMAND_DUKE_X_SMB")
+#define AFLOWRC_MPI_BINARY_DIR_DUKE_X_SMB                     string("~/bin/smb/") // DUKE_X_SMB_MPICH
+#define         MPI_BINARY_DIR_DUKE_X_SMB                     XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_DUKE_X_SMB")
 //CO20201220 X STOP
 
 //CO20220818 JHU_ROCKFISH START
@@ -1026,7 +1070,7 @@
 //DX20190509 - MACHINE002 - START
 #define AFLOWRC_MPI_OPTIONS_MACHINE002                       string("") // MACHINE002
 #define         MPI_OPTIONS_MACHINE002                       XHOST.adefault.getattachedscheme("MPI_OPTIONS_MACHINE002")
-#define AFLOWRC_MPI_COMMAND_MACHINE002                       string("/p/app/intel/parallel_studio_xe_2017_update4/impi/2017.3.196/intel64/bin/mpirun -np") // MACHINE002
+#define AFLOWRC_MPI_COMMAND_MACHINE002                       string("mpirun -np") // MACHINE002
 #define         MPI_COMMAND_MACHINE002                       XHOST.adefault.getattachedscheme("MPI_COMMAND_MACHINE002")
 #define AFLOWRC_MPI_BINARY_DIR_MACHINE002                    string("~/bin/") // MACHINE002
 #define         MPI_BINARY_DIR_MACHINE002                    XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_MACHINE002")
@@ -1035,7 +1079,7 @@
 //DX20201005 - MACHINE003 - START
 #define AFLOWRC_MPI_OPTIONS_MACHINE003                       string("") // MACHINE003
 #define         MPI_OPTIONS_MACHINE003                       XHOST.adefault.getattachedscheme("MPI_OPTIONS_MACHINE003")
-#define AFLOWRC_MPI_COMMAND_MACHINE003                       string("/p/app/intel/parallel_studio_xe_2018_update1/impi/2018.1.163/intel64/bin/mpirun -np") // MACHINE003
+#define AFLOWRC_MPI_COMMAND_MACHINE003                       string("mpirun -np") // MACHINE003
 #define         MPI_COMMAND_MACHINE003                       XHOST.adefault.getattachedscheme("MPI_COMMAND_MACHINE003")
 #define AFLOWRC_MPI_BINARY_DIR_MACHINE003                    string("~/bin/") // MACHINE003
 #define         MPI_BINARY_DIR_MACHINE003                    XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_MACHINE003")
@@ -1044,7 +1088,7 @@
 //DX20211011 - MACHINE004 - START
 #define AFLOWRC_MPI_OPTIONS_MACHINE004                       string("") // MACHINE004
 #define         MPI_OPTIONS_MACHINE004                       XHOST.adefault.getattachedscheme("MPI_OPTIONS_MACHINE004")
-#define AFLOWRC_MPI_COMMAND_MACHINE004                       string("/p/app/intel/parallel_studio_xe_2018_update1/impi/2018.1.163/intel64/bin/mpirun -np") // MACHINE004
+#define AFLOWRC_MPI_COMMAND_MACHINE004                       string("mpirun -np") // MACHINE004
 #define         MPI_COMMAND_MACHINE004                       XHOST.adefault.getattachedscheme("MPI_COMMAND_MACHINE004")
 #define AFLOWRC_MPI_BINARY_DIR_MACHINE004                    string("~/bin/") // MACHINE004
 #define         MPI_BINARY_DIR_MACHINE004                    XHOST.adefault.getattachedscheme("MPI_BINARY_DIR_MACHINE004")
@@ -1183,11 +1227,10 @@ namespace aflowrc {
 namespace aflowrc {
   bool is_available(std::ostream& oss,bool AFLOWRC_VERBOSE) {
     bool LDEBUG=(FALSE || XHOST.DEBUG || AFLOWRC_VERBOSE);   
-    string soliloquy="aflowrc::is_available():";  //CO20200122
     bool aflowrc_local=FALSE;
     bool aflowrc_global=FALSE;
-    if(LDEBUG) oss << soliloquy << " BEGIN" << endl;
-    if(LDEBUG) oss << soliloquy << " XHOST.home=" << XHOST.home << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " BEGIN" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.home=" << XHOST.home << endl;
     // TESTING LOCAL OR USER BASED
     if(XHOST.aflowrc_filename.empty()) XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL;
     aflowrc_local=aurostd::FileExist(AFLOWRC_FILENAME_LOCAL);
@@ -1195,38 +1238,38 @@ namespace aflowrc {
 
     // LOCAL=TRUE && GLOBAL=TRUE => take LOCAL
     if(aflowrc_local && aflowrc_global) {
-      if(LDEBUG) oss << soliloquy << " LOCAL=TRUE && GLOBAL=TRUE => LOCAL " << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " LOCAL=TRUE && GLOBAL=TRUE => LOCAL " << endl;
       XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL;
-      if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
-      if(LDEBUG) oss << soliloquy << " END" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
       return TRUE;
     }
     // LOCAL=TRUE && GLOBAL=FALSE => take LOCAL
     if(aflowrc_local && !aflowrc_global) {
-      if(LDEBUG) oss << soliloquy << " LOCAL=TRUE && GLOBAL=FALSE => LOCAL " << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " LOCAL=TRUE && GLOBAL=FALSE => LOCAL " << endl;
       XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL; 
-      if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
-      if(LDEBUG) oss << soliloquy << " END" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
       return TRUE;
     }
     // LOCAL=FALSE && GLOBAL=TRUE => take GLOBAL
     if(!aflowrc_local && aflowrc_global) {
-      if(LDEBUG) oss << soliloquy << " LOCAL=FALSE && GLOBAL=TRUE => GLOBAL " << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " LOCAL=FALSE && GLOBAL=TRUE => GLOBAL " << endl;
       XHOST.aflowrc_filename=AFLOWRC_FILENAME_GLOBAL;
-      if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
-      if(LDEBUG) oss << soliloquy << " END" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
       return TRUE;
     }
     // LOCAL=FALSE && GLOBAL=FALSE => take NOTHING AND REWRITE
     if(!aflowrc_local && !aflowrc_global) {
-      if(LDEBUG) oss << soliloquy << " LOCAL=FALSE && GLOBAL=FALSE => NOTHING " << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " LOCAL=FALSE && GLOBAL=FALSE => NOTHING " << endl;
       XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL; // because it is going to write it
-      if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
-      if(LDEBUG) oss << soliloquy << " END" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
       return FALSE;
     }
 
-    if(LDEBUG) oss << soliloquy << " END" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
     return FALSE;
   }
 } // namespace aflowrc
@@ -1238,18 +1281,17 @@ namespace aflowrc {
 namespace aflowrc {
   bool read(std::ostream& oss,bool AFLOWRC_VERBOSE) {
     bool LDEBUG=(FALSE || XHOST.DEBUG || AFLOWRC_VERBOSE);   
-    string soliloquy="aflowrc::read():";  //CO20200404
     stringstream message; //CO20200404
-    if(LDEBUG) oss << soliloquy << " BEGIN" << endl;
-    if(LDEBUG) oss << soliloquy << " XHOST.home=" << XHOST.home << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " BEGIN" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.home=" << XHOST.home << endl;
     if(XHOST.aflowrc_filename.empty()) XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL;
-    if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
 
     if(!aflowrc::is_available(oss,AFLOWRC_VERBOSE)){
       if(!XHOST.vflag_control.flag("WWW")){ //CO20200404 - new web flag
         if(!(aurostd::substring2bool(XHOST.aflowrc_filename,"/mnt/MAIN") || aurostd::substring2bool(XHOST.aflowrc_filename,"/mnt/uMAIN"))){ //CO20200404 - patching for new disk
           //[CO20200404 - OBSOLETE]cout << "WARNING: aflowrc::read: " << XHOST.aflowrc_filename << " not found, loading DEFAULT values" << endl;
-          message << XHOST.aflowrc_filename << " not found, loading DEFAULT values";pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,std::cerr,_LOGGER_MESSAGE_);  //CO20200404 - LEAVE std::cerr here, FR needs this for web
+          message << XHOST.aflowrc_filename << " not found, loading DEFAULT values";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,std::cerr,_LOGGER_MESSAGE_);  //CO20200404 - LEAVE std::cerr here, FR needs this for web
         }
       }
     }
@@ -1517,6 +1559,8 @@ namespace aflowrc {
     aflowrc::load_default("DEFAULT_UFF_BONDING_DISTANCE",AFLOWRC_DEFAULT_UFF_BONDING_DISTANCE);
     aflowrc::load_default("DEFAULT_UFF_ENERGY_TOLERANCE",AFLOWRC_DEFAULT_UFF_ENERGY_TOLERANCE);
     aflowrc::load_default("DEFAULT_UFF_CLUSTER_RADIUS",AFLOWRC_DEFAULT_UFF_CLUSTER_RADIUS);
+    aflowrc::load_default("DEFAULT_POCC_RDF_RMAX",AFLOWRC_DEFAULT_POCC_RDF_RMAX);
+    aflowrc::load_default("DEFAULT_POCC_RDF_NBINS",AFLOWRC_DEFAULT_POCC_RDF_NBINS);
     aflowrc::load_default("DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON",AFLOWRC_DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON);
     aflowrc::load_default("DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS",AFLOWRC_DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS);
     aflowrc::load_default("POCC_FILE_PREFIX",AFLOWRC_POCC_FILE_PREFIX);
@@ -1718,6 +1762,18 @@ namespace aflowrc {
     aflowrc::load_default("DEFAULT_AGL_WRITE_GIBBS_INPUT",AFLOWRC_DEFAULT_AGL_WRITE_GIBBS_INPUT);
     aflowrc::load_default("DEFAULT_AGL_PLOT_RESULTS",AFLOWRC_DEFAULT_AGL_PLOT_RESULTS);    
 
+    // DEFAULT QCA
+    aflowrc::load_default("DEFAULT_QCA_MIN_SLEEP_SECONDS",AFLOWRC_DEFAULT_QCA_MIN_SLEEP_SECONDS);
+    aflowrc::load_default("DEFAULT_QCA_MAX_NUM_ATOMS",AFLOWRC_DEFAULT_QCA_MAX_NUM_ATOMS);
+    aflowrc::load_default("DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS",AFLOWRC_DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS);
+    aflowrc::load_default("DEFAULT_QCA_CV_CUTOFF",AFLOWRC_DEFAULT_QCA_CV_CUTOFF);
+    aflowrc::load_default("DEFAULT_QCA_CONC_NPTS",AFLOWRC_DEFAULT_QCA_CONC_NPTS);
+    aflowrc::load_default("DEFAULT_QCA_TEMP_NPTS",AFLOWRC_DEFAULT_QCA_TEMP_NPTS);
+    aflowrc::load_default("DEFAULT_QCA_TEMP_MIN",AFLOWRC_DEFAULT_QCA_TEMP_MIN);
+    aflowrc::load_default("DEFAULT_QCA_TEMP_MAX",AFLOWRC_DEFAULT_QCA_TEMP_MAX);
+    aflowrc::load_default("DEFAULT_QCA_TEMP_MIN_LIMIT",AFLOWRC_DEFAULT_QCA_TEMP_MIN_LIMIT);
+    aflowrc::load_default("DEFAULT_QCA_PRINT",AFLOWRC_DEFAULT_QCA_PRINT);
+
     //RF20200413 START
     // DEFAULT CCE
     aflowrc::load_default("DEFAULT_CCE_OX_METHOD",AFLOWRC_DEFAULT_CCE_OX_METHOD);
@@ -1792,9 +1848,18 @@ namespace aflowrc {
     aflowrc::load_default("MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI",AFLOWRC_MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI); 
 
     //CO20201220 X START
-    aflowrc::load_default("MPI_OPTIONS_DUKE_X",AFLOWRC_MPI_OPTIONS_DUKE_X); 
-    aflowrc::load_default("MPI_COMMAND_DUKE_X",AFLOWRC_MPI_COMMAND_DUKE_X); 
-    aflowrc::load_default("MPI_BINARY_DIR_DUKE_X",AFLOWRC_MPI_BINARY_DIR_DUKE_X); 
+    aflowrc::load_default("MPI_OPTIONS_DUKE_X_X",AFLOWRC_MPI_OPTIONS_DUKE_X_X); 
+    aflowrc::load_default("MPI_COMMAND_DUKE_X_X",AFLOWRC_MPI_COMMAND_DUKE_X_X); 
+    aflowrc::load_default("MPI_BINARY_DIR_DUKE_X_X",AFLOWRC_MPI_BINARY_DIR_DUKE_X_X); 
+    aflowrc::load_default("MPI_OPTIONS_DUKE_X_CRAY",AFLOWRC_MPI_OPTIONS_DUKE_X_CRAY); 
+    aflowrc::load_default("MPI_COMMAND_DUKE_X_CRAY",AFLOWRC_MPI_COMMAND_DUKE_X_CRAY); 
+    aflowrc::load_default("MPI_BINARY_DIR_DUKE_X_CRAY",AFLOWRC_MPI_BINARY_DIR_DUKE_X_CRAY); 
+    aflowrc::load_default("MPI_OPTIONS_DUKE_X_OLDCRAY",AFLOWRC_MPI_OPTIONS_DUKE_X_OLDCRAY); 
+    aflowrc::load_default("MPI_COMMAND_DUKE_X_OLDCRAY",AFLOWRC_MPI_COMMAND_DUKE_X_OLDCRAY); 
+    aflowrc::load_default("MPI_BINARY_DIR_DUKE_X_OLDCRAY",AFLOWRC_MPI_BINARY_DIR_DUKE_X_OLDCRAY); 
+    aflowrc::load_default("MPI_OPTIONS_DUKE_X_SMB",AFLOWRC_MPI_OPTIONS_DUKE_X_SMB); 
+    aflowrc::load_default("MPI_COMMAND_DUKE_X_SMB",AFLOWRC_MPI_COMMAND_DUKE_X_SMB); 
+    aflowrc::load_default("MPI_BINARY_DIR_DUKE_X_SMB",AFLOWRC_MPI_BINARY_DIR_DUKE_X_SMB); 
     //CO20201220 X STOP
     
     //CO20220818 JHU_ROCKFISH START
@@ -1869,7 +1934,7 @@ namespace aflowrc {
     aflowrc::load_default("MPI_COMMAND_MACHINE2",AFLOWRC_MPI_COMMAND_MACHINE2); 
     aflowrc::load_default("MPI_BINARY_DIR_MACHINE2",AFLOWRC_MPI_BINARY_DIR_MACHINE2); 
 
-    if(LDEBUG) oss << soliloquy << " END" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
 
     return TRUE;
   }
@@ -1882,12 +1947,11 @@ namespace aflowrc {
 namespace aflowrc {
   bool write_default(std::ostream& oss,bool AFLOWRC_VERBOSE) {
     bool LDEBUG=(FALSE || XHOST.DEBUG || AFLOWRC_VERBOSE);   
-    string soliloquy="aflowrc::write_default():"; //CO20200404
     stringstream message;
-    if(LDEBUG) oss << soliloquy << " BEGIN" << endl;
-    if(LDEBUG) oss << soliloquy << " XHOST.home=" << XHOST.home << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " BEGIN" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.home=" << XHOST.home << endl;
     if(XHOST.aflowrc_filename.empty()) XHOST.aflowrc_filename=AFLOWRC_FILENAME_LOCAL;
-    if(LDEBUG) oss << soliloquy << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " XHOST.aflowrc_filename=" << XHOST.aflowrc_filename << endl;
 
     stringstream aflowrc("");
     aflowrc << "// ****************************************************************************************************" << endl;
@@ -2178,6 +2242,8 @@ namespace aflowrc {
     aflowrc << "DEFAULT_UFF_BONDING_DISTANCE=" << AFLOWRC_DEFAULT_UFF_BONDING_DISTANCE << endl;
     aflowrc << "DEFAULT_UFF_ENERGY_TOLERANCE=" << AFLOWRC_DEFAULT_UFF_ENERGY_TOLERANCE << endl;
     aflowrc << "DEFAULT_UFF_CLUSTER_RADIUS=" << AFLOWRC_DEFAULT_UFF_CLUSTER_RADIUS << endl;
+    aflowrc << "DEFAULT_POCC_RDF_RMAX=" << AFLOWRC_DEFAULT_POCC_RDF_RMAX << endl;
+    aflowrc << "DEFAULT_POCC_RDF_NBINS=" << AFLOWRC_DEFAULT_POCC_RDF_NBINS << endl;
     aflowrc << "DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON=" << AFLOWRC_DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON << endl;
     aflowrc << "DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS=" << AFLOWRC_DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS << endl;
     aflowrc << "POCC_FILE_PREFIX=\"" << AFLOWRC_POCC_FILE_PREFIX << "\"" << endl;
@@ -2365,6 +2431,21 @@ namespace aflowrc {
     aflowrc << "DEFAULT_AGL_WRITE_GIBBS_INPUT=" << AFLOWRC_DEFAULT_AGL_WRITE_GIBBS_INPUT << endl;
     aflowrc << "DEFAULT_AGL_PLOT_RESULTS=" << AFLOWRC_DEFAULT_AGL_PLOT_RESULTS << endl;    
 
+    //SD20220323 - QCA START
+    aflowrc << " " << endl;
+    aflowrc << "// DEFAULTS QCA " << endl;
+    aflowrc << "DEFAULT_QCA_MIN_SLEEP_SECONDS" << AFLOWRC_DEFAULT_QCA_MIN_SLEEP_SECONDS << endl;
+    aflowrc << "DEFAULT_QCA_MAX_NUM_ATOMS" << AFLOWRC_DEFAULT_QCA_MAX_NUM_ATOMS << endl;
+    aflowrc << "DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS" << AFLOWRC_DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS << endl;
+    aflowrc << "DEFAULT_QCA_CV_CUTOFF" << AFLOWRC_DEFAULT_QCA_CV_CUTOFF << endl;
+    aflowrc << "DEFAULT_QCA_CONC_NPTS" << AFLOWRC_DEFAULT_QCA_CONC_NPTS << endl;
+    aflowrc << "DEFAULT_QCA_TEMP_NPTS" << AFLOWRC_DEFAULT_QCA_TEMP_NPTS << endl;
+    aflowrc << "DEFAULT_QCA_TEMP_MIN" << AFLOWRC_DEFAULT_QCA_TEMP_MIN << endl;
+    aflowrc << "DEFAULT_QCA_TEMP_MAX" << AFLOWRC_DEFAULT_QCA_TEMP_MAX << endl;
+    aflowrc << "DEFAULT_QCA_TEMP_MIN_LIMIT" << AFLOWRC_DEFAULT_QCA_TEMP_MIN_LIMIT << endl;
+    aflowrc << "DEFAULT_QCA_PRINT" << AFLOWRC_DEFAULT_QCA_PRINT << endl;
+    //SD20220323 - QCA END
+
     //RF20200413 START
     aflowrc << " " << endl;
     aflowrc << "// DEFAULTS CCE" << endl;
@@ -2443,9 +2524,18 @@ namespace aflowrc {
     aflowrc << "MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI << "\"" << "  // DUKE_QFLOW_OPENMPI" << endl; 
 
     //CO20201220 X START
-    aflowrc << "MPI_OPTIONS_DUKE_X=\"" << AFLOWRC_MPI_OPTIONS_DUKE_X << "\"" << "  // DUKE_X" << endl;
-    aflowrc << "MPI_COMMAND_DUKE_X=\"" << AFLOWRC_MPI_COMMAND_DUKE_X << "\"" << "  // DUKE_X" << endl;
-    aflowrc << "MPI_BINARY_DIR_DUKE_X=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_X << "\"" << "  // DUKE_X" << endl; 
+    aflowrc << "MPI_OPTIONS_DUKE_X_X=\"" << AFLOWRC_MPI_OPTIONS_DUKE_X_X << "\"" << "  // DUKE_X_X" << endl;
+    aflowrc << "MPI_COMMAND_DUKE_X_X=\"" << AFLOWRC_MPI_COMMAND_DUKE_X_X << "\"" << "  // DUKE_X_X" << endl;
+    aflowrc << "MPI_BINARY_DIR_DUKE_X_X=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_X_X << "\"" << "  // DUKE_X_X" << endl; 
+    aflowrc << "MPI_OPTIONS_DUKE_X_CRAY=\"" << AFLOWRC_MPI_OPTIONS_DUKE_X_CRAY << "\"" << "  // DUKE_X_CRAY" << endl;
+    aflowrc << "MPI_COMMAND_DUKE_X_CRAY=\"" << AFLOWRC_MPI_COMMAND_DUKE_X_CRAY << "\"" << "  // DUKE_X_CRAY" << endl;
+    aflowrc << "MPI_BINARY_DIR_DUKE_X_CRAY=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_X_CRAY << "\"" << "  // DUKE_X_CRAY" << endl; 
+    aflowrc << "MPI_OPTIONS_DUKE_X_OLDCRAY=\"" << AFLOWRC_MPI_OPTIONS_DUKE_X_OLDCRAY << "\"" << "  // DUKE_X_OLDCRAY" << endl;
+    aflowrc << "MPI_COMMAND_DUKE_X_OLDCRAY=\"" << AFLOWRC_MPI_COMMAND_DUKE_X_OLDCRAY << "\"" << "  // DUKE_X_OLDCRAY" << endl;
+    aflowrc << "MPI_BINARY_DIR_DUKE_X_OLDCRAY=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_X_OLDCRAY << "\"" << "  // DUKE_X_OLDCRAY" << endl; 
+    aflowrc << "MPI_OPTIONS_DUKE_X_SMB=\"" << AFLOWRC_MPI_OPTIONS_DUKE_X_SMB << "\"" << "  // DUKE_X_SMB" << endl;
+    aflowrc << "MPI_COMMAND_DUKE_X_SMB=\"" << AFLOWRC_MPI_COMMAND_DUKE_X_SMB << "\"" << "  // DUKE_X_SMB" << endl;
+    aflowrc << "MPI_BINARY_DIR_DUKE_X_SMB=\"" << AFLOWRC_MPI_BINARY_DIR_DUKE_X_SMB << "\"" << "  // DUKE_X_SMB" << endl; 
     //CO20201220 X STOP
     
     //CO20220818 JHU_ROCKFISH START
@@ -2528,10 +2618,10 @@ namespace aflowrc {
     if(aurostd::stringstream2file(aflowrc,XHOST.aflowrc_filename) && aurostd::FileExist(XHOST.aflowrc_filename)){
       if(!XHOST.vflag_control.flag("WWW")){ //CO20200404 - new web flag
         //[CO20200404 - OBSOLETE]cerr << "WARNING: aflowrc::write_default: WRITING default " << XHOST.aflowrc_filename << endl;  //CO20190808 - issue this ONLY if it was written, should fix www-data
-        message << "WRITING default " << XHOST.aflowrc_filename;pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,std::cerr,_LOGGER_MESSAGE_);  //CO20200404 - LEAVE std::cerr here, FR needs this for web
+        message << "WRITING default " << XHOST.aflowrc_filename;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,std::cerr,_LOGGER_MESSAGE_);  //CO20200404 - LEAVE std::cerr here, FR needs this for web
       }
     }
-    if(LDEBUG) oss << soliloquy << " END" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << " END" << endl;
     return TRUE;
   }
 } // namespace aflowrc
@@ -2801,6 +2891,8 @@ namespace aflowrc {
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_UFF_BONDING_DISTANCE\")=" << DEFAULT_UFF_BONDING_DISTANCE << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_UFF_ENERGY_TOLERANCE\")=" << DEFAULT_UFF_ENERGY_TOLERANCE << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_UFF_CLUSTER_RADIUS\")=" << DEFAULT_UFF_CLUSTER_RADIUS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_POCC_RDF_RMAX\")=" << DEFAULT_POCC_RDF_RMAX << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_POCC_RDF_NBINS\")=" << DEFAULT_POCC_RDF_NBINS << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON\")=" << DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS\")=" << DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"POCC_FILE_PREFIX\")=\"" << POCC_FILE_PREFIX << "\"" << endl;
@@ -2982,6 +3074,20 @@ namespace aflowrc {
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_AGL_WRITE_GIBBS_INPUT\")=" << AFLOWRC_DEFAULT_AGL_WRITE_GIBBS_INPUT << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_AGL_PLOT_RESULTS\")=" << AFLOWRC_DEFAULT_AGL_PLOT_RESULTS << endl;    
 
+    //SD20220323 - QCA START
+    if(LDEBUG) oss << "// DEFAULTS QCA " << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_MIN_SLEEP_SECONDS\")=" << AFLOWRC_DEFAULT_QCA_MIN_SLEEP_SECONDS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_MAX_NUM_ATOMS\")=" << AFLOWRC_DEFAULT_QCA_MAX_NUM_ATOMS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS\")=" << AFLOWRC_DEFAULT_QCA_AFLOW_MAX_NUM_ATOMS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_CV_CUTOFF\")=" << AFLOWRC_DEFAULT_QCA_CV_CUTOFF << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_CONC_NPTS\")=" << AFLOWRC_DEFAULT_QCA_CONC_NPTS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_TEMP_NPTS\")=" << AFLOWRC_DEFAULT_QCA_TEMP_NPTS << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_TEMP_MIN\")=" << AFLOWRC_DEFAULT_QCA_TEMP_MIN << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_TEMP_MAX\")=" << AFLOWRC_DEFAULT_QCA_TEMP_MAX << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_TEMP_MIN_LIMIT\")=" << AFLOWRC_DEFAULT_QCA_TEMP_MIN_LIMIT << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_QCA_PRINT\")=" << AFLOWRC_DEFAULT_QCA_PRINT << endl;
+    //SD20220323 - QCA END
+
     //RF20200413 START
     if(LDEBUG) oss << "// DEFAULTS CCE" << endl;
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"DEFAULT_CCE_OX_METHOD\")=\"" << DEFAULT_CCE_OX_METHOD << "\"" << "               // 1 - ELECTRONEGATIVITY_ALLEN, 2 - BADER" << endl;
@@ -3057,9 +3163,18 @@ namespace aflowrc {
     if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI\")=\"" << MPI_BINARY_DIR_DUKE_QFLOW_OPENMPI << "\"" << endl;
 
     //CO20201220 X START
-    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_OPTIONS_DUKE_X\")=\"" << MPI_OPTIONS_DUKE_X << "\"" << endl;
-    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_COMMAND_DUKE_X\")=\"" << MPI_COMMAND_DUKE_X << "\"" << endl;
-    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_X\")=\"" << MPI_BINARY_DIR_DUKE_X << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_OPTIONS_DUKE_X_X\")=\"" << MPI_OPTIONS_DUKE_X_X << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_COMMAND_DUKE_X_X\")=\"" << MPI_COMMAND_DUKE_X_X << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_X_X\")=\"" << MPI_BINARY_DIR_DUKE_X_X << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_OPTIONS_DUKE_X_CRAY\")=\"" << MPI_OPTIONS_DUKE_X_CRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_COMMAND_DUKE_X_CRAY\")=\"" << MPI_COMMAND_DUKE_X_CRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_X_CRAY\")=\"" << MPI_BINARY_DIR_DUKE_X_CRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_OPTIONS_DUKE_X_OLDCRAY\")=\"" << MPI_OPTIONS_DUKE_X_OLDCRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_COMMAND_DUKE_X_OLDCRAY\")=\"" << MPI_COMMAND_DUKE_X_OLDCRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_X_OLDCRAY\")=\"" << MPI_BINARY_DIR_DUKE_X_OLDCRAY << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_OPTIONS_DUKE_X_SMB\")=\"" << MPI_OPTIONS_DUKE_X_SMB << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_COMMAND_DUKE_X_SMB\")=\"" << MPI_COMMAND_DUKE_X_SMB << "\"" << endl;
+    if(LDEBUG) oss << "XHOST.adefault.getattachedscheme(\"MPI_BINARY_DIR_DUKE_X_SMB\")=\"" << MPI_BINARY_DIR_DUKE_X_SMB << "\"" << endl;
     //CO20201220 X STOP
     
     //CO20220818 JHU_ROCKFISH START
@@ -3150,6 +3265,6 @@ namespace aflowrc {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

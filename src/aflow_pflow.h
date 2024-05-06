@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -415,7 +415,7 @@ namespace pflow {
   xstructure RMCOPIES(istream& input);
   void RAYTRACE(vector<string>);
   xstructure SCALE(const string& options,istream& input);
-  void RDF(const string& options,istream& input);
+  void RDF(const string& options,istream& input,bool raw_counts=false); //CO20220627
   void RDFCMP(const string& options);
   void RSM(vector<string>, istream& input);
   xstructure SD(vector<string>,istream& input);
@@ -516,7 +516,9 @@ void PrintNdata(const xstructure&,ostream& oss=cout);
 //void PrintNeatProj(projdata& pd);
 void PrintPDB(const xstructure&,ostream& oss=cout);
 void platon2print(xstructure,bool P_EQUAL,bool P_EXACT,double P_ang,double P_d1,double P_d2,double P_d3,ostream& sout);
-void PrintRDF(const xstructure& str,const double& rmax,const int& nbins,const int& smooth_width,const aurostd::matrix<double>& rdf_all,
+string RDF2string(const xstructure& xstr,const double rmax,const int nbins,const xmatrix<double>& rdf_all); //CO20220627
+void PrintRDF(const xstructure& xstr,const double rmax,const int nbins,const xmatrix<double>& rdf_all,ostream& oss=cout); //CO20220627
+void PrintRDF_20220101(const xstructure& str,const double& rmax,const int& nbins,const int& smooth_width,const aurostd::matrix<double>& rdf_all,
     aurostd::matrix<double>& rdfsh_all,aurostd::matrix<double>& rdfsh_loc,ostream& oss=cout);  //CO20200404 pflow::matrix()->aurostd::matrix()
 void PrintRDFCmp(const xstructure& str_A,const xstructure& str_B,const double& rmax,const int nbins,
     const double& smooth_width,const int nsh,const aurostd::matrix<double>& rdfsh_all_A,
@@ -570,7 +572,9 @@ namespace pflow {
   void GetXrayData(const xstructure& str,vector<double>& dist,vector<double>& sf,
       vector<double>& scatt_fact,vector<double>& mass,vector<double>& twoB_vec,
       vector<vector<double> >& ids,aurostd::matrix<double>& data,double lambda=XRAY_RADIATION_COPPER_Kalpha);  //CO20190409  //CO20190620 - intmax can be grabbed later  //CO20200404 pflow::matrix()->aurostd::matrix()
-  void GetRDF(xstructure str,const double& rmax,const int& nbins,aurostd::matrix<double>& rdf_all);  //CO20200404 pflow::matrix()->aurostd::matrix()
+  vector<vector<int> > getvvitypesRDF(const xstructure& xstr);  //CO20220627
+  void GetRDF(const xstructure& xstr,aurostd::xmatrix<double>& rdf_all,const double rmax=5.0,const int nbins=25,bool raw_counts=false,const double sigma=0.0,const int window_gaussian=0);  //CO20220627 - rewritten
+  void GetRDF_20220101(const xstructure& xstr,const double rmax,const int nbins,aurostd::matrix<double>& rdf_all);  //CO20200404 pflow::matrix()->aurostd::matrix() //CO20220627 - rewrite later
   void GetRDFShells(const xstructure& str,const double& rmax,const int& nbins,const int& smooth_width,
       const aurostd::matrix<double>& rdf,aurostd::matrix<double>& rdfsh,aurostd::matrix<double>& rdfsh_loc); //CO20200404 pflow::matrix()->aurostd::matrix()
   double RdfSh_RMS(const int iaA,const int iaB,const int nsh_max,const int nt,
@@ -590,9 +594,9 @@ int Nint(const double& x);
 int Sign(const double& x);
 
 //CO20200731 START include from aflow_aconvasp.cpp
-namespace pflow {
-  void GetStrNeighData(const xstructure& str,const double cutoff,deque<deque<_atom> >& neigh_mat);   //CO20200731
-}
+//[CO20220623 - OBSOLETE]namespace pflow {
+//[CO20220623 - OBSOLETE]  void GetStrNeighData(const xstructure& str,const double cutoff,deque<deque<_atom> >& neigh_mat);   //CO20200731
+//[CO20220623 - OBSOLETE]}
 //CO20200731 END include from aflow_aconvasp.cpp
 
 // ---------------------------------------------------------------------------
@@ -1122,7 +1126,7 @@ namespace  pflow {
 #endif
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

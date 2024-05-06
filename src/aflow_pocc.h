@@ -446,7 +446,7 @@ namespace pocc {
       void setSpeciesRedecoration(const vector<string>& species_redecoration);
       void setExplorationRadius();
       void getCluster(xmatrix<double>& _hnf_mat);
-      void setBonds(vector<vector<int> >& v_types_config);
+      void setBonds(const vector<vector<int> >& v_types_config);
       double getUFFEnergy();
       bool isVacancy(vector<uint>& v_vacancies,uint atom);
       double bondEnergyBond(const UFFParamBond& uffb);
@@ -566,14 +566,19 @@ namespace pocc {
 
       //post-processing
       bool m_convolution;
+      bool m_count_unique_fast;
       vector<string> m_ARUN_directories;
       double m_Hmix;
       double m_efa;
       int m_temperature_precision;
       int m_zero_padding_temperature;
       bool m_temperatures_int;
+      uint m_relaxation_max;
       double m_energy_dft_ground;
       uint m_ARUN_directory_ground;
+      aurostd::xmatrix<double> m_rdf_all;
+      double m_rdf_rmax;
+      int m_rdf_nbins;
       xDOSCAR m_xdoscar;
       vector<double> m_Egap_DOS,m_Egap;
       double m_Egap_DOS_net,m_Egap_net;
@@ -693,6 +698,8 @@ namespace pocc {
       unsigned long long int runRobustStructureComparison(std::list<POccSuperCellSet>::iterator it);
       void calculateHNF();
       void getTotalPermutationsCount();
+      void calculatePOccSuperCellUFF(int thread_id, vector<POccSuperCell>& vpsc, const vector<POccUFFEnergyAnalyzer>& v_energy_analyzer, const vector<vector<vector<int>>>& vv_types_config, size_t& npsc_queue, std::mutex& m_save, std::mutex& m_job); //SD20230604
+      void countUniquePOccSuperCellUFF(int thread_id, std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>& map_unique, const vector<POccSuperCell>& vpsc, const vector<POccUFFEnergyAnalyzer>& v_energy_analyzer, const vector<vector<vector<int>>>& vv_types_config, size_t& npsc_queue, std::mutex& m_save, std::mutex& m_job); //SD20230609
       void calculate();
       string getARUNString(unsigned long long int i);
       xstructure getUniqueSuperCell(unsigned long long int i);
@@ -720,6 +727,7 @@ namespace pocc {
       void calculatePlasmonicProperties(double temperature=300);
       void setPOccStructureProbabilities(double temperature=300); //room temperature
       string getTemperatureString(double temperature) const;
+      void setAvgRDF(double temperature=300);  //depends on probabilities
       void setAvgDOSCAR(double temperature=300);  //depends on probabilities
       void setAvgPlasmonicData(double temperature=300);  //depends on probabilities
       void plotAvgDOSCAR(double temperature) const; //no default temperature, needs to be set inside setAvgDOSCAR()

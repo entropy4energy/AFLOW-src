@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -34,6 +34,13 @@ using aurostd::ran0;
 //#define COMMENT_NEGLECT_2 string("// ")
 #define COMMENT_NEGLECT_2 string("//")
 #define COMMENT_NEGLECT_3 string("!")
+
+#ifdef AFLOW_MULTITHREADS_ENABLE  //CO+HE20221116
+// Global mutex that prevents two xThread instances from executing a system call.
+// system calls are not generally thread-safe: https://stackoverflow.com/questions/12025640/how-can-i-know-whether-a-linux-syscall-is-thread-safe
+static std::mutex xthread_execute;
+#endif
+
 
 //CO20171215 - moved to xscalar
 // ***************************************************************************
@@ -642,7 +649,10 @@ namespace aurostd {
   // Function random_shuffle of a vector/deque
   // ***************************************************************************
   template<class utype> void random_shuffle(vector<utype>& vec) {
-    std::random_shuffle(vec.begin(),vec.end());
+    // switch std::random_shuffle to not deprecated std::shuffle //HE20230620
+    // https://en.cppreference.com/w/cpp/algorithm/random_shuffle
+    std::random_device rd;
+    std::shuffle(vec.begin(),vec.end(), rd);
   }
   // overload to force compiling
   void _aurostd_initialize_random_shuffle(vector<bool>& vec) {random_shuffle(vec);}
@@ -656,7 +666,10 @@ namespace aurostd {
   void _aurostd_initialize_random_shuffle(vector<long double>& vec) {random_shuffle(vec);}
 
   template<class utype> void random_shuffle(deque<utype>& vec) {
-    std::random_shuffle(vec.begin(),vec.end());
+    // switch std::random_shuffle to not deprecated std::shuffle //HE20230620
+    // https://en.cppreference.com/w/cpp/algorithm/random_shuffle
+    std::random_device rd;
+    std::shuffle(vec.begin(),vec.end(), rd);
   }
   // overload to force compiling
   void _aurostd_initialize_random_shuffle(deque<bool>& vec) {random_shuffle(vec);}
@@ -677,12 +690,19 @@ namespace aurostd {
     for(uint i=0;i<vec1.size();i++) if(aurostd::abs(vec1[i]-vec2[i])>epsilon) return FALSE;
     return TRUE;
   }
+  #define AST_TEMPLATE(utype) template bool identical(vector<utype>, vector<utype>, utype);
+    AST_GEN_1(AST_UTYPE_NUM)
+  #undef AST_TEMPLATE
 
   template<class utype> bool identical(deque<utype> vec1,deque<utype> vec2,utype epsilon) {
     if(vec1.size()!=vec2.size()) return FALSE;
     for(uint i=0;i<vec1.size();i++) if(aurostd::abs(vec1[i]-vec2[i])>epsilon) return FALSE;
     return TRUE;
   }
+  #define AST_TEMPLATE(utype) template bool identical(deque<utype>, deque<utype>, utype);
+    AST_GEN_1(AST_UTYPE_NUM)
+  #undef AST_TEMPLATE
+
 
   bool identical(vector<int> vec1,vector<int> vec2,int epsilon) {
     if(vec1.size()!=vec2.size()) return FALSE;
@@ -809,6 +829,8 @@ namespace aurostd {
     //[old way - need to convert char array -> string]char work_dir[PATH_LENGTH_MAX];
     //[old way - need to convert char array -> string]getcwd(work_dir, PATH_LENGTH_MAX); 
 
+    string pwd=aurostd::getenv2string("PWD");
+    if(!pwd.empty()){return pwd;}
     return aurostd::execute2string("pwd"); //XHOST.command("pwd") ?
   }
 
@@ -1198,7 +1220,7 @@ namespace aurostd {
       else{ return false; } //signals file is unchanged
     } else {
       string message = "File does not exist: " + directory + "/" + filename;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
     return false;
   }
@@ -1236,7 +1258,7 @@ namespace aurostd {
     deque<string> vzip; aurostd::string2tokens("bzip2,xz,gzip",vzip,",");vzip.push_front(""); // cheat for void string
     if(vext.size()!=vcmd.size()) {
       string message = "vext.size()!=vcmd.size()";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
     }
 
     for(uint iext=0;iext<vext.size();iext++){ // check filename.EXT
@@ -1779,7 +1801,7 @@ namespace aurostd {
       }
       return vpids;
     }
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"\"pgrep\"-type command not found",_INPUT_ILLEGAL_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"\"pgrep\"-type command not found",_INPUT_ILLEGAL_);
     return vpids;
   }
 
@@ -1787,14 +1809,14 @@ namespace aurostd {
   vector<string> ProcessPIDs(const string& process,const string& pgid,string& output_syscall,bool user_specific){
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     if(pgid.empty()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"PGID is empty",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"PGID is empty",_INPUT_ILLEGAL_);
     }
     if(LDEBUG){
       cerr << __AFLOW_FUNC__ << " looking for pgid=" << pgid << endl;
       cerr << __AFLOW_FUNC__ << " looking for process=" << process << endl;
     }
     if(!aurostd::IsCommandAvailable("ps") || !aurostd::IsCommandAvailable("grep")) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"\"pgrep\"-type command not found",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"\"pgrep\"-type command not found",_INPUT_ILLEGAL_);
     }
     string ps_opts=" uid,pgid,pid,etime,pcpu,pmem,args"; // user-defined options, since just "u" or "j" might not be good enough
     string command="ps";
@@ -1807,7 +1829,7 @@ namespace aurostd {
     else{command+=" axo";}
     command+=ps_opts;
     if(!aurostd::execute2string(command+" > /dev/null",stderr_fsio).empty()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"Unknown options in \"ps\"",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown options in \"ps\"",_INPUT_ILLEGAL_);
     }
     command+=" 2>/dev/null | "+command_grep+" 2> /dev/null";
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " running command=\"" << command << "\"" << endl;}
@@ -1856,7 +1878,7 @@ namespace aurostd {
   void ProcessKill(const string& process,bool user_specific,uint signal){ //CO20210315
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     if(signal<1 || signal>64){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"invalid signal specification",_VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"invalid signal specification",_VALUE_ILLEGAL_);
     }
     vector<string> vpids=aurostd::ProcessPIDs(process,user_specific);
     if(vpids.empty()){return;}
@@ -1894,10 +1916,10 @@ namespace aurostd {
   void ProcessKill(const string& process,const string& pgid,bool user_specific,uint signal){
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     if(signal<1 || signal>64){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"invalid signal specification",_VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"invalid signal specification",_VALUE_ILLEGAL_);
     }
     if(pgid.empty()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,"PGID is empty",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"PGID is empty",_INPUT_ILLEGAL_);
     }
     string output_syscall="";
     vector<string> vpids=aurostd::ProcessPIDs(process,pgid,output_syscall,user_specific);
@@ -1912,11 +1934,25 @@ namespace aurostd {
   // Function ProcessRenice
   // ***************************************************************************
   //CO20210315
-  void ProcessRenice(const string& process,int nvalue,bool user_specific){ //CO20210315
-    vector<string> vpids=ProcessPIDs(process,user_specific);
-    if(vpids.empty()){return;}
+  bool ProcessRenice(const string& process,int nvalue,bool user_specific,const string& pgid){ //CO20210315 //CO20221029 - void->bool to catch if renice worked and added pgid to renice executable-specific processes
+    vector<string> vpids;
+    if(pgid.empty()){vpids=ProcessPIDs(process,user_specific);} //CO20221028
+    else{string output_syscall="";vpids=ProcessPIDs(process,pgid,output_syscall,user_specific);}  //CO20221028
+    if(vpids.empty()){return false;}
     string command="renice "+aurostd::utype2string(nvalue)+" "+aurostd::joinWDelimiter(vpids," ");
-    aurostd::execute(command);
+    string err=aurostd::execute2string(command,stderr_fsio);
+    return err.empty();
+  }
+  
+  // ***************************************************************************
+  // Function ReniceAvailable
+  // ***************************************************************************
+  //CO20221029 - checks if renice up/down is allowed on the system
+  bool ReniceAvailable(void){
+    aurostd::execute("sleep 10 &"); //to background
+    if(!ProcessRenice("sleep",19,true,aurostd::utype2string(getpgrp()))){return false;}  //try making more nice, this should almost always work
+    if(!ProcessRenice("sleep",0,true,aurostd::utype2string(getpgrp()))){return false;}   //try making default nice, this may not always work: https://superuser.com/questions/88542/why-cant-unix-users-renice-downwards
+    return true;
   }
 
   // ***************************************************************************
@@ -2203,7 +2239,7 @@ namespace aurostd {
       }
       else {
         string message = "Error linking "+from_clean+" -> "+to_clean+" | errno="+aurostd::utype2string<int>(errno);
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_FILE_ERROR_);
       }
     }
     else {
@@ -2764,7 +2800,7 @@ namespace aurostd {
     ifstream infile(filename.c_str(), std::ios::in | std::ios::binary);
     if (!infile.is_open()) {
       string message = "Cannot open file " + filename + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_ERROR_);
     }
 
     // Get file length
@@ -2853,7 +2889,7 @@ namespace aurostd {
     string FileName(CleanFileName(_FileName));
     if(!file_to_check) {
       string message = "In routine " + routine + ". Cannot open file " + FileName + ".";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__, message, _FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_ERROR_);
     }
   }
 
@@ -2902,7 +2938,7 @@ namespace aurostd {
     aurostd::StringSubst(position,"\n","");
     if(position.length()>0) return TRUE;
     string message = "\"" + command + "\" is not available";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     return FALSE;
   }
 
@@ -3040,9 +3076,16 @@ namespace aurostd {
     }
     if(message_parts.size()==0){return;}
 
-    //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
-    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);
+    //CO20220129 - input quiet is always XHOST.QUIET, this is legacy: aflow.h (XHOST) was previously not made available in aurostd
+    //keep redundant for now, just in case in the future we change our mind about including aflow.h
+    //CO20220630 - note about osswrite, it is redundant with quiet, so it would be nice to get rid of it in the future
+    //but it would require a full overhaul of many critical aflow printing functions
+    //better not to touch and leave the overloads
+    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);  //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
     bool verbose=(!quiet && osswrite);
+    if(XHOST.QUIET_GLOBAL){verbose=false;}  //CO20220630
+    if((&oss==&cout) && XHOST.QUIET_COUT){verbose=false;}
+    if((&oss==&cerr) && XHOST.QUIET_CERR){verbose=false;}
     bool fancy_print=(!XHOST.vflag_control.flag("WWW")&&!XHOST.vflag_control.flag("NO_FANCY_PRINT"));  //CO20200404 - new web flag
 
     FILE* fstr=stdout;
@@ -3142,9 +3185,15 @@ namespace aurostd {
     }
     if(message_parts.size()==0){return;}
 
-    //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
-    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);  //[CO2010315 - not always, removing for OUTCARs read during vasp runs]verbose=true; //ALWAYS!
+    //CO20220129 - input quiet is always XHOST.QUIET, this is legacy: aflow.h (XHOST) was previously not made available in aurostd
+    //keep redundant for now, just in case in the future we change our mind about including aflow.h
+    //CO20220630 - note about osswrite, it is redundant with quiet, so it would be nice to get rid of it in the future
+    //but it would require a full overhaul of many critical aflow printing functions
+    //better not to touch and leave the overloads
+    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);  //[CO2010315 - not always, removing for OUTCARs read during vasp runs]verbose=true; //ALWAYS! //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
     bool verbose=(!quiet && osswrite);
+    if(XHOST.QUIET_GLOBAL){verbose=false;}  //CO20220630
+    if(XHOST.QUIET_CERR){verbose=false;}
     bool fancy_print=(!XHOST.vflag_control.flag("WWW")&&!XHOST.vflag_control.flag("NO_FANCY_PRINT"));  //CO20200404 - new web flag
 
     FILE* fstr=stderr;
@@ -3220,9 +3269,15 @@ namespace aurostd {
     }
     if(message_parts.size()==0){return;}
 
-    //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
-    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);  //[CO2010315 - not always, removing for OUTCARs read during vasp runs]verbose=true; //ALWAYS!
+    //CO20220129 - input quiet is always XHOST.QUIET, this is legacy: aflow.h (XHOST) was previously not made available in aurostd
+    //keep redundant for now, just in case in the future we change our mind about including aflow.h
+    //CO20220630 - note about osswrite, it is redundant with quiet, so it would be nice to get rid of it in the future
+    //but it would require a full overhaul of many critical aflow printing functions
+    //better not to touch and leave the overloads
+    //bool verbose=(!XHOST.QUIET && !quiet && osswrite);  //[CO2010315 - not always, removing for OUTCARs read during vasp runs]verbose=true; //ALWAYS! //ME20220503 - XHOST.QUIET should be part of quiet to allow for whitelisting
     bool verbose=(!quiet && osswrite);
+    if(XHOST.QUIET_GLOBAL){verbose=false;}  //CO20220630
+    if(XHOST.QUIET_CERR){verbose=false;}
     bool fancy_print=(!XHOST.vflag_control.flag("WWW")&&!XHOST.vflag_control.flag("NO_FANCY_PRINT"));  //CO20200404 - new web flag
 
     FILE* fstr=stderr;
@@ -3361,7 +3416,9 @@ namespace aurostd {
   }
 
   bool execute(const string& _command) {
-
+#ifdef AFLOW_MULTITHREADS_ENABLE  //CO+HE20221116
+    std::lock_guard<std::mutex> lk(xthread_execute);  //prevents race conditions likely caused by system calls
+#endif
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     // cerr << "COMMAND " <<  command.c_str() << endl;
     string command=aurostd::CleanCommand4Execute(_command); //CO20200624
@@ -3939,6 +3996,26 @@ namespace aurostd {
     // stringstreamIN.clear();stringstreamIN.seekg(0); // ******* INPUT FILE goes at the beginning
     return vstringout.size();  // return FALSE if something got messed up
   }
+  uint trimEmptyEdges(vector<string>& vstringout){  //CO20230502
+    uint count=vstringout.size();
+    //start with front
+    while(vstringout.size()){
+      if(vstringout.front().find_first_not_of("\t\n ")!=string::npos){ //CO20230502 - fast way to check for empty string //!aurostd::RemoveWhiteSpaces(vstringout.front()).empty())
+        break;
+      }
+      vstringout.erase(vstringout.begin());
+      count--;
+    }
+    //now back
+    while(vstringout.size()){
+      if(vstringout.back().find_first_not_of("\t\n ")!=string::npos){ //CO20230502 - fast way to check for empty string //aurostd::RemoveWhiteSpaces(vstringout.back()).empty())
+        break;
+      }
+      vstringout.pop_back();
+      count--;
+    }
+    return count;
+  }
   uint string2vectorstring(const string& stringIN,vector<string> &vstringout,bool consecutive,bool trim_edges) {  //CO20170613
     //CO mods 20170613
     //we are adding functionality here, because string2tokens will treat "\n\n" same as "\n", but not "\n \n"
@@ -3946,24 +4023,7 @@ namespace aurostd {
     //trim_edges will remove delimiters from beginning and end, similar to consecutive=false behavior
     //return aurostd::string2tokens(stringIN,vstringout,"\n",true);
     uint count=aurostd::string2tokens(stringIN,vstringout,"\n",consecutive);
-    if(trim_edges){
-      //start with front
-      while(vstringout.size()){
-        if(!aurostd::RemoveWhiteSpaces(vstringout.front()).empty()){
-          break;
-        }
-        vstringout.erase(vstringout.begin());
-        count--;
-      }
-      //now back
-      while(vstringout.size()){
-        if(!aurostd::RemoveWhiteSpaces(vstringout.back()).empty()){
-          break;
-        }
-        vstringout.pop_back();
-        count--;
-      }
-    }
+    if(trim_edges){count=trimEmptyEdges(vstringout);}
     return count;
   }
 
@@ -4185,10 +4245,7 @@ namespace aurostd {
   // Function stringstream2file stringstream2compressedfile stringstream2gzfile stringstream2bz2file stringstream2xzfile
   // ***************************************************************************
   // write string to file - Stefano Curtarolo
-  bool stringstream2file(const stringstream& StringstreamOUTPUT,const string& file,const string& mode) {
-    //    cerr << StringstreamOUTPUT.str() << endl;
-    return string2file(StringstreamOUTPUT.str(),file,mode);
-  }  //CO20210315 - cleaned up
+  bool stringstream2file(const stringstream& StringstreamOUTPUT,const string& file,const string& mode) {return string2file(StringstreamOUTPUT.str(),file,mode);}  //CO20210315 - cleaned up
 
   bool stringstream2compressfile(const string& command,const stringstream& StringstreamOUTPUT,const string& _file,const string& mode) {
     string file=aurostd::CleanFileName(_file);
@@ -5061,6 +5118,7 @@ namespace aurostd {
   }
   //CO END
 
+//#define DEBUG_STRING2TOKENS
   // ***************************************************************************
   // Function string2tokens string2tokens<utype>
   // ***************************************************************************
@@ -5076,11 +5134,24 @@ namespace aurostd {
     tokens.clear(); // clear in the case there was something already in!
     string::size_type lastPos=(consecutive ? 0 : str.find_first_not_of(delimiters,0));   // Skip delimiters at beginning.
     string::size_type pos=str.find_first_of(delimiters,lastPos);     // Find first "non-delimiter".
+#ifdef DEBUG_STRING2TOKENS
+    cerr << __AFLOW_FUNC__ << " delimiters=" << delimiters << endl;
+    cerr << __AFLOW_FUNC__ << " consecutive=" << consecutive << endl;
+    cerr << __AFLOW_FUNC__ << " lastPos=" << lastPos << endl;
+    cerr << __AFLOW_FUNC__ << " pos=" << pos << endl;
+#endif
     while (pos!=string::npos || lastPos!=string::npos) {
       tokens.push_back(str.substr(lastPos,pos-lastPos));             // Found a token, add it to the vector.
+#ifdef DEBUG_STRING2TOKENS
+      cerr << __AFLOW_FUNC__ << " tokens.back()=\"" << tokens.back() << "\"" << endl;
+#endif
       if(consecutive){lastPos=(pos!=string::npos ? pos+1 : string::npos);}
-      else{lastPos=str.find_first_not_of(delimiters,pos);}  // Skip delimiters.  Note the "not_of"
+      else{lastPos=str.find_first_not_of(delimiters,pos);}           // Skip delimiters.  Note the "not_of"
       pos=str.find_first_of(delimiters,lastPos);                     // Find next "non-delimiter"
+#ifdef DEBUG_STRING2TOKENS
+      cerr << __AFLOW_FUNC__ << " lastPos=" << lastPos << endl;
+      cerr << __AFLOW_FUNC__ << " pos=" << pos << endl;
+#endif
     }
     return tokens.size();
   }
@@ -5108,6 +5179,28 @@ namespace aurostd {
     for(uint i=0;i<stokens.size();i++)
       tokens.push_back(aurostd::string2utype<utype>(stokens[i]));
     return out;
+  }
+
+  //SD20220504 - string2tokens, but using a single delimiter that can have more than one char. Makes use of "find" rather than "find_first_of"
+  uint string2tokensByDelimiter(const string& str, vector<string>& tokens, const string& delimiter) { //SD20220504
+    tokens.clear();
+    uint dlen = delimiter.length();
+    if (dlen == 1) {return aurostd::string2tokens(str, tokens, delimiter);}
+    string::size_type lpos = 0, cpos = str.find(delimiter, lpos);
+    while (cpos != string::npos) {
+      tokens.push_back(str.substr(lpos, cpos - lpos));
+      lpos = cpos + dlen;
+      cpos = str.find(delimiter, lpos);
+    }
+    tokens.push_back(str.substr(lpos, str.length() - lpos));
+    return tokens.size();
+  }
+  uint string2tokensByDelimiter(const string& str, deque<string>& tokens, const string& delimiter) { //SD20220504
+    tokens.clear();
+    vector<string> vtokens;
+    aurostd::string2tokensByDelimiter(str, vtokens, delimiter);
+    tokens = aurostd::vector2deque(vtokens);
+    return tokens.size();
   }
 
   // ***************************************************************************
@@ -5187,9 +5280,14 @@ namespace aurostd {
   }
   template<typename utype> utype string2utype(const string& from, const uint base) {
     if(from.empty()){return (utype) stream2stream<utype>("0",AUROSTD_DEFAULT_PRECISION,DEFAULT_STREAM);} //CO20210315 - stream2stream behavior is not defined for empty string input: https://stackoverflow.com/questions/4999650/c-how-do-i-check-if-the-cin-buffer-is-empty
-    string FROM=aurostd::toupper(from); //CO20210315
-    if(FROM=="TRUE"||FROM=="T"||FROM==".TRUE."){return (utype) stream2stream<utype>("1",AUROSTD_DEFAULT_PRECISION,DEFAULT_STREAM);;}  //CO20210315 - safe because inputs are generally digits
-    if(FROM=="FALSE"||FROM=="F"||FROM==".FALSE."){return (utype) stream2stream<utype>("0",AUROSTD_DEFAULT_PRECISION,DEFAULT_STREAM);;}  //CO20210315 - safe because inputs are generally digits
+    if(from.find("T")!=string::npos||from.find("t")!=string::npos||from.find("F")!=string::npos||from.find("f")!=string::npos){ //CO20221112
+      //CO20221112 - gdb died here when running chull in parallel
+      //seems toupper might have some issues with threaded processes
+      //adding this guard to mitigate the issue
+      string FROM=aurostd::toupper(from); //CO20210315
+      if(FROM=="TRUE"||FROM=="T"||FROM==".TRUE."){return (utype) stream2stream<utype>("1",AUROSTD_DEFAULT_PRECISION,DEFAULT_STREAM);;}  //CO20210315 - safe because inputs are generally digits
+      if(FROM=="FALSE"||FROM=="F"||FROM==".FALSE."){return (utype) stream2stream<utype>("0",AUROSTD_DEFAULT_PRECISION,DEFAULT_STREAM);;}  //CO20210315 - safe because inputs are generally digits
+    }
     if (base != 10) { //HE20220324 add non-decimal bases (will ignore positions behind a point)
       std::stringstream temp;
       temp << std::stoll(from, nullptr, base); // stoll -> string to long long
@@ -5576,6 +5674,10 @@ namespace aurostd {
     // in the string (match_all) or none have (!match_all)
     return match_all;
   }
+  
+  bool substring2bool(const stringstream& strstream,const string& strsub1,bool RemoveWS,bool RemoveComments) {
+    return aurostd::substring2bool(strstream.str(),strsub1,RemoveWS,RemoveComments);
+  }
 
   bool substringlist2bool(const string& strin, const deque<string>& substrings, bool match_all) {
     for (uint i = 0; i < substrings.size(); i++) {
@@ -5592,69 +5694,144 @@ namespace aurostd {
     return match_all;
   }
 
-  bool substring2bool(const stringstream& strstream,const string& strsub1,bool RemoveWS,bool RemoveComments) {
-    return aurostd::substring2bool(strstream.str(),strsub1,RemoveWS,RemoveComments);
+  /// @brief Determines whether a specific value exists inside a list
+  ///
+  /// @param list List of values
+  /// @param input Specific value to match the values within the list
+  /// @param index Index of the element that matched the input
+  /// @param sorted Whether the list is sorted
+  /// @return Boolean if the input was found in the list or not
+  ///
+  /// @note index is assigned the value of 0 if the input is not found in the list
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, size_t& index, bool sorted) { //SD20220705
+    for (size_t i = 0; i < list.size(); i++) {
+      if(sorted && list[i]>input){break;}
+      if(aurostd::isequal(list[i],input)) {
+        index = i;
+        return true;
+      }
+    }
+    index = 0;
+    return false;
   }
-
-  bool WithinList(const vector<string>& list,const string& input,bool sorted) { //CO20181010
-    //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
-    //return false;  OBSOLETE ME20190905
-    int index=-1;
-    return WithinList(list, input, index, sorted);
+  bool WithinList(const vector<string>& list, const string& input, size_t& index, bool sorted) { //SD20220705
+    for (size_t i = 0; i < list.size(); i++) {
+      if(sorted && list[i]>input){break;}
+      if(aurostd::isequal(list[i],input)) {
+        index = i;
+        return true;
+      }
+    }
+    index = 0;
+    return false;
   }
-  bool WithinList(const deque<string>& list,const string& input,bool sorted) { //CO20181010
-    int index=-1;
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, size_t& index, bool sorted) { //SD20220705
     return WithinList(aurostd::deque2vector(list), input, index, sorted);
   }
-  bool WithinList(const vector<int>& list,int input,bool sorted) {  //CO20181010
-    //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
-    //return false;  OBSOLETE ME20190905
-    int index=-1;
+  bool WithinList(const deque<string>& list, const string& input, size_t& index, bool sorted) { //SD20220705
+    return WithinList(aurostd::deque2vector(list), input, index, sorted);
+  }
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, bool sorted) { //SD20220705
+    size_t index=0;
     return WithinList(list, input, index, sorted);
   }
-  bool WithinList(const vector<uint>& list,uint input,bool sorted) {  //CO20181010
-    //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
-    //return false;  OBSOLETE ME20190905
-    int index=-1;
+  bool WithinList(const vector<string>& list, const string& input, bool sorted) { //SD20220705
+    size_t index=0;
     return WithinList(list, input, index, sorted);
   }
-
-  //ME20190813 - added versions that also determine the index of the item in the list
-  bool WithinList(const vector<string>& list, const string& input, int& index, bool sorted) {
-    for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
-      if(sorted && list[i]>input){break;} //CO20201111
-      if(list[i]==input) {
-        index = i;
-        return true;
-      }
-    }
-    index = -1;
-    return false;
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, bool sorted) { //SD20220705
+    return WithinList(aurostd::deque2vector(list), input, sorted);
+  }
+  bool WithinList(const deque<string>& list, const string& input, bool sorted) { //SD20220705
+    return WithinList(aurostd::deque2vector(list), input, sorted);
   }
 
-  bool WithinList(const vector<int>& list, int input, int& index, bool sorted) {
-    for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
-      if(sorted && list[i]>input){break;} //CO20201111
-      if(list[i]==input) {
-        index = i;
-        return true;
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, vector<size_t>& index, bool sorted) { //SD20220705
+    index.clear();
+    for (size_t i = 0; i < list.size(); i++) {
+      if(sorted && list[i]>input){break;}
+      if(aurostd::isequal(list[i],input)) {
+        index.push_back(i);
       }
     }
-    index = -1;
-    return false;
+    return !index.empty();
+  }
+  bool WithinList(const vector<string>& list, const string& input, vector<size_t>& index, bool sorted) { //SD20220705
+    index.clear();
+    for (size_t i = 0; i < list.size(); i++) {
+      if(sorted && list[i]>input){break;}
+      if(aurostd::isequal(list[i],input)) {
+        index.push_back(i);
+      }
+    }
+    return !index.empty();
+  }
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, vector<size_t>& index, bool sorted) { //SD20220705
+    return WithinList(aurostd::deque2vector(list), input, index, sorted);
+  }
+  bool WithinList(const deque<string>& list, const string& input, vector<size_t>& index, bool sorted) { //SD20220705
+    return WithinList(aurostd::deque2vector(list), input, index, sorted);
   }
 
-  bool WithinList(const vector<uint>& list, uint input, int& index, bool sorted) {
-    for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
-      if(sorted && list[i]>input){break;} //CO20201111
-      if(list[i]==input) {
-        index = i;
-        return true;
-      }
-    }
-    index = -1;
-    return false;
-  }
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<string>& list,const string& input,bool sorted) { //CO20181010
+  //[SD20220705 - OBSOLETE]  //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  //return false;  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  int index=-1;
+  //[SD20220705 - OBSOLETE]  return WithinList(list, input, index, sorted);
+  //[SD20220705 - OBSOLETE]}
+  //[SD20220705 - OBSOLETE]bool WithinList(const deque<string>& list,const string& input,bool sorted) { //CO20181010
+  //[SD20220705 - OBSOLETE]  int index=-1;
+  //[SD20220705 - OBSOLETE]  return WithinList(aurostd::deque2vector(list), input, index, sorted);
+  //[SD20220705 - OBSOLETE]}
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<int>& list,int input,bool sorted) {  //CO20181010
+  //[SD20220705 - OBSOLETE]  //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  //return false;  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  int index=-1;
+  //[SD20220705 - OBSOLETE]  return WithinList(list, input, index, sorted);
+  //[SD20220705 - OBSOLETE]}
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<uint>& list,uint input,bool sorted) {  //CO20181010
+  //[SD20220705 - OBSOLETE]  //for(uint i=0;i<list.size();i++){if(list[i]==input){return true;}}  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  //return false;  OBSOLETE ME20190905
+  //[SD20220705 - OBSOLETE]  int index=-1;
+  //[SD20220705 - OBSOLETE]  return WithinList(list, input, index, sorted);
+  //[SD20220705 - OBSOLETE]}
+
+  //[SD20220705 - OBSOLETE]//ME20190813 - added versions that also determine the index of the item in the list
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<string>& list, const string& input, int& index, bool sorted) {
+  //[SD20220705 - OBSOLETE]  for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
+  //[SD20220705 - OBSOLETE]    if(sorted && list[i]>input){break;} //CO20201111
+  //[SD20220705 - OBSOLETE]    if(list[i]==input) {
+  //[SD20220705 - OBSOLETE]      index = i;
+  //[SD20220705 - OBSOLETE]      return true;
+  //[SD20220705 - OBSOLETE]    }
+  //[SD20220705 - OBSOLETE]  }
+  //[SD20220705 - OBSOLETE]  index = -1;
+  //[SD20220705 - OBSOLETE]  return false;
+  //[SD20220705 - OBSOLETE]}
+
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<int>& list, int input, int& index, bool sorted) {
+  //[SD20220705 - OBSOLETE]  for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
+  //[SD20220705 - OBSOLETE]    if(sorted && list[i]>input){break;} //CO20201111
+  //[SD20220705 - OBSOLETE]    if(list[i]==input) {
+  //[SD20220705 - OBSOLETE]      index = i;
+  //[SD20220705 - OBSOLETE]      return true;
+  //[SD20220705 - OBSOLETE]    }
+  //[SD20220705 - OBSOLETE]  }
+  //[SD20220705 - OBSOLETE]  index = -1;
+  //[SD20220705 - OBSOLETE]  return false;
+  //[SD20220705 - OBSOLETE]}
+
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<uint>& list, uint input, int& index, bool sorted) {
+  //[SD20220705 - OBSOLETE]  for (int i = 0, nlist = (int) list.size(); i < nlist; i++) {
+  //[SD20220705 - OBSOLETE]    if(sorted && list[i]>input){break;} //CO20201111
+  //[SD20220705 - OBSOLETE]    if(list[i]==input) {
+  //[SD20220705 - OBSOLETE]      index = i;
+  //[SD20220705 - OBSOLETE]      return true;
+  //[SD20220705 - OBSOLETE]    }
+  //[SD20220705 - OBSOLETE]  }
+  //[SD20220705 - OBSOLETE]  index = -1;
+  //[SD20220705 - OBSOLETE]  return false;
+  //[SD20220705 - OBSOLETE]}
 
   //ME20220503
   bool SubstringWithinList(const deque<string>& list, const string& input) {
@@ -5737,7 +5914,7 @@ namespace aurostd {
 
     if(!aurostd::FileExist(FileName)) {
       message = "file input not found =" + FileName;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
     if(size_max!=AUROSTD_MAX_ULLINT){
       unsigned long long int fsize=aurostd::FileSize(FileName);
@@ -5806,7 +5983,7 @@ namespace aurostd {
     aurostd::execute(aus);
     if(!aurostd::FileExist(temp_file)) {
       message = "file output not found =" + FileName;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
     }
     FileFile.open(temp_file.c_str(),std::ios::in);
     FileFile.clear();FileFile.seekg(0);
@@ -5828,6 +6005,10 @@ namespace aurostd {
   //n==0 returns all entries, starts counting from 1, negative numbers go backwards
   //Original substring2string always returned just the first entry
   //When two substrings are present strsub1 is the start keyword and strsub2 is the stop keyword
+  //CO20230502 - another rewrite for strsub1 and strsub2
+  //substring2string() with strsub1 grabs everything on the line
+  //substring2string() with strsub1 and strsub2 grabs everything in between
+  //substring2strings() with strsub1 and strsub2 now handles newlines within entries of the return vector, as well as start/stop tags within the same line
   string substring2string(ifstream& input,const string& strsub1,const int instance,bool RemoveWS,bool RemoveComments) {
     //substring2string and kvpair2string are similar but distinct
     //substring2string will match any strsub1 and return everything AFTER strsub1
@@ -5875,14 +6056,15 @@ namespace aurostd {
 
   string substring2string(const string& _input,const string& strsub1,const int instance,bool RemoveWS,bool RemoveComments) {
     bool LDEBUG=FALSE;
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " BEGIN [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
     string input=_input;
     if(RemoveWS) {input=aurostd::RemoveWhiteSpaces(_input,'"');}
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input << "\"] [substring=\"" << strsub1 << "\"]" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [input=\"" << input << "\"] [substring=\"" << strsub1 << "\"]" << endl;}
     if(input.find(strsub1)==string::npos) {return "";}
     stringstream strstream;
     vector<string> tokens;
     aurostd::string2vectorstring(input,tokens);
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [tokens.size()=" << tokens.size() << "]" << endl;}
     int iter=0;
     if(instance>0) {
       for(uint i=0;i<tokens.size();i++) {
@@ -5892,7 +6074,7 @@ namespace aurostd {
           if(instance==iter) {strstream << tokens[i].substr(tokens[i].find(strsub1)+strsub1.length());break;}
         }
       }
-      if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
       return strstream.str();
     }
     else if(instance<0) {
@@ -5903,7 +6085,7 @@ namespace aurostd {
           if(instance==iter) {strstream << tokens[i].substr(tokens[i].find(strsub1)+strsub1.length());break;}
         }
       }
-      if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
       return strstream.str();
     }
     else { //instance==0
@@ -5913,7 +6095,7 @@ namespace aurostd {
           strstream << tokens[i].substr(tokens[i].find(strsub1)+strsub1.length()) << endl;
         }
       }
-      if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " END [substring=\"" << strsub1 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
       return strstream.str();
     }
     return "";
@@ -5923,112 +6105,197 @@ namespace aurostd {
     return substring2string(input.str(),strsub1,instance,RemoveWS,RemoveComments);
   }
 
-  string substring2string(ifstream& input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) {
-    bool LDEBUG=FALSE;
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input.rdbuf() << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
-    string strline="";
-    input.clear();input.seekg(0);
-    vector<string> vlines,tokens;
-    bool read=FALSE;
-    int iter=0;
-    while(getline(input,strline) && (instance==0 || iter!=instance)) {
-      if(RemoveWS) {strline=aurostd::RemoveWhiteSpaces(strline,'"');}
-      if(RemoveComments) {strline=aurostd::RemoveComments(strline);}
-      if(read==FALSE && strline.find(strsub1)!=string::npos) {
-        vlines.push_back(strline.substr(strline.find(strsub1)+strsub1.length()));
-        read=TRUE;
-      }
-      else if(read==TRUE && strline.find(strsub2)!=string::npos) {
-        vlines.push_back(strline.substr(0,strline.find(strsub2)));
-        read=FALSE;
-        tokens.push_back(aurostd::vectorstring2string(vlines));
-        vlines.clear();
-        iter++;
-      }
-      else if(read) {
-        vlines.push_back(strline);
+  uint substring2stringInnerLoop(const string& _strline,bool& read,vector<string>& vlines,vector<string>& tokens,const string& strsub1,const string& strsub2,bool RemoveComments,bool trim_edges) { //CO20230502 - helper function for substring2strings()
+    bool LDEBUG=false;
+    string strline=_strline,strline2="",strline3="";
+    bool found_strsub1=false,found_strsub2=false;
+    if(RemoveComments) {strline=aurostd::RemoveComments(strline);}
+    if(read==FALSE && strline.find(strsub1)!=string::npos) {
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline.find(strsub1)!=string::npos" << endl;}
+      //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
+      while(strline.find(strsub1)!=string::npos){
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;}
+        strline2=strline.substr(strline.find(strsub1)+strsub1.length());
+        strline="";
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+        }
+        if(strline2.find(strsub2)==string::npos){
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline2.find(strsub2)==string::npos" << endl;}
+          read=TRUE;
+          vlines.push_back(strline2);
+        }
+        else{
+          strline3=strline2.substr(0,strline2.find(strsub2));
+          strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
+          strline2=strline3;
+          if(LDEBUG){
+            cerr << __AFLOW_FUNC__ << " strline2.find(strsub2)!=string::npos" << endl;
+            cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+            cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+          }
+          vlines.push_back(strline2);
+          if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
+          tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
+          vlines.clear();
+        }
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;}
       }
     }
-    input.clear();input.seekg(0);
+    else if(read==TRUE && strline.find(strsub2)!=string::npos) {
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline.find(strsub2)!=string::npos)" << endl;}
+      //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
+      while(!strline.empty() || strline.find(strsub2)!=string::npos){
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+        }
+        found_strsub2=(strline.find(strsub2)!=string::npos);
+        strline2=strline;
+        strline="";
+        if(found_strsub2){
+          strline3=strline2.substr(0,strline2.find(strsub2));
+          strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
+          strline2=strline3;
+        }
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+        }
+        vlines.push_back(strline2);
+        if(found_strsub2){
+          if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
+          tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
+          if(LDEBUG){
+            for(uint i=0;i<vlines.size();i++){cerr << __AFLOW_FUNC__ << " vlines[i=" << i << "]=" << vlines[i] << endl;}
+            for(uint i=0;i<tokens.size();i++){cerr << __AFLOW_FUNC__ << " tokens[i=" << i << "]=" << tokens[i] << endl;}
+          }
+          vlines.clear();
+          if(strline.empty()){read=FALSE;}
+        }
+        if(!strline.empty()){
+          found_strsub1=(strline.find(strsub1)!=string::npos);
+          if(found_strsub1){
+            strline=strline.substr(strline.find(strsub1)+strsub1.length());
+          }
+        }
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " read=" << read << endl;
+          cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;
+        }
+      }
+    }
+    else if(read) {
+      vlines.push_back(strline);
+    }
+    return tokens.size();
+  }
+
+  string substring2stringConsolidate(const vector<string>& tokens,const int instance){  //CO20230502 - helper function for substring2strings()
     if(tokens.size()==0 || (uint)aurostd::abs(instance)>tokens.size()) {return "";}
     stringstream strstream;
     if(instance==0) {
       for(uint i=0;i<tokens.size();i++) {strstream << tokens[i] << endl;}
     }
     else if(instance>0) {
-      strstream << tokens[tokens.size()-1];
+      strstream << tokens[instance-1]; //[CO20230501 - OBSOLETE]tokens[tokens.size()-1];
     }
-    else if(instance<0) {
+    else if(instance<0) { //CO20230501 - if instance<0, then we need to get full tokens to see how many to subtract
       uint i=(uint)aurostd::boundary_conditions_periodic(0,tokens.size()-1,instance);
       strstream << tokens[i];
     }
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
     return strstream.str();
   }
 
-  string substring2string(const string& _input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) {
+  string substring2string(ifstream& input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) {
+    //CO20230502 - another rewrite to handle newlines within start/stop tags, and start/stop tags within the same line
     bool LDEBUG=FALSE;
     if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
-    string input=_input;
-    if(RemoveWS) {input=aurostd::RemoveWhiteSpaces(_input,'"');}
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
-    if(input.find(strsub1)==string::npos || input.find(strsub2)==string::npos) {return "";}
-    stringstream strstream;
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input.rdbuf() << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
     vector<string> tokens;
-    vector<uint> vstart, vstop;
-    aurostd::string2vectorstring(input,tokens);
-    uint istart=0,istop=0;
-    int iter=0;
-    if(instance>0) {
-      for(uint i=0;i<tokens.size();i++) {
-        if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
-        if(tokens[i].find(strsub2)!=string::npos) {
-          istop=i-1;
-          if(instance==iter) {vstop.push_back(istop);break;}
-        }
-        if(tokens[i].find(strsub1)!=string::npos) {
-          iter++;
-          istart=i+1;
-          if(instance==iter) {vstart.push_back(istart);}
-        }
-      }
-    }
-    else if(instance<0) {
-      for(int i=tokens.size()-1;i>=0;i--) {
-        if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
-        if(tokens[i].find(strsub2)!=string::npos) {
-          iter--;
-          istop=i-1;
-          if(instance==iter) {vstop.push_back(istop);}
-        }
-        if(tokens[i].find(strsub1)!=string::npos) {
-          istart=i+1;
-          if(instance==iter) {vstart.push_back(istart);break;}
-        }
-      }
-    }
-    else { //instance==0
-      for(uint i=0;i<tokens.size();i++) {
-        if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
-        if(tokens[i].find(strsub2)!=string::npos) {
-          istop=i-1;
-          vstop.push_back(istop);
-        }
-        if(tokens[i].find(strsub1)!=string::npos) {
-          istart=i+1;
-          vstart.push_back(istart);
-        }
-      }
-    }
-    if(vstop.empty()) {return "";}
-    if(vstop.size()!=vstart.size()) {vstart.pop_back();} // remove unfinished start
-    for(uint i=0;i<vstart.size();i++) {
-      for(uint j=vstart[i];j<=vstop[i];j++) {strstream << tokens[j] << endl;}
-    }
-    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
-    return strstream.str();
+    aurostd::substring2strings(input,tokens,strsub1,strsub2,instance,RemoveWS,RemoveComments);
+    string output=substring2stringConsolidate(tokens,instance);
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [output=\"" << output << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+    return output;
   }
+
+  string substring2string(const string& input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) {
+    //CO20230502 - another rewrite to handle newlines within start/stop tags, and start/stop tags within the same line
+    bool LDEBUG=FALSE;
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
+    vector<string> tokens;
+    aurostd::substring2strings(input,tokens,strsub1,strsub2,instance,RemoveWS,RemoveComments);
+    string output=substring2stringConsolidate(tokens,instance);
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [output=\"" << output << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+    return output;
+  }
+  
+  //[CO20230501 - OBSOLETE]string substring2string(const string& _input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) {
+  //[CO20230501 - OBSOLETE]  bool LDEBUG=FALSE;
+  //[CO20230501 - OBSOLETE]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
+  //[CO20230501 - OBSOLETE]  string input=_input;
+  //[CO20230501 - OBSOLETE]  if(RemoveWS) {input=aurostd::RemoveWhiteSpaces(_input,'"');}
+  //[CO20230501 - OBSOLETE]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
+  //[CO20230501 - OBSOLETE]  if(input.find(strsub1)==string::npos || input.find(strsub2)==string::npos) {return "";}
+  //[CO20230501 - OBSOLETE]  stringstream strstream;
+  //[CO20230501 - OBSOLETE]  vector<string> tokens;
+  //[CO20230501 - OBSOLETE]  vector<uint> vstart, vstop;
+  //[CO20230501 - OBSOLETE]  aurostd::string2vectorstring(input,tokens);
+  //[CO20230501 - OBSOLETE]  uint istart=0,istop=0;
+  //[CO20230501 - OBSOLETE]  int iter=0;
+  //[CO20230501 - OBSOLETE]  if(instance>0) {
+  //[CO20230501 - OBSOLETE]    for(uint i=0;i<tokens.size();i++) {
+  //[CO20230501 - OBSOLETE]      if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub2)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        istop=i-1;
+  //[CO20230501 - OBSOLETE]        if(instance==iter) {vstop.push_back(istop);break;}
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub1)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        iter++;
+  //[CO20230501 - OBSOLETE]        istart=i+1;
+  //[CO20230501 - OBSOLETE]        if(instance==iter) {vstart.push_back(istart);}
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]    }
+  //[CO20230501 - OBSOLETE]  }
+  //[CO20230501 - OBSOLETE]  else if(instance<0) {
+  //[CO20230501 - OBSOLETE]    for(int i=tokens.size()-1;i>=0;i--) {
+  //[CO20230501 - OBSOLETE]      if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub2)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        iter--;
+  //[CO20230501 - OBSOLETE]        istop=i-1;
+  //[CO20230501 - OBSOLETE]        if(instance==iter) {vstop.push_back(istop);}
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub1)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        istart=i+1;
+  //[CO20230501 - OBSOLETE]        if(instance==iter) {vstart.push_back(istart);break;}
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]    }
+  //[CO20230501 - OBSOLETE]  }
+  //[CO20230501 - OBSOLETE]  else { //instance==0
+  //[CO20230501 - OBSOLETE]    for(uint i=0;i<tokens.size();i++) {
+  //[CO20230501 - OBSOLETE]      if(RemoveComments) {tokens[i]=aurostd::RemoveComments(tokens[i]);}
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub2)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        istop=i-1;
+  //[CO20230501 - OBSOLETE]        vstop.push_back(istop);
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]      if(tokens[i].find(strsub1)!=string::npos) {
+  //[CO20230501 - OBSOLETE]        istart=i+1;
+  //[CO20230501 - OBSOLETE]        vstart.push_back(istart);
+  //[CO20230501 - OBSOLETE]      }
+  //[CO20230501 - OBSOLETE]    }
+  //[CO20230501 - OBSOLETE]  }
+  //[CO20230501 - OBSOLETE]  if(vstop.empty()) {return "";}
+  //[CO20230501 - OBSOLETE]  if(vstop.size()!=vstart.size()) {vstart.pop_back();} // remove unfinished start
+  //[CO20230501 - OBSOLETE]  for(uint i=0;i<vstart.size();i++) {
+  //[CO20230501 - OBSOLETE]    for(uint j=vstart[i];j<=vstop[i];j++) {strstream << tokens[j] << endl;}
+  //[CO20230501 - OBSOLETE]  }
+  //[CO20230501 - OBSOLETE]  if(LDEBUG) {cerr << __AFLOW_FUNC__ << "END [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [output=\"" << strstream.str() << "\"] [RemoveWS=" << RemoveWS << "]" << endl;}
+  //[CO20230501 - OBSOLETE]  return strstream.str();
+  //[CO20230501 - OBSOLETE]}
 
   string substring2string(const stringstream& input,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments) { 
     return substring2string(input.str(),strsub1,strsub2,instance,RemoveWS,RemoveComments);
@@ -6399,11 +6666,36 @@ namespace aurostd {
     return vstringout.size();
   }
 
-  uint substring2strings(ifstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS,bool RemoveComments) {
-    vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
-    return vstringout.size();
+  uint substring2strings(ifstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments,bool trim_edges) { //CO20230502
+    //[CO20230502 - OBSOLETE]vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
+    //[CO20230502 - OBSOLETE]return vstringout.size();
+    //CO20230502 - another rewrite to handle newlines within start/stop tags, and start/stop tags within the same line
+    bool LDEBUG=false;
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input.rdbuf() << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
+    vstringout.clear();
+    string strline="";
+    input.clear();input.seekg(0);
+    vector<string> vlines;
+    int iter=0;
+    bool read=FALSE;
+    while(getline(input,strline) && (instance<=0 || iter<instance)) {
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;}
+      if(RemoveWS) {strline=aurostd::RemoveWhiteSpaces(strline,'"');}
+      //
+      iter=substring2stringInnerLoop(strline,read,vlines,vstringout,strsub1,strsub2,RemoveComments,trim_edges); //CO20230502
+      //
+    }
+    input.clear();input.seekg(0);
+    uint count=vstringout.size();
+    if(LDEBUG){
+      for(uint i=0;i<count;i++) {
+        cerr << __AFLOW_FUNC__ << " vstringout[i=" << i << "]=\"" <<  vstringout[i] << "\"" << endl;
+      }
+    }
+    return count;
   }
-  uint substring2strings(const string& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS,bool RemoveComments) {
+  uint substring2strings(const string& _input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments,bool trim_edges) {  //CO20230502
     //[SD20220520 - OBSOLETE]bool LDEBUG=(FALSE || XHOST.DEBUG);
     //[SD20220520 - OBSOLETE]if(LDEBUG) cerr << "DEBUG substring2strings5: (BEGIN) " << strsub1 << " " << strsub2 << " " << RemoveWS << endl;
     //[SD20220520 - OBSOLETE]string _strstream(strstream),_strline,_strsub1(strsub1),_strsub2(strsub2);
@@ -6428,12 +6720,40 @@ namespace aurostd {
     //[SD20220520 - OBSOLETE]}
     //[SD20220520 - OBSOLETE]if(LDEBUG) cerr << "DEBUG substring2string5: (END) " << strsub1 << " " << strsub2 << " " << vstringout.size() << " " << RemoveWS << endl;
     //[SD20220520 - OBSOLETE]return vstringout.size();
-    vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
-    return vstringout.size();
+    //[CO20230502 - OBSOLETE]vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
+    //[CO20230502 - OBSOLETE]return vstringout.size();
+    //CO20230502 - another rewrite to handle newlines within start/stop tags, and start/stop tags within the same line
+    bool LDEBUG=FALSE;
+    string input=_input;
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "BEGIN [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"] [instance=" << instance << "] [RemoveWS=" << RemoveWS << "]" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << "[input=\"" << input << "\"] [substring=\"" << strsub1 << "\"] [substring=\"" << strsub2 << "\"]" << endl;}
+    vstringout.clear();
+    if(RemoveWS) {input=aurostd::RemoveWhiteSpaces(input,'"');}
+    if(input.find(strsub1)==string::npos && input.find(strsub2)==string::npos) {return vstringout.size();}
+    string strline="";
+    vector<string> vlines,vlines2;
+    aurostd::string2vectorstring(input,vlines2);
+    int iter=0;
+    bool read=false;
+    for(uint iline=0;iline<vlines2.size() && (instance<=0 || iter<instance);iline++){
+      strline=vlines2[iline];
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;}
+      //
+      iter=substring2stringInnerLoop(strline,read,vlines,vstringout,strsub1,strsub2,RemoveComments,trim_edges); //CO20230502
+      //
+    }
+    uint count=vstringout.size();
+    if(LDEBUG){
+      for(uint i=0;i<count;i++) {
+        cerr << __AFLOW_FUNC__ << " vstringout[i=" << i << "]=\"" <<  vstringout[i] << "\"" << endl;
+      }
+    }
+    return count;
   }
-  uint substring2strings(const stringstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS,bool RemoveComments) {
-    vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
-    return vstringout.size();
+  uint substring2strings(const stringstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance,bool RemoveWS,bool RemoveComments,bool trim_edges) { //CO20230502
+    //[CO20230502 - OBSOLETE]vstringout=aurostd::string2vectorstring(aurostd::substring2string(input,strsub1,strsub2,0,RemoveWS,RemoveComments));
+    //[CO20230502 - OBSOLETE]return vstringout.size();
+    return aurostd::substring2strings(input.str(),vstringout,strsub1,strsub2,instance,RemoveWS,RemoveComments,trim_edges);  //CO20230502
   }
 
   template<typename utype> uint substring2utypes(ifstream& input,vector<utype> &vutypeout,const string& strsub1,bool RemoveWS,bool RemoveComments) {  //SD202205020
@@ -6822,12 +7142,13 @@ namespace aurostd {
 
   template<class utype1,class utype2> // function quicksort
     void sort(vector<utype1>& arr, vector<utype2>& brr) {
-      xvector<utype1> xarr = aurostd::vector2xvector(arr);
-      xvector<utype2> xbrr = aurostd::vector2xvector(brr);
-      aurostd::sort2(xarr.rows,xarr,xbrr);
-      arr = aurostd::xvector2vector(xarr);
-      brr = aurostd::xvector2vector(xbrr);
-    }
+    xvector<utype1> xarr = aurostd::vector2xvector(arr);
+    xvector<utype2> xbrr = aurostd::vector2xvector(brr);
+    aurostd::sort2(xarr.rows, xarr, xbrr);
+    arr = aurostd::xvector2vector(xarr);
+    brr = aurostd::xvector2vector(xbrr);
+  }
+
 
   template<class utype1,class utype2> // function quicksort //CO20200915
     void sort(deque<utype1>& arr, deque<utype2>& brr) {
@@ -7098,18 +7419,66 @@ namespace aurostd {
   }
 }
 
+// ----------------------------------------------------------------------------
+// reorder vector //CO20221111
+namespace aurostd {
+  template<class utype> // function quicksort
+    void reorder(vector<utype>& vec,vector<uint>& vorder,uint mode){	//CO20221111
+			//algorithms and discussion from here: https://stackoverflow.com/questions/838384/reorder-vector-using-a-vector-of-indices (very good!)
+			//solution by chmike
+      //reorder a vector given input indices
+      //there are two ways this can be done depending on what is inside vorder
+      //input: vec={7,5,9,6}; vorder={1,3,0,2}
+      //
+      //mode 1: ``draw the elements of vector from the position of the indices''
+      //result: {5,6,7,9}
+      //NOTE: this is the default mode
+      //
+      //mode 2: ``move elements of vector to the position of the indices''
+      //result: {9,7,6,5}
+      //NOTE: this can also be accomplished with aurostd::sort(vorder,vec) but it requires vec to be C++ type or string
+      //this function seems to run faster than aurostd::sort() as well
+			uint i=0,j=0;
+			if(mode==1){
+				for(i=0;i<vec.size()-1;i++){
+					if(vorder[i]==i){continue;}
+					for(j=i+1;j<vorder.size();j++){
+						if(vorder[j]==i){break;}
+					}
+					std::iter_swap(vec.begin()+i,vec.begin()+vorder[i]);
+					std::iter_swap(vorder.begin()+i,vorder.begin()+j);
+				}
+        return;
+      }
+      else if(mode==2) {
+				uint alt=0;
+				// for all elements to put in place
+				for(i=0;i<vec.size()-1;++i){
+					// while the element i is not yet in place 
+					while(i!=vorder[i]){
+						// swap it with the element at its final place
+						alt=vorder[i];
+            std::iter_swap(vec.begin()+i,vec.begin()+alt);
+            std::iter_swap(vorder.begin()+i,vorder.begin()+alt);
+					}
+				}
+			}
+			else{throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "Unknown mode", _INPUT_ILLEGAL_);}
+    }
+}
+
 // ***************************************************************************
 // Function some statistical stuff
 // combinations
 // ***************************************************************************
-template<class utype> utype combinations(utype n,utype k) { // http://en.wikipedia.org/wiki/Combination // C^n_k=n!/k!(n-k)!   hard to calculate
-  double cnk=1.0;
-  for(utype i=0;i<=k-1;i++) cnk=cnk*(n-i)/(k-i);
-  return (utype) cnk;
+namespace aurostd  {
+  template<class utype> utype combinations(utype n,utype k) { // http://en.wikipedia.org/wiki/Combination // C^n_k=n!/k!(n-k)!   hard to calculate
+    double cnk=1.0;
+    for(utype i=0;i<=k-1;i++) cnk=cnk*(n-i)/(k-i);
+    return (utype) cnk;
+  }
+  template<class utype> utype Cnk(utype n,utype k) { return combinations(n,k);}  // http://en.wikipedia.org/wiki/Combination
 }
-
-template<class utype> utype Cnk(utype n,utype k) { return combinations(n,k);}  // http://en.wikipedia.org/wiki/Combination
-
 
 // ***************************************************************************
 // aurostd::ShiftFirstColumn(const vector<vector<double> >& a, const double& value)
@@ -7149,7 +7518,7 @@ namespace aurostd  {
     //normalize DOS and sum
     if(vvva.size()!=vFi.size()) {
       string message = "Vector sizes are not equal.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
     }
     vector<vector<double> > vvb, vv_tmp, vv_tmp_shrinked;
     vector<vector<vector<double> > > vvvc;
@@ -7188,7 +7557,7 @@ namespace aurostd  {
   vector<vector<double> > Sum2DVectorExceptFirstColumn(const vector<vector<double> >& vva, const vector<vector<double> >& vvb) {
     if((vva.size()!=vvb.size()) && (vva.at(0).size() != vvb.at(0).size())) {
       string message = "Vector sizes are not equal.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
     }
 
     vector<vector<double> > vv_sum; vv_sum.resize(vva.size());
@@ -8308,6 +8677,6 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

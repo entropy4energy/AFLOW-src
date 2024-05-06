@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -180,13 +180,13 @@ namespace aflow {
       oss << "*                          aflow - Automatic-FLOW for materials discovery                          *" << endl;
       oss << "*                aflow.org consortium - High-Throughput ab-initio Computing Project                *" << endl;
       //      oss << "*                     VERSION "<<aurostd::PaddedPOST(string(AFLOW_VERSION),5) <<" - BUILT ["<<TODAY<<"] - Copyright " << XHOST.Copyright_Years << "                     *" << endl;
-      oss << "*" << aurostd::PaddedCENTER(string("version "+string(AFLOW_VERSION)+" - g++/gcc "+aurostd::utype2string(__GNUC__)+"."+aurostd::utype2string(__GNUC_MINOR__)+"."+aurostd::utype2string(__GNUC_PATCHLEVEL__)+" - built ["+string(TODAY)+"] - (C) " +string("2003-2021")),100) << "*" << endl;
+      oss << "*" << aurostd::PaddedCENTER(string("version "+string(AFLOW_VERSION)+" - g++/gcc "+aurostd::utype2string(__GNUC__)+"."+aurostd::utype2string(__GNUC_MINOR__)+"."+aurostd::utype2string(__GNUC_PATCHLEVEL__)+" - built ["+string(TODAY)+"] - (C) " +string("2003-2023")),100) << "*" << endl;
       oss << "*                                                                                                  *" << endl;
       oss << "****************************************************************************************************" << endl;
       return oss.str();
     }
     if(type=="BANNER_TINY") {
-      oss << "AFLOW VERSION "<<string(AFLOW_VERSION)<<":  [Stefano Curtarolo - 2003-2021] ";
+      oss << "AFLOW VERSION "<<string(AFLOW_VERSION)<<":  [Stefano Curtarolo - 2003-2023] ";
       return oss.str();
     }
     cerr << "aflow::Banner type=" << type << " not found..." << endl;
@@ -867,6 +867,6 @@ namespace aurostd {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

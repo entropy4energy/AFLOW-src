@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2011
@@ -62,7 +62,7 @@ namespace aurostd {
 // ----------------------------------------------------------------------------
 // -------------------------- uniform function and procedures on xvector, xmatrix
 
-#ifdef __XVECTOR_CPP
+#ifdef _AUROSTD_XVECTOR_CPP_
 
 namespace aurostd {
   // namespace aurostd
@@ -100,7 +100,7 @@ namespace aurostd {
 
 // ---------------------------------- uniform function and procedures on xmatrix
 
-#ifdef __XMATRIX_CPP
+#ifdef _AUROSTD_XMATRIX_CPP_
 
 namespace aurostd {
   // namespace aurostd
@@ -622,7 +622,7 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

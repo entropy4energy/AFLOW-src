@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo 1994-2012
@@ -387,7 +387,7 @@ namespace aurostd {
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-#ifdef __XVECTOR_CPP
+#ifdef _AUROSTD_XVECTOR_CPP_
 
 namespace aurostd {
   // namespace aurostd
@@ -397,6 +397,7 @@ namespace aurostd {
         a[i]=(utype) x+(y-x)*uniform(utype(1.0));
       return a;
     }
+ template xvector<double> uniform(const xvector<double>& a,const double& x,const double& y);
 
   template<class utype> xvector<utype>              // uniform xvector<utype> [0,y]
     uniform(const xvector<utype>& a,const utype& y)  {
@@ -504,7 +505,7 @@ namespace aurostd {
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
-#ifdef __XMATRIX_CPP
+#ifdef _AUROSTD_XMATRIX_CPP_
 
 namespace aurostd {
   // namespace aurostd
@@ -1370,7 +1371,7 @@ namespace aurostd {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************
 

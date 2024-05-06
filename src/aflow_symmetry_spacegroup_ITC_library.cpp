@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Richard H. Taylor
@@ -503,7 +503,6 @@ namespace SYM {
   }
 
   xvector<double> operator*(Glide& G, const xvector<double>& P) {
-    string function_name = "SYM::glide::operator*():";
     stringstream message;
     if(G.DIRECT == true) {
       //cerr << "DIRECT = true" << endl;
@@ -516,7 +515,7 @@ namespace SYM {
         message << "THERE IS A PROBLEM in operator* Glide(DIRECT=true): " << endl;
         message << "d1,d2: " << d1 << " " << d2 << endl;
         message << "x_0: " << x_0 << endl;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_GENERIC_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_GENERIC_ERROR_);
       }
       if(d2 < d1) {  //Normal not oriented properly, switch sign. (G.a -> -G.a) et.c
         orient = -1;
@@ -615,7 +614,6 @@ namespace SYM {
 // **********************************************************************************************************************
 namespace SYM {
   xvector<double> get_random_point_in_plane(string plane) {
-    string function_name = "SYM::get_random_point_in_plane():";
     stringstream message;
     vector<string> parametric_plane = splitstring(plane);
     vector<char> params;
@@ -635,7 +633,7 @@ namespace SYM {
     }
     if(params.size() > 2) {
       message << "Not a valid representation of a plane.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
     }
     vector<double> x, y;
     x.push_back((double)rand() / RAND_MAX);

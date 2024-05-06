@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow ERIC PERIM MARTINS - Duke University 2014-2016          *
 // *           Aflow DENISE FORD - Duke University 2016-2019                 *
 // *                                                                         *  
@@ -719,9 +719,8 @@ namespace pflow {
       vector<string> species){
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_GFA_); //CO20190424
-    string soliloquy = XPID + "pflow::ComputeGFA():";  //CO20190424
     if(LDEBUG) { //CO20190424
-      for(uint i=0;i<Egs.size();i++){cerr << soliloquy << " Egs[i=" << i << "]=" << Egs[i] << endl;} //CO20190424
+      for(uint i=0;i<Egs.size();i++){cerr << __AFLOW_FUNC__ << " Egs[i=" << i << "]=" << Egs[i] << endl;} //CO20190424
     } //CO20190424
 
     aurostd::xcombos xc(entries_size, dimension);
@@ -936,10 +935,10 @@ namespace pflow {
                 }
               }
               double gfa_tmp = exp(-abs(El_ref-Egs[X])/kBT_ROOM)*weight*(1.0-dotProduct); //DX20210122 - create variable
-              if(LDEBUG){ cerr << soliloquy << " exp(-abs(El_ref-Egs[X])/kBT)*weight*(1.0-dotProduct): " << gfa_tmp << endl; }
+              if(LDEBUG){ cerr << __AFLOW_FUNC__ << " exp(-abs(El_ref-Egs[X])/kBT)*weight*(1.0-dotProduct): " << gfa_tmp << endl; }
 
               gfa[X]+=gfa_tmp;
-              if(LDEBUG){ cerr << soliloquy << " gfa[X]: " << gfa[X] << endl; }
+              if(LDEBUG){ cerr << __AFLOW_FUNC__ << " gfa[X]: " << gfa[X] << endl; }
               sampling[X]=sampling[X]+weight;
 
               weight_avgDP.push_back(weight);
@@ -1047,7 +1046,6 @@ namespace pflow {
 
   void CalculateGFA(aurostd::xoption& vpflow, const string& alloy, const string& AE_file_read, double fe_cut){
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_GFA_); //CO20190424
-    string soliloquy = XPID + "pflow::CalculateGFA():";  //CO20190424
 
     uint entries_size=0;
     string buffer;
@@ -1381,7 +1379,7 @@ namespace pflow {
     VCoordGroup = the_hull.m_coord_groups;
     Vpoint = the_hull.m_points;
 
-    if(LDEBUG) {cerr << soliloquy << " [1]" << endl;} //CO20190424
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [1]" << endl;} //CO20190424
 
     for(uint i=0;i<stoichiometries.size();i++){
       bool equal=false;
@@ -1409,15 +1407,15 @@ namespace pflow {
       }
     }
 
-    if(LDEBUG) {cerr << soliloquy << " [2]" << endl;} //CO20190424
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [2]" << endl;} //CO20190424
 
     sort(vcpt.begin(), vcpt.end());
 
     VDecomp_coefs.resize(vcpt.size());  VDecomp_phases.resize(vcpt.size());
-    if(LDEBUG) {cerr << soliloquy << " [2.0]" << endl;} //CO20190424
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [2.0]" << endl;} //CO20190424
     for(uint i=0;i<vcpt.size();i++){
       bool on_hull=false;
-      if(LDEBUG) {cerr << soliloquy << " [2.1]" << endl;} //CO20190424
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [2.1]" << endl;} //CO20190424
       for(uint j=0;j<VCoordGroup.size();j++){
         for(int k=vcpt[i].m_coords.lrows;k<=vcpt[i].m_coords.urows-1;k++){  //CO20190424
           if(abs(vcpt[i].m_coords[k]-VCoordGroup[j].m_coords[k])>0.00001){
@@ -1428,20 +1426,20 @@ namespace pflow {
             VDecomp_coefs[i].push_back(1.0); VDecomp_phases[i].push_back(VCoordGroup[j].m_ref_state);
             Egs.push_back(Vpoint.at(VCoordGroup[j].m_hull_member).getLastCoord());  //CO20190424
             if(LDEBUG) { //CO20190424
-              cerr << soliloquy << " VCoordGroup[j].m_hull_member=" << VCoordGroup[j].m_hull_member << endl; //CO20190424
-              cerr << soliloquy << " Egs.back()=" << Egs.back() << endl; //CO20190424
+              cerr << __AFLOW_FUNC__ << " VCoordGroup[j].m_hull_member=" << VCoordGroup[j].m_hull_member << endl; //CO20190424
+              cerr << __AFLOW_FUNC__ << " Egs.back()=" << Egs.back() << endl; //CO20190424
             } //CO20190424
           }
         }
       }
-      if(LDEBUG) {cerr << soliloquy << " [2.2]" << endl;} //CO20190424
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [2.2]" << endl;} //CO20190424
       if(on_hull==false){
         Egs.push_back(vcpt[i].getLastCoord()-the_hull.getDistanceToHull(vcpt[i]));  //CO20190424
         if(LDEBUG) { //CO20190424
-          cerr << soliloquy << " i=" << i << endl; //CO20190424
-          cerr << soliloquy << " vcpt[i].m_coords[dimension-1]=" << vcpt[i].getLastCoord() << endl; //CO20190424
-          cerr << soliloquy << " the_hull.getDistanceToHull(vcpt[i])=" << the_hull.getDistanceToHull(vcpt[i]) << endl; //CO20190424
-          cerr << soliloquy << " Egs.back()=" << Egs.back() << endl; //CO20190424
+          cerr << __AFLOW_FUNC__ << " i=" << i << endl; //CO20190424
+          cerr << __AFLOW_FUNC__ << " vcpt[i].m_coords[dimension-1]=" << vcpt[i].getLastCoord() << endl; //CO20190424
+          cerr << __AFLOW_FUNC__ << " the_hull.getDistanceToHull(vcpt[i])=" << the_hull.getDistanceToHull(vcpt[i]) << endl; //CO20190424
+          cerr << __AFLOW_FUNC__ << " Egs.back()=" << Egs.back() << endl; //CO20190424
         } //CO20190424
         VDecomp_phases[i]=the_hull.getDecompositionPhases(vcpt[i]);
         vector<xvector<double> > lhs, rhs; double others=0; xvector<double> compositionL(VDecomp_phases[i].size()); //-1,0);  //CO20190424
@@ -1483,7 +1481,7 @@ namespace pflow {
       }
     }
 
-    if(LDEBUG) {cerr << soliloquy << " [3]" << endl;} //CO20190424
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " [3]" << endl;} //CO20190424
 
     cout << endl << "Computing GFA for " << vcpt.size() << " stoichiometries. . ." << endl << endl;
 

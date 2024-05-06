@@ -24,12 +24,11 @@
 namespace pflow {
   void AClusterExpansionMethodMain(string options) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::AClusterExpansionMethodMain():";
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> tokens;
     aurostd::string2tokens(options,tokens,",");
     if(tokens.size()!=5) {
-      init::ErrorOption(options,soliloquy,aurostd::liststring2string("aflow --cluster-expansion=... | --ce=structure_type,A,B,EA,EB"));
+      init::ErrorOption(options,__AFLOW_FUNC__,aurostd::liststring2string("aflow --cluster-expansion=... | --ce=structure_type,A,B,EA,EB"));
     } 
 
     string structure_type;
@@ -68,12 +67,12 @@ namespace pflow {
       str_list =  ReadInFitStructure(cin, structure_type);
       num_input_str = str_list.size();
     } else {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No structure",_INPUT_MISSING_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No structure",_INPUT_MISSING_); //CO20200624
     }
 
 
     if(num_input_str==0) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No input structure matches "+structure_type,_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No input structure matches "+structure_type,_FILE_CORRUPT_); //CO20200624
     }
 
     vector<_ceatom> atom_species;
@@ -536,19 +535,18 @@ namespace pflow {
     }
 
     CleanUp();
-    if(LDEBUG) cerr << soliloquy << " END" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " END" << endl;
   }
 } // namespace pflow
 
 namespace pflow {
   void SQS(string options) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::SQS():";  //CO20200624
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> tokens;
     aurostd::string2tokens(options,tokens,",");
     if(tokens.size()!=7 && tokens.size()!=3) {
-      init::ErrorOption(options,soliloquy,aurostd::liststring2string("aflow --sqs=structure_type,atom_num,neighbor_num,sl_num_min,sl_num_max,A,B | --special-quasirandom-structure=...","aflow --sqs=structure_type n1 n2 < POSCAR | --special-quasirandom-structure=..."));
+      init::ErrorOption(options,__AFLOW_FUNC__,aurostd::liststring2string("aflow --sqs=structure_type,atom_num,neighbor_num,sl_num_min,sl_num_max,A,B | --special-quasirandom-structure=...","aflow --sqs=structure_type n1 n2 < POSCAR | --special-quasirandom-structure=..."));
     } 
 
     string structure_type;
@@ -561,11 +559,11 @@ namespace pflow {
     bool ACEFlag = ACEGetStructureType(structure_type);
 
     if(!ACEFlag) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"structure types are fcc, bcc, hcp",_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"structure types are fcc, bcc, hcp",_INPUT_ILLEGAL_); //CO20200624
     }
 
     if((tokens.size() != 3) && (tokens.size() != 7)) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"incorrect argument numbers",_INPUT_NUMBER_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"incorrect argument numbers",_INPUT_NUMBER_); //CO20200624
     }
 
     //////////////////////////////////////////////////////////////
@@ -618,7 +616,7 @@ namespace pflow {
       //SLtmp = ceSL(str_type);
 
       if(a.species.size() > 2) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"only binary alloy is implemented",_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"only binary alloy is implemented",_INPUT_ILLEGAL_); //CO20200624
       }
 
       SLtmp.SetStrCluster(allcluster);
@@ -665,20 +663,19 @@ namespace pflow {
       mySLfilein.close();
 
     }
-    if(LDEBUG) cerr << soliloquy << " END" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " END" << endl;
   }
 }
 
 namespace pflow {
   void Superlattice(string options) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::Superlattice():";
     stringstream message;
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> tokens;
     aurostd::string2tokens(options,tokens,",");
     if(tokens.size()!=3 && tokens.size()!=4) {
-      init::ErrorOption(options,soliloquy,aurostd::liststring2string("aflow --superlattice=structure_type,n_min,n_max < POSCAR","--superlattice=VASP,structure_type,A,B < superlattice_name"));
+      init::ErrorOption(options,__AFLOW_FUNC__,aurostd::liststring2string("aflow --superlattice=structure_type,n_min,n_max < POSCAR","--superlattice=VASP,structure_type,A,B < superlattice_name"));
     }      
 
     // calculate all superlattices with atom number in a unit cell
@@ -712,7 +709,7 @@ namespace pflow {
 
     bool ACEFlag = ACEGetStructureType(structure_type);
     if(!ACEFlag) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No structure",_INPUT_MISSING_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No structure",_INPUT_MISSING_); //CO20200624
     }
 
     if(tokens.at(0)=="VASP") {
@@ -753,7 +750,7 @@ namespace pflow {
         message << "Please use the command" << endl;
         message << "    aflow --cluster=structure_type,minimun_site_num,maximum_site_num,minimum_nearest_neighbor,maximum_nearest_neighbor" << endl;
         message << "to generate it";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_FILE_CORRUPT_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_FILE_CORRUPT_); //CO20200624
 
       } else {
         myfile.close();
@@ -776,7 +773,7 @@ namespace pflow {
       ACESLProperties(cerr, structure_type, min_SLcell_nr, max_SLcell_nr, allcluster, ECIcluster);
     }
 
-    if(LDEBUG) cerr << soliloquy << " END" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " END" << endl;
   }
 }
 
@@ -787,12 +784,11 @@ namespace pflow {
 namespace pflow {
   void Cluster(string options) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::Cluster():";
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> tokens;
     aurostd::string2tokens(options,tokens,",");
     if(tokens.size()!=5) {
-      init::ErrorOption(options,soliloquy,"aflow --cluster=structure_type,n_min,n_max,m_min,m_max");
+      init::ErrorOption(options,__AFLOW_FUNC__,"aflow --cluster=structure_type,n_min,n_max,m_min,m_max");
     } 
     // generate the clusters
 
@@ -805,7 +801,7 @@ namespace pflow {
     }
     bool ACEFlag = ACEGetStructureType(structure_type);
     if(!ACEFlag) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"No structure",_INPUT_MISSING_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No structure",_INPUT_MISSING_); //CO20200624
     }
 
     ceallclusters allcluster(structure_type);
@@ -824,7 +820,7 @@ namespace pflow {
     NNNum_up = aurostd::string2utype<int>(tokens.at(4));
     allcluster.SetCluster(site_num_low, site_num_up, NNNum_low, NNNum_up);
     allcluster.WriteFile(filename, open_opt);
-    if(LDEBUG) cerr << soliloquy << " END" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " END" << endl;
   }
 }
 

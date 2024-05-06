@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Cormac Toher
@@ -26,12 +26,11 @@ namespace pflow {
     //
 
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::DEBYE():";
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     vector<string> tokens;
     aurostd::string2tokens(options,tokens,",");
     if(tokens.size()!=1) {
-      init::ErrorOption(options,soliloquy,"aflow --debye=THERMO[.bz2|.gz|.xz]");
+      init::ErrorOption(options,__AFLOW_FUNC__,"aflow --debye=THERMO[.bz2|.gz|.xz]");
     }
     string thermofilename="";
     if(tokens.size()>=1) thermofilename=tokens.at(0);
@@ -404,7 +403,7 @@ namespace pflow {
     if(thermofilename == "THERMO.gz") { aurostd::execute("gzip -9fq THERMO"); }
     if(thermofilename == "THERMO.xz") { aurostd::execute("xz -9fq THERMO"); }
     // END
-    if(LDEBUG) cerr << soliloquy << " END" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " END" << endl;
   }
 }
 

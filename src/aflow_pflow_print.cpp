@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -92,8 +92,8 @@ namespace pflow {
     //  oss.setf(std::ios::fixed,std::ios::floatfield);
     //  oss.precision(10);
     deque<deque<_atom> > neigh_mat;
-    // [OBSOLETE]  GetStrNeighData(str,cutoff,neigh_mat);
-    str.GetStrNeighData(cutoff,neigh_mat);   // once PrintAngles goes in xstructure I can remove the copy
+    // [OBSOLETE]  GetNeighData(str,cutoff,neigh_mat);
+    str.GetNeighData(cutoff,neigh_mat);   // once PrintAngles goes in xstructure I can remove the copy  //CO20220623 - using new GetNeighData()
     double tol=1e-15;
 
     // Output header
@@ -248,34 +248,33 @@ namespace pflow {
       const string& output_name,
       ostream& oss) {  
 
-    string soliloquy = XPID + "pflow::PrintCHGCAR():  ";     // so you know who's talking
 
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    if(LDEBUG) oss << soliloquy << "BEGIN" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "BEGIN" << endl;
     stringstream CHGCARout_ss;
     uint npts,natoms=pflow::GetNumAtoms(str),indx=0,numcolumns;
 
     // print POSCAR
-    if(LDEBUG) oss << soliloquy << "PRINTING POSCAR" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING POSCAR" << endl;
     CHGCARout_ss << chgcar_header.str();
     // empty line
     CHGCARout_ss << " " << endl;    //put space so AFLOW pick this up as a line
     // grid
     if(ngrid.size()!=3) {
       oss << endl;
-      oss << soliloquy << "ERROR: ngrid must be length 3." << endl;
-      oss << soliloquy << "Exiting." << endl;
+      oss << __AFLOW_FUNC__ << "ERROR: ngrid must be length 3." << endl;
+      oss << __AFLOW_FUNC__ << "Exiting." << endl;
       oss << endl;
       return FALSE;
     }
-    if(LDEBUG) oss << soliloquy << "PRINTING GRID" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING GRID" << endl;
     for(uint i=0;i<ngrid.size();i++) {
       CHGCARout_ss << "   " << ngrid.at(i);
     }
     CHGCARout_ss << " " << endl;    //put space so AFLOW pick this up as a line
     npts=ngrid.at(0)*ngrid.at(1)*ngrid.at(2);
     // chg_tot
-    if(LDEBUG) oss << soliloquy << "PRINTING CHG_TOT" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING CHG_TOT" << endl;
     for(uint i=0;i<npts;i+=format_dim.at(indx)) {
       // make sure we get exactly format_dim.at(indx) 0's and not more
       if(npts-i>=(uint)format_dim.at(indx)) {
@@ -295,8 +294,8 @@ namespace pflow {
     indx++;
     // augmentation occupancies, all set to 0
     if(format_dim.size()>1) {   // we have CHGCAR, not AECCAR
-      if(LDEBUG) oss << soliloquy << "THIS IS A CHGCAR FILE, NOT AN AECCAR FILE" << endl;
-      if(LDEBUG) oss << soliloquy << "PRINTING AUGMENTATION OCCUPANCIES (ALL SET TO 0)" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "THIS IS A CHGCAR FILE, NOT AN AECCAR FILE" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING AUGMENTATION OCCUPANCIES (ALL SET TO 0)" << endl;
       for(uint i=1;i<(natoms+1);i++) {
         CHGCARout_ss << "augmentation occupancies " << i << " " << format_dim.at(indx) << endl;
         for(uint j=0;j<(uint)format_dim.at(indx);j+=(uint)format_dim.at(indx+1)) {
@@ -315,7 +314,7 @@ namespace pflow {
       }
     }
     if(chg_diff.size()>0) {     // we have spin-polarized
-      if(LDEBUG) oss << soliloquy << "THIS IS A SPIN-POLARIZED CALCULATION" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "THIS IS A SPIN-POLARIZED CALCULATION" << endl;
       // add line of 0's
       for(uint i=0;i<(uint)format_dim.at(indx);i++) { //mimic formatting of chg_diff for 0's line
         // standard shows +1 more 0
@@ -323,13 +322,13 @@ namespace pflow {
       }
       CHGCARout_ss << " " << endl;    //put space so AFLOW pick this up as a line
       // grid
-      if(LDEBUG) oss << soliloquy << "PRINTING GRID" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING GRID" << endl;
       for(uint i=0;i<ngrid.size();i++) {
         CHGCARout_ss << "   " << ngrid.at(i);
       }
       CHGCARout_ss << " " << endl;    //put space so AFLOW pick this up as a line
       // chg_diff
-      if(LDEBUG) oss << soliloquy << "PRINTING CHG_DIFF" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING CHG_DIFF" << endl;
       for(uint i=0;i<npts;i+=format_dim.at(indx)) {
         // make sure we get exactly format_dim.at(indx) 0's and not more
         if(npts-i>=(uint)format_dim.at(indx)) {
@@ -346,7 +345,7 @@ namespace pflow {
       indx++;
       // check for augmentation occupancies
       if(format_dim.size()>indx) { // we have more augmentation occupancies to write out, all set to 0
-        if(LDEBUG) oss << soliloquy << "PRINTING AUGMENTATION OCCUPANCIES (ALL SET TO 0)" << endl;
+        if(LDEBUG) oss << __AFLOW_FUNC__ << "PRINTING AUGMENTATION OCCUPANCIES (ALL SET TO 0)" << endl;
         for(uint i=1;i<(natoms+1);i++) {
           CHGCARout_ss << "augmentation occupancies " << i << " " << format_dim.at(indx) << endl;
           for(uint j=0;j<(uint)format_dim.at(indx);j+=(uint)format_dim.at(indx+1)) {
@@ -369,14 +368,14 @@ namespace pflow {
 
     // check if output file exists, delete it first
     if(aurostd::FileExist(output_name)) {
-      if(LDEBUG) oss << soliloquy << "DELETING EXISTING OUTPUT FILE" << endl;
+      if(LDEBUG) oss << __AFLOW_FUNC__ << "DELETING EXISTING OUTPUT FILE" << endl;
       aurostd::RemoveFile(output_name);
     }
 
     // write out to file
-    if(LDEBUG) oss << soliloquy << "WRITING OUTPUT FILE" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "WRITING OUTPUT FILE" << endl;
     aurostd::stringstream2file(CHGCARout_ss,output_name);
-    if(LDEBUG) oss << soliloquy << "DONE" << endl;
+    if(LDEBUG) oss << __AFLOW_FUNC__ << "DONE" << endl;
     return TRUE;
   }
 } // namespace pflow
@@ -581,10 +580,9 @@ namespace pflow {
 namespace pflow {
   void PrintClat(const xvector<double>& data, ostream& oss) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::PrintClat():";
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
     if(data.rows!=6) {
-      init::ErrorOption("",soliloquy,aurostd::liststring2string("data.size()=",aurostd::utype2string(data.rows)));
+      init::ErrorOption("",__AFLOW_FUNC__,aurostd::liststring2string("data.size()=",aurostd::utype2string(data.rows)));
     }
     oss.setf(std::ios::fixed,std::ios::floatfield);
     oss.precision(10);
@@ -594,7 +592,7 @@ namespace pflow {
     oss << lattice(1,1) << " " << lattice(1,2) << " " << lattice(1,3) << endl;
     oss << lattice(2,1) << " " << lattice(2,2) << " " << lattice(2,3) << endl;
     oss << lattice(3,1) << " " << lattice(3,2) << " " << lattice(3,3) << endl;
-    if(LDEBUG) cerr << soliloquy << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
   }
 } // namespace pflow
 
@@ -796,8 +794,8 @@ namespace pflow {
     int nsh_max=2;
     aurostd::matrix<double> rdf_all_1; //CO20200404 pflow::matrix()->aurostd::matrix()
     aurostd::matrix<double> rdf_all_2; //CO20200404 pflow::matrix()->aurostd::matrix()
-    GetRDF(sstr1,cutoff,nbins,rdf_all_1);
-    GetRDF(sstr2,cutoff,nbins,rdf_all_2);
+    GetRDF_20220101(sstr1,cutoff,nbins,rdf_all_1);
+    GetRDF_20220101(sstr2,cutoff,nbins,rdf_all_2);
     aurostd::matrix<double> rdf_all_1_sm=GetSmoothRDF(rdf_all_1,smooth_width); //CO20200404 pflow::matrix()->aurostd::matrix()
     aurostd::matrix<double> rdf_all_2_sm=GetSmoothRDF(rdf_all_2,smooth_width); //CO20200404 pflow::matrix()->aurostd::matrix()
     // Get shells
@@ -978,10 +976,9 @@ namespace pflow {
       bool no_scan,
       int setting){
 
-    string function_name = XPID + "pflow::PrintData():";
     bool LDEBUG=(FALSE || XHOST.DEBUG);
 
-    if(LDEBUG) cerr << function_name << " BEGIN" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN" << endl;
 
     stringstream oss;
     oss.setf(std::ios::fixed,std::ios::floatfield);
@@ -1683,7 +1680,6 @@ namespace pflow {
 namespace pflow {
   string PrintRealLatticeData(const xstructure& xstr, aurostd::xoption& vpflow, const string& smode, filetype ftype, bool standalone, bool already_calculated, double sym_eps){
 
-    string function_name = XPID + "pflow::PrintRealLatticeData():";
 
     // ---------------------------------------------------------------------------
     // calculate the real lattice symmetry if not already calculated
@@ -1813,7 +1809,7 @@ namespace pflow {
       if(standalone) { ss_output << endl; }
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Format type is not supported.",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Format type is not supported.",_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -1858,7 +1854,6 @@ namespace pflow {
 namespace pflow {
   string PrintLatticeLatticeData(const xstructure& xstr, aurostd::xoption& vpflow, filetype ftype, bool standalone, bool already_calculated, double sym_eps){
 
-    string function_name = XPID + "pflow::PrintLatticeLatticeData():";
 
     // ---------------------------------------------------------------------------
     // calculate the real lattice symmetry if not already calculated
@@ -1913,7 +1908,7 @@ namespace pflow {
 
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Format type is not supported.",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Format type is not supported.",_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -1948,7 +1943,6 @@ namespace pflow {
 namespace pflow {
   string PrintCrystalPointGroupData(const xstructure& xstr, aurostd::xoption& vpflow, filetype ftype, bool standalone, bool already_calculated, double sym_eps){
 
-    string function_name = XPID + "pflow::PrintCrystalPointGroupData():";
 
     // ---------------------------------------------------------------------------
     // calculate the real lattice symmetry (contains point group information)
@@ -2052,7 +2046,7 @@ namespace pflow {
 
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Format type is not supported.",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Format type is not supported.",_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2099,7 +2093,6 @@ namespace pflow {
 namespace pflow {
   string PrintReciprocalLatticeData(const xstructure& xstr, aurostd::xoption& vpflow, filetype ftype, bool standalone, bool already_calculated, double sym_eps){
 
-    string function_name = XPID + "pflow::PrintReciprocalLatticeData():";
 
     // ---------------------------------------------------------------------------
     // calculate the reciprocal lattice symmetry if not already calculated
@@ -2174,7 +2167,7 @@ namespace pflow {
       if(standalone) { ss_output << endl; }
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Format type is not supported.",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Format type is not supported.",_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2211,7 +2204,6 @@ namespace pflow {
 namespace pflow {
   string PrintSuperlatticeData(const xstructure& xstr, aurostd::xoption& vpflow, filetype ftype, bool standalone, bool already_calculated, double sym_eps){
 
-    string function_name = XPID + "pflow::PrintSuperlatticeData():";
 
     // ---------------------------------------------------------------------------
     // calculate the superlattice symmetry if not already calculated
@@ -2331,7 +2323,7 @@ namespace pflow {
       if(standalone) { ss_output << endl; }
     }
     else{
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Format type is not supported.",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Format type is not supported.",_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2591,8 +2583,8 @@ namespace pflow {
     //  oss.setf(std::ios::fixed,std::ios::floatfield);
     //  oss.precision(10);
     deque<deque<_atom> > neigh_mat;
-    // [OBSOLETE]  pflow::GetStrNeighData(str,cutoff,neigh_mat);
-    str.GetStrNeighData(cutoff,neigh_mat);
+    // [OBSOLETE]  pflow::GetNeighData(str,cutoff,neigh_mat);
+    str.GetNeighData(cutoff,neigh_mat); //CO20220623 - using new GetNeighData()
     // double tol=1e-15;   //DM not used
     xmatrix<double> lattice(3);
     lattice=str.lattice;
@@ -2658,8 +2650,8 @@ namespace pflow {
     //  oss.setf(std::ios::fixed,std::ios::floatfield);
     oss.precision(10);
     deque<deque<_atom> > neigh_mat;
-    // [OBSOLETE] pflow::GetStrNeighData(str,cutoff,neigh_mat);
-    str.GetStrNeighData(cutoff,neigh_mat);
+    // [OBSOLETE] pflow::GetNeighData(str,cutoff,neigh_mat);  //CO20220623 - using new GetNeighData()
+    str.GetNeighData(cutoff,neigh_mat);                       //CO20220623 - using new GetNeighData()
     //  cerr << "DEBUG: neigh_mat.size()=" << neigh_mat.size() << endl;
     //  for(uint i=0;i<neigh_mat.size();i++)
     //   cerr << "DEBUG: neigh_mat.at(i).size()=" << neigh_mat.at(i).size() << endl;
@@ -2889,7 +2881,6 @@ void PrintImages(xstructure strA, xstructure strB, const int& ni, const string& 
 //  This funtion prints out structural data in a msi format (for cerius).
 // Dane Morgan - Stefano Curtarolo
 void PrintMSI(const xstructure& str, ostream& oss) {
-  string soliloquy=XPID+"PrintMSI():";
   oss.setf(std::ios::fixed,std::ios::floatfield);
   oss.precision(10);
   xstructure sstr=str;
@@ -2906,7 +2897,7 @@ void PrintMSI(const xstructure& str, ostream& oss) {
   for(uint i=0;i<sstr.atoms.size();i++) {
     sstr.atoms.at(i).CleanName();
     if(sstr.atoms.at(i).atomic_number<1) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"atomic_number not found: sstr.atoms.at("+aurostd::utype2string(i)+").cleanname="+sstr.atoms.at(i).cleanname,_INPUT_ILLEGAL_);  //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"atomic_number not found: sstr.atoms.at("+aurostd::utype2string(i)+").cleanname="+sstr.atoms.at(i).cleanname,_INPUT_ILLEGAL_);  //CO20200624
     }
   }
 
@@ -3231,9 +3222,50 @@ void PrintRBPoscarDisp(const xstructure& diffstr, double& totdist,
 // **************************************************************************
 // PrintRDF
 // **************************************************************************
+string RDF2string(const xstructure& xstr,const double rmax,const int nbins,const xmatrix<double>& rdf_all){ //CO20220627 - new procedure
+  int padding=8,padding_extra=5;  //4 because of 10,100,1000,neg below
+  string eset="";
+  vector<vector<int> > vvitypes=pflow::getvvitypesRDF(xstr);
+  double rad=0.0;
+  double drad=rmax/(double)nbins; //sphere shell volume=4*pi*r^2*dr
+  uint k=0;
+  int ibin=0,itype=0;
+  stringstream oss;
+  oss << aurostd::PaddedPOST("#bin",padding) << " ";
+  oss << aurostd::PaddedPRE("rad",padding+padding_extra) << " ";
+  for(k=0;k<vvitypes.size();k++){
+    eset=xstr.species[vvitypes[k][0]]+"-"+xstr.species[vvitypes[k][1]];
+    oss << aurostd::PaddedPRE(eset,padding+padding_extra) << " ";
+  }
+  oss << aurostd::PaddedPRE("total",padding+padding_extra) << " ";
+  oss << endl;
+  for(ibin=rdf_all.lrows;ibin<=rdf_all.urows;ibin++){
+    oss << aurostd::PaddedPOST(aurostd::utype2string(ibin,padding-3,FIXED_STREAM),padding) << " ";
+    rad=drad*(ibin-rdf_all.lrows);
+    oss << (rad<10?" ":"");
+    oss << (rad<100?" ":"");
+    oss << (rad<1000?" ":"");
+    oss << (rad<10000?" ":"");
+    oss << (std::signbit(rad)?"":" ");
+    oss << aurostd::PaddedPOST(aurostd::utype2string(rad,padding-2,FIXED_STREAM),padding) << " ";
+    for(itype=rdf_all.lcols;itype<=rdf_all.ucols;itype++){
+      oss << (rdf_all[ibin][itype]<10?" ":"");
+      oss << (rdf_all[ibin][itype]<100?" ":"");
+      oss << (rdf_all[ibin][itype]<1000?" ":"");
+      oss << (rdf_all[ibin][itype]<10000?" ":"");
+      oss << (std::signbit(rdf_all[ibin][itype])?"":" ");
+      oss << aurostd::PaddedPOST(aurostd::utype2string(rdf_all[ibin][itype],padding-2,FIXED_STREAM),padding) << " ";
+    }
+    oss << endl;
+  }
+  return oss.str();
+}
+void PrintRDF(const xstructure& xstr,const double rmax,const int nbins,const xmatrix<double>& rdf_all,ostream& oss){ //CO20220627 - new procedure
+  oss << RDF2string(xstr,rmax,nbins,rdf_all);
+}
 // This function prints out the RDF information.
 // Dane Morgan - Stefano Curtarolo
-void PrintRDF(const xstructure& str, const double& rmax,
+void PrintRDF_20220101(const xstructure& str, const double& rmax,
     const int& nbins,
     const int& smooth_width,
     const aurostd::matrix<double>& rdf_all,  //CO20200404 pflow::matrix()->aurostd::matrix()
@@ -3557,10 +3589,9 @@ namespace pflow {
       int setting,
       bool suppress_Wyckoff) {
 
-    string function_name = XPID + "pflow::PrintSGData():";
     bool LDEBUG=(FALSE || XHOST.DEBUG);
 
-    if(LDEBUG){ cerr << function_name << " BEGIN" << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " BEGIN" << endl; }
 
     // ---------------------------------------------------------------------------
     // calculate the space group symmetry if not already calculated
@@ -3614,9 +3645,23 @@ namespace pflow {
         ss_output << "WYCCAR" << endl;
         // ---------------------------------------------------------------------------
         // expanded form of WYCCAR (i.e., poscar, not just the wyccar) //DX20210708
+        xstructure str_expanded;
+        str_expanded.title = str_sg.title; // transfer title over
+        str_expanded.sym_eps = str_sg.sym_eps; // transfer symmetry eps over
+        // ---------------------------------------------------------------------------
+        // add representative atoms only //DX20220921
+        _atom atom_tmp;
+        for(uint i=0;i<str_sg.wyckoff_sites_ITC.size();i++){
+          atom_tmp.fpos = str_sg.wyckoff_sites_ITC[i].coord;
+          atom_tmp.type = str_sg.wyckoff_sites_ITC[i].index;
+          atom_tmp.name = str_sg.wyckoff_sites_ITC[i].type;
+          atom_tmp.partial_occupation_flag = aurostd::isdifferent(str_sg.wyckoff_sites_ITC[i].site_occupation,1.0);
+          atom_tmp.partial_occupation_value = str_sg.wyckoff_sites_ITC[i].site_occupation;
+          str_expanded.AddAtom(atom_tmp,false);  //CO20230319 - add by species
+        }
         xvector<double> data = Getabc_angles(str_sg.standard_lattice_ITC,DEGREES);
-        xstructure str_expanded = WyckoffPOSITIONS(str_sg.space_group_ITC, str_sg.setting_ITC, str_sg);
-        str_expanded.lattice=str_sg.standard_lattice_ITC;
+        str_expanded = WyckoffPOSITIONS(str_sg.space_group_ITC, str_sg.setting_ITC, str_expanded); //DX20220921 - changed str_sg to str_expanded in last argument
+        str_expanded.lattice=GetClat(data(1), data(2), data(3), data(4), data(5), data(6)); //DX20221128 - need to use GetClat to get standard representation of the ITC unit cell (rather than using std_lattice_ITC(), which could be rotated)
         str_expanded.ReScale(1.0);
         str_expanded.neg_scale=FALSE;
         str_expanded.iomode = IOVASP_POSCAR;
@@ -3845,10 +3890,9 @@ namespace pflow {
       bool no_scan,
       int setting) {
 
-    string function_name = XPID + "pflow::PrintWyckoffData():";
     bool LDEBUG=(FALSE || XHOST.DEBUG);
 
-    if(LDEBUG){ cerr << function_name << " BEGIN" << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " BEGIN" << endl; }
 
     // ---------------------------------------------------------------------------
     // calculate the space group symmetry if not already calculated
@@ -4312,7 +4356,7 @@ void GetGoodShellPoints(vector<xvector<double> >& points, const xstructure& str,
 
   // Send atoms to GetNeighData to get their neigh info.
   //[OBSOLETE]  pflow::GetNeighData(atvec,str,rmin,rmax,neigh_mat);
-  sstr.GetNeighData(atvec,rmin,rmax,neigh_mat);
+  sstr.GetNeighData_20220101(atvec,rmin,rmax,neigh_mat);  //CO20220623 - use orig GetNeighData() since input is NOT the atoms of the structure, this routine should be rewritten
 
   // Remove every point that does not have ns atoms in shell.
   deque<deque<_atom> > nnm;
@@ -4872,6 +4916,6 @@ void PrintXray(const xstructure& str, double lambda, ostream& oss) {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

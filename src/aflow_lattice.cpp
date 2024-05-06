@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo, Wahyu Setyawan - 2007-2011 Duke
@@ -19,7 +19,7 @@ namespace LATTICE {
     string message = "";
     if(lat.empty()){
       message = "input lattice string is empty";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_);
     }
     if(lat=="CUB" || lat=="cP") return TRUE;
     if(lat=="BCC" || lat=="cI") return TRUE;
@@ -37,7 +37,7 @@ namespace LATTICE {
     if(lat=="TRI" || lat=="aP") return TRUE;
 
     message = "BZ for " + lat + " is not ready";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_); // you do not want to produce or run stuff that is not ready so you do not clog the computers
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _VALUE_ILLEGAL_); // you do not want to produce or run stuff that is not ready so you do not clog the computers
     return FALSE;
   }
 }
@@ -61,7 +61,7 @@ namespace LATTICE {
     if(lattice_type=="FCC"){ return "cF"; }
     if(lattice_type=="BCC"){ return "cI"; }
 
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,lattice_type+" is not a possible lattice type.",_VALUE_ILLEGAL_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,lattice_type+" is not a possible lattice type.",_VALUE_ILLEGAL_);
 
     return "";
   }
@@ -79,7 +79,7 @@ namespace LATTICE {
     else if(lattice_centering == 'F'){ return 4; }
     else{
       stringstream message; message << lattice_centering << " is not a possible lattice centering.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
     }
 
     return 1;
@@ -181,7 +181,7 @@ namespace LATTICE {
       LATTICE::SpaceGroup2Lattice(sg,lattice_type,lattice_system);
       if(lattice_type=="error") {
         string message = "Could not find the lattice type for space group=" + aurostd::utype2string(sg) + ". Check the space group input or the LATTICE::Lattice2SpaceGroup() function.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }
       if(lattice_type==lattice) vsgn.push_back(sg);
     }
@@ -369,7 +369,7 @@ namespace LATTICE {
       message += "a = " + aurostd::utype2string<double>(a);
       message += ", b = " + aurostd::utype2string<double>(b);
       message += ", c = " + aurostd::utype2string<double>(c);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     // 4. ORC
     if((sg>=16 && sg <=19) || (sg>=25 && sg<=34) || (sg>=47 && sg<=62)) return "ORC";
@@ -380,7 +380,7 @@ namespace LATTICE {
       message += "a = " + aurostd::utype2string<double>(a);
       message += ", b = " + aurostd::utype2string<double>(b);
       message += ", c = " + aurostd::utype2string<double>(c);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     // 6. ORCF
     if(sg==22 || sg==42 || sg==43 ||sg==69 || sg==70) {
@@ -393,7 +393,7 @@ namespace LATTICE {
       message += "a = " + aurostd::utype2string<double>(a);
       message += ", b = " + aurostd::utype2string<double>(b);
       message += ", c = " + aurostd::utype2string<double>(c);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     // 7. ORCI
     if(sg==23 || sg==24 || (sg>=44 && sg<=46) || (sg>=71 && sg<=74)) return "ORCI";
@@ -409,7 +409,7 @@ namespace LATTICE {
       message += "a = " + aurostd::utype2string<double>(a);
       message += ", b = " + aurostd::utype2string<double>(b);
       message += ", c = " + aurostd::utype2string<double>(c);
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     // 10. Trigonal, can be rhombohedral or hexagonal
     if(sg>=143 && sg<=167) {
@@ -2197,7 +2197,7 @@ namespace LATTICE {
       //xstructure str_reciprocal_in,str_reciprocal_sp,str_reciprocal_sc;
       //str_reciprocal_in.lattice=str_sp.klattice;str_reciprocal_in.FixLattices();
       //str_reciprocal_in.title="NO_RECURSION";
-      //_atom atom;str_reciprocal_in.AddAtom(atom);
+      //_atom atom;str_reciprocal_in.AddAtom(atom,false); //CO20230319 - add by type
       //// LATTICE::Standard_Lattice_Structure(str_reciprocal_in,str_reciprocal_sp,str_reciprocal_sc,eps,epsang); //SC OLD VERSION
       //int ss=0; //JX
       //LATTICE::Standard_Lattice_Structure(str_reciprocal_in,str_reciprocal_sp,str_reciprocal_sc,eps,epsang,ss,_EPS_);//JX
@@ -2276,7 +2276,7 @@ namespace LATTICE {
           message << "==========================================" << endl;
           message << "str_sp.transform_coordinates_original2new: " << str_sp.transform_coordinates_original2new << endl;
           message << "str_sp.rotate_lattice_original2new: " << str_sp.rotate_lattice_original2new;
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
         }
       }
       else {
@@ -2396,7 +2396,7 @@ namespace LATTICE {
       _str_in.sym_eps_calculated=_str_sp.sym_eps_calculated=_str_sc.sym_eps_calculated=str_sp.sym_eps_calculated; //DX
       _str_in.sym_eps_change_count=_str_sp.sym_eps_change_count=_str_sc.sym_eps_change_count=str_sp.sym_eps_change_count; //DX20180222 - added sym_eps change count
       _str_in.sym_eps_no_scan=_str_sp.sym_eps_no_scan=_str_sc.sym_eps_no_scan=str_sp.sym_eps_no_scan; //DX20180222 - added sym_eps change count
-      _atom atom; atom.cpos.clear();atom.fpos.clear();atom.type=0; _str_in.AddAtom(atom);
+      _atom atom; atom.cpos.clear();atom.fpos.clear();atom.type=0; _str_in.AddAtom(atom,false); //CO20230319 - add by type
       //DX20170814 START - Use real pgroup to calculate pgroupk and then set pgrouk from str_sp to the pgroup and pgroup_xtal of str_reciprocal_in
       //DX20170814 The pgroup and pgroup_xtal are the same for the str_reciprocal structure because there is only one atom at the origin
       //DX20170814 (i.e. lattice and crystal symmetry are the same for the reciprocal space crystal) 
@@ -2453,7 +2453,7 @@ namespace LATTICE {
     str_sp.bravais_lattice_system=str_sp.bravais_lattice_system;
     xstructure _str_in,_str_sp,_str_sc;
     _str_in.lattice=str_in.lattice; _str_in.scale=1.0;
-    _atom atom; atom.cpos.clear();atom.fpos.clear();atom.type=0; _str_in.AddAtom(atom);
+    _atom atom; atom.cpos.clear();atom.fpos.clear();atom.type=0; _str_in.AddAtom(atom,false); //CO20230319 - add by type
     LATTICE::Standard_Lattice_StructureDefault(_str_in,_str_sp,_str_sc);
     str_in.bravais_lattice_lattice_type=_str_sp.bravais_lattice_type;
     str_in.bravais_lattice_lattice_variation_type=_str_sp.bravais_lattice_variation_type;
@@ -7459,6 +7459,6 @@ namespace LATTICE {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

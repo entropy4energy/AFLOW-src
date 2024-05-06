@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -26,6 +26,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <memory>
 #include <pthread.h>
 #include <pwd.h>
@@ -38,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <codecvt> //HE20220922 for JSON
 #include <sys/stat.h>
 #ifndef __CYGWIN__  //ME20190327 - Cygwin support
 //#include <sys/sysctl.h>
@@ -61,6 +63,9 @@
 #include <netdb.h>       //CO20180321 - frisco needs for AFLUX + for EntryLoader
 #include <fts.h>         //HE20220222 - for EntryLoader (effective filesystem tree walk)
 #include <regex>         //HE20220222 - for EntryLoader (faster match of complex patterns like alloy matching)
+#include <limits.h>      //HE20230324 - for embedded files
+#include <random>        //HE20230620 - for replacement of random_shuffle with shuffle
+
 
 #define GCC_VERSION (__GNUC__ * 10000  + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)  //CO20200502 - moved from aflow.h
 
@@ -148,6 +153,11 @@ using std::vector;
 #define AUROSTD_MAX_DOUBLE std::numeric_limits<double>::max()
 #endif
 
+//SD20220914
+#ifndef AUROSTD_MAX_SIZET
+#define AUROSTD_MAX_SIZET std::numeric_limits<size_t>::max()
+#endif
+
 //CO20180101 - stream2stream modes
 #ifndef DEFAULT_STREAM
 #define DEFAULT_STREAM 'D'
@@ -171,7 +181,7 @@ using std::vector;
 #define __xprototype
 #endif
 #endif
-
+#include "aurostd_automatic_template.h" //HE20230622
 #include "aurostd_xscalar.h"
 #include "aurostd_xcomplex.h"
 #include "aurostd_xvector.h"
@@ -448,7 +458,8 @@ namespace aurostd {
   bool ProcessRunning(const string& process,const string& pgid,bool user_specific=true); //SD20220329
   void ProcessKill(const string& process,bool user_specific=true,uint signal=9); //CO20210315 //SD20220627 - 9 = SIGKILL, 15 = SIGTERM
   void ProcessKill(const string& process,const string& pgid,bool user_specific=true,uint signal=9); //SD20220329 - 9 = SIGKILL, 15 = SIGTERM
-  void ProcessRenice(const string& process,int nvalue,bool user_specific=true); //CO20210315
+  bool ProcessRenice(const string& process,int nvalue,bool user_specific=true,const string& pgid=""); //CO20210315
+  bool ReniceAvailable(void); //CO20221029
   // about directories and file existing or not
   bool DirectoryMake(string Directory);
   bool SSH_DirectoryMake(string user, string machine,string Directory);
@@ -742,6 +753,8 @@ namespace aurostd {
   uint string2tokensAdd(const string& str,deque<string>& tokens,const string& delimiters = " ") __xprototype;
   template<class utype> uint string2tokensAdd(const string& str,std::vector<utype>& tokens,const string& delimiters = " ") __xprototype;
   template<class utype> uint string2tokensAdd(const string& str,std::deque<utype>& tokens,const string& delimiters = " ") __xprototype;
+  uint string2tokensByDelimiter(const string& str, vector<string>& tokens, const string& delimiter); //SD20220504
+  uint string2tokensByDelimiter(const string& str, deque<string>& tokens, const string& delimiter); //SD20220504
 
   //[CO20210315 - OBSOLETE use stream2stream()]template<typename typeTo, typename typeFrom> typeTo StringStreamConvert(const typeFrom& from);  //CO20210315 - cleaned up
   //[CO20210315 - OBSOLETE use stream2stream()]template<typename typeFrom> string StringConvert(const typeFrom& from);  //CO20210315 - cleaned up
@@ -827,13 +840,25 @@ namespace aurostd {
   bool substringlist2bool(const string& strin, const deque<string>& substrings, bool match_all=true);  //ME20220505
   bool substring_present_file(const string& FileName,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //CO20210315 - cleaned up
   bool substring_present_file_FAST(const string& FileName,const string& strsub1,bool RemoveWS=false,bool case_insensitive=false,bool expect_near_end=false,unsigned long long int size_max=AUROSTD_MAX_ULLINT);  //CO20210315 - cleaned up
-  bool WithinList(const vector<string>& list,const string& input,bool sorted=false);  //CO20181010
-  bool WithinList(const deque<string>& list,const string& input,bool sorted=false);  //CO20181010
-  bool WithinList(const vector<int>& list,int input,bool sorted=false); //CO20181010
-  bool WithinList(const vector<uint>& list,uint input,bool sorted=false); //CO20181010
-  bool WithinList(const vector<string>&, const string&, int&,bool sorted=false);  //ME20190905
-  bool WithinList(const vector<int>&, int, int&,bool sorted=false);  //ME20190905
-  bool WithinList(const vector<uint>&, uint, int&,bool sorted=false);  //ME20190905
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<string>& list,const string& input,bool sorted=false);  //CO20181010
+  //[SD20220705 - OBSOLETE]bool WithinList(const deque<string>& list,const string& input,bool sorted=false);  //CO20181010
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<int>& list,int input,bool sorted=false); //CO20181010
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<uint>& list,uint input,bool sorted=false); //CO20181010
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<string>&, const string&, int&,bool sorted=false);  //ME20190905
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<int>&, int, int&,bool sorted=false);  //ME20190905
+  //[SD20220705 - OBSOLETE]bool WithinList(const vector<uint>&, uint, int&,bool sorted=false);  //ME20190905
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, size_t& index, bool sorted=false); //SD20220705
+  bool WithinList(const vector<string>& list, const string& input, size_t& index, bool sorted=false); //SD20220705
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, size_t& index, bool sorted=false); //SD20220705
+  bool WithinList(const deque<string>& list, const string& input, size_t& index, bool sorted=false); //SD20220705
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, bool sorted=false); //SD20220705
+  bool WithinList(const vector<string>& list, const string& input, bool sorted=false); //SD20220705
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, bool sorted=false); //SD20220705
+  bool WithinList(const deque<string>& list, const string& input, bool sorted=false); //SD20220705
+  template<class utype> bool WithinList(const vector<utype>& list, const utype& input, vector<size_t>& index, bool sorted=false); //SD20220705
+  bool WithinList(const vector<string>& list, const string& input, vector<size_t>& index, bool sorted=false); //SD20220705
+  template<class utype> bool WithinList(const deque<utype>& list, const utype& input, vector<size_t>& index, bool sorted=false); //SD20220705
+  bool WithinList(const deque<string>& list, const string& input, vector<size_t>& index, bool sorted=false); //SD20220705
   bool EWithinList(const vector<string>& list,const string& input); //CO20200223
   bool EWithinList(const vector<string>& list, const string& input, string& output); //CO20200223
   bool SubstringWithinList(const deque<string>& list, const string& input);  //ME20220503
@@ -867,9 +892,9 @@ namespace aurostd {
   uint substring2strings(ifstream& input,vector<string> &vstringout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //SD20220520 - rewritten
   uint substring2strings(const string& input,vector<string> &vstringout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //CO20210315 - cleaned up //SD20220520 - rewritten
   uint substring2strings(const stringstream& input,vector<string> &vstringout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //CO20210315 - cleaned up //SD20220520 - rewritten
-  uint substring2strings(ifstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS=false,bool RemoveComments=true); //SD20220520
-  uint substring2strings(const string& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS=false,bool RemoveComments=true); //SD20220520 - rewritten
-  uint substring2strings(const stringstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,bool RemoveWS=false,bool RemoveComments=true); //SD20220520
+  uint substring2strings(ifstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance=0,bool RemoveWS=false,bool RemoveComments=true,bool trim_edges=true); //SD20220520  //CO20230502 - give instance here to speed up aurostd::substring2string(), default instance==0 //CO20230502 - trim_edges is the default behavior of substring2string()
+  uint substring2strings(const string& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance=0,bool RemoveWS=false,bool RemoveComments=true,bool trim_edges=true); //SD20220520 - rewritten  //CO20230502 - give instance here to speed up aurostd::substring2string(), default instance==0 //CO20230502 - trim_edges is the default behavior of substring2string()
+  uint substring2strings(const stringstream& input,vector<string> &vstringout,const string& strsub1,const string& strsub2,const int instance=0,bool RemoveWS=false,bool RemoveComments=true,bool trim_edges=true); //SD20220520  //CO20230502 - give instance here to speed up aurostd::substring2string(), default instance==0 //CO20230502 - trim_edges is the default behavior of substring2string()
   template<typename utype> uint substring2utypes(ifstream& input,vector<utype> &vutypeout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //SD202205020
   template<typename utype> uint substring2utypes(const string& input,vector<utype> &vutypeout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //CO20210315 - cleaned up //SD202205020 - added utype
   template<typename utype> uint substring2utypes(const stringstream& input,vector<utype> &vutypeout,const string& strsub1,bool RemoveWS=false,bool RemoveComments=true); //CO20210315 - cleaned up //SD202205020 - added utype
@@ -927,10 +952,14 @@ namespace aurostd { // aurostd_crc64.cpp
     UINT64_C(0xa6df411fbfb21ca3),UINT64_C(0xdc0731d78f8795da),UINT64_C(0x536fa08fdfd90e51),UINT64_C(0x29b7d047efec8728),
   };
 
+  static const string human_alphanum_choices="0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"; ///< basis for the human readable hash, drops O and I to avoid mix-ups
+
   uint64_t crc64(uint64_t crc, const unsigned char *s, uint64_t l);
   uint64_t crc64(uint64_t crc, const string s);
   uint64_t crc64(const string s);  //HE20220404 partner function to aurostd::ctcrc64 starting at crc 0
   string crc2string(uint64_t crc);
+  string crc2human(const uint64_t crc, const uint width=0); //HE20230221
+  string crc2human(const string & input, const uint width=0); //HE20230221
 
   // HE20220404 START
   // constexpr variant of aurostd::crc64 that the compiler can precalculate
@@ -1302,9 +1331,16 @@ namespace aurostd {   // INT
 }
 
 // ***************************************************************************
+// reorder //CO20221111
+namespace aurostd {
+  template<class utype> void reorder(vector<utype>& vec,vector<uint>& vorder,uint mode=1);
+}
+// ***************************************************************************
 // some statistical stuff
-template<class utype> utype combinations(utype n,utype k) __xprototype; // http://en.wikipedia.org/wiki/Combination
-template<class utype> utype Cnk(utype n,utype k) __xprototype; // http://en.wikipedia.org/wiki/Combination
+namespace aurostd {
+  template<class utype> utype combinations(utype n,utype k) __xprototype; // http://en.wikipedia.org/wiki/Combination
+  template<class utype> utype Cnk(utype n,utype k) __xprototype; // http://en.wikipedia.org/wiki/Combination
+}
 
 // ***************************************************************************
 namespace aurostd {
@@ -1479,7 +1515,7 @@ namespace aurostd {
 //DX20170803 - Add Matrix print out
 namespace aurostd {
   // [OBSOLETE] string xmatDouble2String(const xmatrix<double>& xmat_in, bool roff=false);
-  string xmatDouble2String(const xmatrix<double>& xmat_in, int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
+  string xmatDouble2String(const xmatrix<double>& xmat_in, int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);  //CO20230313 - utype clang warnings
   // ME20220324
   template <typename utype>
     string xmat2String(const xmatrix<utype>& mat_in);
@@ -1493,16 +1529,16 @@ namespace aurostd {
 
 namespace aurostd {
   // [OBSOLETE] vector<string> vecDouble2vecString(const vector<double>& vin, bool roff=false);
-  vector<string> vecDouble2vecString(const vector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
-  string vecDouble2String(const vector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
+  vector<string> vecDouble2vecString(const vector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);  //CO20230313 - utype clang warnings
+  string vecDouble2String(const vector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM); //CO20230313 - utype clang warnings
   // [OBSOLETE] vector<string> xvecDouble2vecString(const xvector<double>& vin, bool roff=false);
   // [OBSOLETE] vector<string> xvecDouble2vecString(const xvector<double>& vin, bool roff=false);
-  vector<string> xvecDouble2vecString(const xvector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
-  string xvecDouble2String(const xvector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
+  vector<string> xvecDouble2vecString(const xvector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);  //CO20230313 - utype clang warnings
+  string xvecDouble2String(const xvector<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM); //CO20230313 - utype clang warnings
   // [OBSOLETE] deque<string> deqDouble2deqString(const deque<double>& vin, bool roff=false);
-  deque<string> vecDouble2vecString(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
-  string vecDouble2String(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
-  // deque<string> deqDouble2deqString(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);
+  deque<string> vecDouble2vecString(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);  //CO20230313 - utype clang warnings
+  string vecDouble2String(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM);  //CO20230313 - utype clang warnings
+  // deque<string> deqDouble2deqString(const deque<double>& vin,int precision=AUROSTD_DEFAULT_PRECISION, bool roff=false, double tol=(double)AUROSTD_ROUNDOFF_TOL, char FORMAT=DEFAULT_STREAM); //CO20230313 - utype clang warnings
 }
 
 namespace aurostd {
@@ -1588,6 +1624,15 @@ namespace aurostd {
   b64_decoder_proxy operator<<(std::ostream & os, b64_decoder_creator);
 }
 
+// Helper functions to retrieve embedded data //HE20230413 
+namespace aurostd {
+  namespace EmbData {
+    JSON::object get_unit_test();
+    std::string get_content(const std::string &filename);
+    void save_to_file(const std::string &filename, const std::string &target_path);
+  }
+}
+
 //binary to base64 conversion
 const std::string base64_chars = 
 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -1599,6 +1644,6 @@ const std::string base64_chars =
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

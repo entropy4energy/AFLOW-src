@@ -1,6 +1,6 @@
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow Andriy Smolyanyuk - Duke University 2021-2021           *
 // *                                                                         *
 //****************************************************************************
@@ -83,7 +83,7 @@ namespace pocc {
     bool LDEBUG = false || _DEBUG_POCC_QHA_ || XHOST.DEBUG;
 
     msg = "Performing POCC+QHA post-processing step.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, m_aflags.Directory,
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, msg, m_aflags.Directory,
       *p_FileMESSAGE, *p_oss, _LOGGER_MESSAGE_);
 
     apl::QHAmethod qha_method = apl::QHA_CALC;
@@ -146,7 +146,7 @@ namespace pocc {
             else{
               msg="Inconsistent amount of properties (columns) among different";
               msg+="POCC-QHA calculations.";
-              throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg,
+              throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg,
                   _INDEX_MISMATCH_);
             }
           }
@@ -154,18 +154,18 @@ namespace pocc {
         }
         else{
           msg = "The " + filename + " file is empty.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_ERROR_);
         }
       }
       else{
         msg = "The " + filename + " file is missing.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_NOT_FOUND_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_NOT_FOUND_);
       }
     }
 
     if (!ncols) {
       msg = "POCC+QHA was not able to extract any data.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
     }
 
     if (LDEBUG){
@@ -198,7 +198,7 @@ namespace pocc {
                               pocc_qha_thermo_properties[i+1][row][0])){
           msg="Inconsistent list of temperatures among different";
           msg+="POCC-QHA calculations.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg,
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg,
               _VALUE_ILLEGAL_);
         }
       }
@@ -339,13 +339,13 @@ namespace pocc {
 
     string output_file = POCC_FILE_PREFIX + DEFAULT_POCC_QHA_AVGTHERMO_FILE;
     msg = "Writing the averaged POCC+QHA data to " + output_file+" file.";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, m_aflags.Directory,
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, msg, m_aflags.Directory,
         *p_FileMESSAGE, *p_oss, _LOGGER_MESSAGE_);
     output_file = m_aflags.Directory + "/" + output_file;
 
     if (!aurostd::stringstream2file(file, output_file)){
       msg = "Error writing to " + output_file + " file.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
   }
 }

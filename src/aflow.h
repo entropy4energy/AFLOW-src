@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -172,6 +172,22 @@ extern string _AFLOWLOCK_;
 extern const string _LOCK_LINK_SUFFIX_; //SD20220224
 
 const string VASP_KEYWORD_EXECUTION=" Executing: ";
+
+#define _AFLOWIN_DEFAULT_     string("aflow.in")  //CO20210302
+#define _AFLOWIN_AEL_DEFAULT_ string("ael_aflow.in")  //CO20210302
+#define _AFLOWIN_AGL_DEFAULT_ string("agl_aflow.in")  //CO20210302
+#define _AFLOWIN_QHA_DEFAULT_ string("aflow_qha.in")  //CO20210302 - moved from APL/aflow_qha.cpp
+
+#define _AFLOWIN_AEL_VARIANTS_ string("ael_aflow.in,aflow_ael.in")  //CO20210302
+#define _AFLOWIN_AGL_VARIANTS_ string("agl_aflow.in,aflow_agl.in")  //CO20210302
+
+#define _AFLOWLOCK_DEFAULT_     string("LOCK")  //CO20210302
+#define _AFLOWLOCK_AEL_DEFAULT_ string("ael.LOCK")  //CO20210302
+#define _AFLOWLOCK_AGL_DEFAULT_ string("agl.LOCK")  //CO20210302
+#define _AFLOWLOCK_QHA_DEFAULT_ string("LOCK.qha")  //CO20210302 - moved from APL/aflow_qha.cpp
+
+#define _AFLOWLOCK_AEL_VARIANTS_ string("ael.LOCK,LOCK.ael")  //CO20210302
+#define _AFLOWLOCK_AGL_VARIANTS_ string("agl.LOCK,LOCK.agl")  //CO20210302
 
 // --------------------------------------------------------------------------
 // definitions for aflow
@@ -346,7 +362,11 @@ class _XHOST {
     string sPGID,sPID,sTID;           // aflow_init.cpp  [PID=12345678]  [TID=12345678]
     bool showPGID,showPID,showTID;       // aflow_init.cpp  check if --showPID
     // machinery
-    bool QUIET,QUIET_CERR,QUIET_COUT,TEST,DEBUG,MPI;    // extra quiet SC20210617
+    bool QUIET;           //CO20220630 - can be overridden by LOGGER_WHITELIST/_BLACKLIST, modifiable within functions
+    bool QUIET_GLOBAL;    //CO20220630 - exclusively for --quiet (headless server), do not set/unset inside code (GLOBAL SILENCE)
+    bool QUIET_CERR;      //CO20220630 - silences cerr exclusively  // extra quiet SC20210617 
+    bool QUIET_COUT;      //CO20220630 - silences cout exclusively  // extra quiet SC20210617 
+    bool TEST,DEBUG,MPI;
     vector<string> LOGGER_WHITELIST;  //HE+ME20220305 - for logging
     vector<string> LOGGER_BLACKLIST;  //HE+ME20220305 - for logging
     bool GENERATE_AFLOWIN_ONLY; //CT20180719
@@ -585,7 +605,14 @@ inline std::string aflowFunc(const std::string& pretty_func, const std::string& 
   return XPID + pretty_func.substr(begin, end - begin) + func + "():";
 }
 
+// SD+HE20220914
+// Get filename and line number
+inline std::string aflowFile(const std::string &file_name, const size_t line_number ){
+  return file_name + ":" + std::to_string(line_number);
+}
+
 #define __AFLOW_FUNC__ aflowFunc(__PRETTY_FUNCTION__, __func__)
+#define __AFLOW_FILE__ aflowFile(__FILE__, __LINE__)
 
 //DX20180131 - add symmetry definitions - START
 // symmetry 
@@ -1591,14 +1618,17 @@ class xstructure {
     void SetCoordinates(int mode);                                // change coordinates
     void MakeBasis(void);                                         // make basis for atoms (basis and number)
     void MakeTypes(void);                                         // refresh types based on num_each_type  //CO20180420
-    void AddAtom(const _atom& atom,bool check_present=true);      // adding an atom
-    void AddAtom(const deque<_atom>& atom,bool check_present=true);// adding a deque<_atom> //CO20210129 //DX20210201
+    void AddAtom(const _atom& atom,bool add_species,              // adding an atom //CO20230319 - adding add_species which assumes the species information of the incoming atoms is correct, otherwise add by type
+        bool check_present=true);
+    void AddAtom(const deque<_atom>& atom,bool add_species,       // adding a deque<_atom> //CO20210129 //DX20210201  //CO20230319 - adding add_species which assumes the species information of the incoming atoms is correct, otherwise add by type
+        bool check_present=true);
     void AddAtom_POCC(const _atom& atom);                         // adding an atom FOR POCC ONLY
     void RemoveAtom(const uint& iat);                             // deleting an atom (index)
     void RemoveAtom(vector<uint>& v_atoms_to_remove);             // deleting many atoms (indices)
     void RemoveAtom(void);                                        // removes all atoms //DX20210129
     void ReplaceAtoms(const deque<_atom>& new_atoms,
-        bool check_atom_overlap=true);                            // replace all atoms SAFELY/CLEANLY //DX20210129 - added option to check atom overlap
+        bool check_atom_overlap=true,                             // replace all atoms SAFELY/CLEANLY //DX20210129 - added option to check atom overlap
+        bool sort_species=true);                                  // CO20230319 - sort species
     void RemoveCopies(double=1.0e-3);                             // deleting atoms too close F/C
     void RemoveFractionalCopies(double=1.0e-3);                   // deleting atoms too close F
     void RemoveCartesianCopies(double=1.0e-3);                    // deleting atoms too close C
@@ -1615,8 +1645,13 @@ class xstructure {
     bool SpeciesGetAlphabetic(void);                              // Check is species are in alphabetic order
     bool SpeciesPutAlphabetic(void);                              // Put Species in alphabetic
     string SpeciesString(void);                                   // Gives a string with the list of all the species
-    uint SetSpecies(const std::deque<string>& vspecies);          // Set the species
-    void UpdateSpecies(const _atom& atom);                        // Update species from atom (consolidated from AddAtom) //DX20210202
+    uint SetSpecies(const std::deque<string>& vspecies,           // Set the species
+        bool sort_species=true);                                  // CO20230319 - sort species
+    void UpdateSpecies(const _atom& atom,bool add_species);       // Update species from atom (consolidated from AddAtom) //DX20210202  //CO20230319 - adding add_species which assumes the species information of the incoming atoms is correct, otherwise add by type
+    void UpdateSpecies_20230319(const _atom& atom,                // Update species from atom (consolidated from AddAtom) //DX20210202  //CO20230319 - adding add_species which assumes the species information of the incoming atoms is correct, otherwise add by type
+        bool add_species);
+    void UpdateSpecies_20230101(const _atom& atom,                // Update species from atom (consolidated from AddAtom) //DX20210202  //CO20230319 - adding add_species which assumes the species information of the incoming atoms is correct, otherwise add by type
+        bool add_species);
     //DX20210302 [OBSOLETE] void GetLatticeType(xstructure& sp,xstructure& sc);           // Get all lattices
     //DX20210302 [OBSOLETE] void GetLatticeType(void);                                    // Get all lattices
     void GetLatticeType(
@@ -2025,9 +2060,12 @@ class xstructure {
     //
     // NEIGHBORS OBEJCTS OLD-ACONVASP BUT WORKS                  // NEIGHBORS OBEJCTS 
     // GetNeighData collects all the neighbor data between rmin and rmax and stores it for each atom in a vector of atom objects in order of increasing distance.  
-    void GetNeighData(const deque<_atom>& in_atom_vec,const double& rmin, const double& rmax,deque<deque<_atom> >& neigh_mat);
-    // GetStrNeighData collects all the neighbor data out to some cutoff and stores it for each atom in the structure.
-    void GetStrNeighData(const double cutoff,deque<deque<_atom> >& neigh_mat) const; //RF+CO20200513
+    void GetNeighData(const double rmax,deque<deque<_atom> >& neigh_mat,const double rmin=_ZERO_TOL_) const; //CO20220623 - use this function
+    void GetNeighData(deque<_atom>& atoms_cell,const double rmax,deque<deque<_atom> >& neigh_mat,const double rmin=_ZERO_TOL_) const; //CO20220623 - use this function
+    void GetNeighData_20220101(const deque<_atom>& in_atom_vec,const double rmin, const double rmax,deque<deque<_atom> >& neigh_mat) const; //CO20220623 - AVOID this function, use one above
+    //[CO20220623 - OBSOLETE]// GetStrNeighData collects all the neighbor data out to some cutoff and stores it for each atom in the structure.
+    //[CO20220623 - OBSOLETE]void GetStrNeighData(const double cutoff,deque<deque<_atom> >& neigh_mat) const; //RF+CO20200513
+    //[CO20220623 - OBSOLETE]void GetStrNeighData_20220101(const double cutoff,deque<deque<_atom> >& neigh_mat) const; //RF+CO20200513
 
     // ----------------------------------------------------------------------------------------
     // OUTPUT/ERROR FLAGS                                         // --------------------------------------
@@ -3210,9 +3248,9 @@ namespace KBIN {
   double OUTCAR2VASPVersionDouble(const string& outcar);  //CO20210315
   string VASPVersionString2Number(const string& vasp_version);  //CO20210315
   double VASPVersionString2Double(const string& vasp_version);  //CO20210315
-  string getVASPVersion(const string& binfile,const string& mpi_command="");  //ME20190219
-  string getVASPVersionNumber(const string& binfile,const string& mpi_command="");  //CO20200610
-  double getVASPVersionDouble(const string& binfile,const string& mpi_command="");  //CO20200610
+  string getVASPVersion(const string& binfile);  //ME20190219
+  string getVASPVersionNumber(const string& binfile);  //CO20200610
+  double getVASPVersionDouble(const string& binfile);  //CO20200610
 }
 
 // ----------------------------------------------------------------------------
@@ -3234,7 +3272,7 @@ namespace KBIN {
   bool VASP_Produce_POSCAR(_xvasp& xvasp,const string& AflowIn,ofstream& FileERROR,_aflags& aflags,_kflags& kflags,_vflags& vflags);
   bool VASP_Produce_POSCAR(_xvasp& xvasp);
   bool VASP_Modify_POSCAR(_xvasp& xvasp,const string& AflowIn,ofstream& FileERROR,_aflags& aflags,_vflags& vflags);
-  void convertPOSCARFormat(_xvasp&, const _aflags& aflags, const _kflags&);  //ME20190220 //CO20210713 - aflags
+  void convertPOSCARFormat(_xvasp&, const _kflags&);  //ME20190220 //CO20210713 - aflags //SD20220923 - updated for vasp6.3
   bool VASP_Convert_Unit_Cell(_xvasp&, _vflags&, _aflags&, ofstream&, ostringstream&); //ME20181216
   bool VASP_Reread_POSCAR(_xvasp& xvasp); //CO20210315
   bool VASP_Reread_POSCAR(_xvasp& xvasp,ofstream &FileMESSAGE,_aflags &aflags);
@@ -3405,6 +3443,18 @@ class xQMVASP;  //CO20190803
 class xPLASMONICS;  //CO20190803
 namespace aflowlib { class _aflowlib_entry;}
 
+namespace aurostd {
+  // REGEX expressions for quick finding/replacements in strings
+  /// REGEX to find all chemical elements in a string
+  const std::regex regex_elements{"(A[cglmrstu]|B[aehikr]?|C[adeflmnorsu]?|D[bsy]|E[rsu]|F[elmr]?|G[ade]|H[efgos]?|I[nr]?|Kr?|L[airuv]|M[dgnot]|N[abdeiop]?|Os?|P[abdmortu]?|R[abefghnu]|S[bcegimnr]?|T[abcehilm]|U(u[opst])?|V|W|Xe|Yb?|Z[nr])"};
+  /// REGEX to find all pseudo potentials that contain uppercase letters from a string (could be mistaken for a chemical element)
+  const std::regex regex_ppclean{"("+ std::regex_replace(CAPITAL_LETTERS_PP_LIST, std::regex(","), "|") + ")"};
+  /// @brief REGEX to help change a AURL into a file path
+  /// @note the content of the group `((?:(?:LIB\d{1,})|(?:ICSD)))` can be used in the replacement  with `$1`;
+  ///       the second group `(?:(?:RAW)|(?:LIB)|(?:WEB))` is there to select the full substring to be replaced
+  const std::regex regex_aurl2file{"((?:(?:LIB\\d{1,})|(?:ICSD)))_(?:(?:RAW)|(?:LIB)|(?:WEB))\\/"};
+}
+
 // -------------------------------------------------------------------------------------------------
 class xOUTCAR : public xStream { //CO20200404 - xStream integration for logging
   public:
@@ -3561,9 +3611,7 @@ class xOUTCAR : public xStream { //CO20200404 - xStream integration for logging
     string         Egap_type_net;
     //CO20211106 - IONIC STEPS DATA
     bool GetIonicStepsData();   //CO20211106
-    void populateAFLOWLIBEntry(aflowlib::_aflowlib_entry& data,const string& outcar_path); //CO20220124
-    void WriteMTPCFG(stringstream& output_ss,const string& outcar_path);   //CO20211106
-    void WriteMTPCFG(stringstream& output_ss,const string& outcar_path,const vector<string>& velements);   //CO20211106
+    void AddStepsIAPCFG(aurostd::JSON::object& jo, aflowlib::_aflowlib_entry& entry);   //CO20211106 //SD20221207 - rewritten using JSON
     //[CO20200404 - OBSOLETE]string ERROR;
     //int number_bands,number_kpoints; //CO20171006 - camilo garbage
     //int ISPIN; // turn this into spin = 0 if ISPIN = 1 //CO20171006 - camilo garbage
@@ -5319,7 +5367,7 @@ namespace aflowMachL {  //CO20211111
   void writeCoordCECSV();
 } // namespace aflowMachL
 namespace aflowMachL {  //CO20211111
-  void PrintMTPCFGAlloy(const aurostd::xoption& vpflow);  //CO20211111
+  void WriteFileIAPCFG(const aurostd::xoption& vpflow);  //CO20211111 //SD20221207 - rewritten using EntryLoader and JSON
 } // namespace aflowMachL
 //CO20201111 - END
 // ----------------------------------------------------------------------------
@@ -5450,25 +5498,24 @@ namespace unittest {
             const string& checkDescription, uint& passed_checks, vector<vector<string> >& results);
 
       template <typename utype>
-        void checkEqual(const vector<utype>& calculated, const vector<utype>& expected, const string& check_function,
-            const string& check_description, uint& passed_checks, vector<vector<string> >& results);
-      void checkEqual(const vector<string>& calculated, const vector<string>& expected, const string& check_function,
+      void checkEqual(const vector<utype>& calculated, const vector<utype>& expected, const string& check_function,
           const string& check_description, uint& passed_checks, vector<vector<string> >& results);
       template <typename utype>
-        void checkEqual(const utype& calculated, const utype& expected, const string& check_function,
-            const string& check_description, uint& passed_checks, vector<vector<string> >& results);
-      void checkEqual(const string& calculated, const string& expected, const string& check_function,
+      void checkEqual(const utype& calculated, const utype& expected, const string& check_function,
           const string& check_description, uint& passed_checks, vector<vector<string> >& results);
-      void checkEqual(const bool calculated, const bool expected, const string& check_function,
+      void checkEqual(const string &calculated, const string &expected, const string& check_function,
           const string& check_description, uint& passed_checks, vector<vector<string> >& results);
 
-      // Test functions ---------------------------------
+
+    // Test functions ---------------------------------
 
       // aurostd
       void xvectorTest(uint&, vector<vector<string> >&, vector<string>&);
       void xscalarTest(uint&, vector<vector<string> >&, vector<string>&);
       void xmatrixTest(uint&, vector<vector<string> >&, vector<string>&);
       void aurostdMainTest(uint&, vector<vector<string> >&, vector<string>&);
+      void xparserTest(uint&, vector<vector<string> >&, vector<string>&);
+      void xfitTest(uint&, vector<vector<string> >&, vector<string>&);
 
       // database
       void schemaTest(uint&, vector<vector<string> >&, vector<string>&);
@@ -5494,6 +5541,6 @@ namespace unittest {
 #endif
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

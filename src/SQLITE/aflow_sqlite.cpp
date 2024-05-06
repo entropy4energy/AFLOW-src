@@ -1,6 +1,6 @@
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 //****************************************************************************
@@ -32,7 +32,7 @@ namespace sql {
     if (sql_code != SQLITE_OK) {
       std::string function = "sql::SQLexecuteCommand():";
       std::string message = string(sqlErrMsg) + " in command " + command;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, function, message, _RUNTIME_SQL_);
+      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
     }
   }
 
@@ -45,7 +45,7 @@ namespace sql {
       string function = XPID + "sql::SQLexecuteCommandSCALAR():";
       string message = string(sqlErrMsg) + " in command " + command;
       message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, function, message, _RUNTIME_SQL_);
+      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
     } else {
       return returnstring;
     }
@@ -60,7 +60,7 @@ namespace sql {
       string function = XPID + "sql::SQLexecuteCommandVECTOR():";
       string message = string(sqlErrMsg) + " in command " + command;
       message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, function, message, _RUNTIME_SQL_);
+      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
     } else {
       return returnvector;
     }
@@ -75,7 +75,7 @@ namespace sql {
       string function = XPID + "sql::SQLexecuteCommand2DVECTOR():";
       string message = string(sqlErrMsg) + " in command " + command;
       message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, function, message, _RUNTIME_SQL_);
+      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
     } else {
       return returnvector;
     }
@@ -152,7 +152,7 @@ namespace sql {
 
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *            Aflow MARCO ESTERS - Duke University 2019-2021               *
 // *                                                                         *
 //****************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow DAVID HICKS - Duke University 2014-2021                 *
 // *                                                                         *
 // ***************************************************************************
@@ -26,7 +26,6 @@ namespace anrl {
       string Pearson_symbol,uint spacegroup,string params,uint print_mode) { //DX20180710 - added print_mode info //DX20200207 - oss no longer needed
 
     if(vparameters_size!=nparameters && print_mode!=1) { //DX20180710 - if equations only (print_mode==1), we do not need the parameters
-      string function_name = XPID + "anrl::PrototypeANRL_Consistency():";
       stringstream message;
       message << "anrl::PrototypeANRL" << endl;
       message << " Prototype                   : " << prototype << endl;
@@ -37,7 +36,7 @@ namespace anrl {
       message << " Space group symbol          : " << spacegroup << endl;
       message << " AFLOW prototype command     : aflow --proto=" << label << endl;
       message << "                                     --params=" << params << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name, message, _INPUT_NUMBER_); //DX20200207 - return FALSE -> throw (throw here instead of in another function)
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _INPUT_NUMBER_); //DX20200207 - return FALSE -> throw (throw here instead of in another function)
     }
     return TRUE;
   }
@@ -274,7 +273,6 @@ namespace anrl {
   vector<double> getANRLLatticeParameterValuesFromABCAngles(const xstructure& xstr, char lattice_type, char lattice_centering, uint setting ){
     // get lattice parameter values from the XSTRUCTURE
 
-    string function_name = XPID + "anrl::getANRLLatticeParameterValuesFromABCAngles():";
 
     // extract lattice parameters from xstructure
     vector<double> all_lattice_parameters;
@@ -289,7 +287,7 @@ namespace anrl {
     for(uint i=0;i<all_lattice_parameters.size();i++){
       if(all_lattice_parameters[i]<=_ZERO_TOL_){
         stringstream message; message << "The " << i << "th lattice parameter is ill-defined. Please check input.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name, message, _VALUE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _VALUE_ERROR_);
       }
     }
 
@@ -381,7 +379,6 @@ namespace anrl {
 
     // determine anrl label, parameters, and parameter values of the input structure
 
-    string function_name = XPID + "anrl::structure2anrl():";
 
     string directory="";
     bool recalculate_symmetry = true; //DX20191030
@@ -418,10 +415,10 @@ namespace anrl {
     if(vpflow.flag("STRUCTURE2ANRL::FORCE_WYCKOFF")){
       // check if Wyckoff information is available
       if(xstr.wyckoff_sites_ITC.size()==0){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Cannot use --force_Wyckoff option, Wyckoff positions must be given.",_INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot use --force_Wyckoff option, Wyckoff positions must be given.",_INPUT_ILLEGAL_);
       }
       if(vpflow.flag("STRUCTURE2ANRL::SETTING")){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Cannot use options --setting and --force_Wyckoff together.",_INPUT_AMBIGUOUS_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot use options --setting and --force_Wyckoff together.",_INPUT_AMBIGUOUS_);
       }
       setting = xstr.spacegroupnumberoption;
       recalculate_symmetry = false;
@@ -485,7 +482,6 @@ namespace anrl {
     // determine anrl label, parameters, and parameter values of the input structure
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
 
-    string function_name = XPID + "anrl::structure2anrl():";
     ostringstream oss;
     stringstream message;
     ofstream FileMESSAGE;
@@ -549,7 +545,7 @@ namespace anrl {
     // combine stoichiometry + Pearson + space group number + Wyckoff positions to make label
     string aflow_label = reduced_stoichiometry + "_" + Pearson_symbol + "_" + space_group_number_str + "_" + Wyckoff_string; 
 
-    if(LDEBUG) {cerr << function_name << ":: AFLOW ANRL label = " << aflow_label << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << ":: AFLOW ANRL label = " << aflow_label << endl;}
 
     // ===== Determine parameters ===== //
     vector<string> parameter_list, lattice_parameter_list, Wyckoff_parameter_list;
@@ -569,7 +565,7 @@ namespace anrl {
     // reorder Wyckoff positions alphabetically by Wyckoff letter, then by species
     std::sort(ordered_Wyckoff_sites_ITC.begin(), ordered_Wyckoff_sites_ITC.end()); 
 
-    if(LDEBUG) { for(uint i=0;i<ordered_Wyckoff_sites_ITC.size();i++){cerr << function_name << "::Ordered Wyckoff site: " << ordered_Wyckoff_sites_ITC[i] << endl;} }
+    if(LDEBUG) { for(uint i=0;i<ordered_Wyckoff_sites_ITC.size();i++){cerr << __AFLOW_FUNC__ << ":Ordered Wyckoff site: " << ordered_Wyckoff_sites_ITC[i] << endl;} }
 
     // determine degrees of freedom in Wyckoff positions 
     for(uint i=0;i<ordered_Wyckoff_sites_ITC.size();i++){
@@ -599,7 +595,7 @@ namespace anrl {
         }
       }
       else {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"The equations for site "+aurostd::utype2string(i)+"are not provided. Check symmetry",_INPUT_MISSING_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"The equations for site "+aurostd::utype2string(i)+"are not provided. Check symmetry",_INPUT_MISSING_); //CO20200624
       }
     }
 
@@ -610,7 +606,7 @@ namespace anrl {
     parameter_values = lattice_parameter_values; 
     parameter_values.insert(parameter_values.end(), Wyckoff_parameter_values.begin(), Wyckoff_parameter_values.end());
 
-    if(LDEBUG) { cerr << function_name << "::ANRL parameters:" << endl; for(uint i=0;i<parameter_list.size();i++){cerr << parameter_list[i] << "=" << parameter_values[i] << endl;} }
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << "::ANRL parameters:" << endl; for(uint i=0;i<parameter_list.size();i++){cerr << parameter_list[i] << "=" << parameter_values[i] << endl;} }
 
     // store label/params/params values/etc. in xstructure
     xstr.prototype = aflow_label;
@@ -688,10 +684,9 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getLattice():";
     stringstream message;
 
-    if(LDEBUG){ cerr << function_name << " Lattice mode=" << mode << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " Lattice mode=" << mode << endl; }
 
     // ---------------------------------------------------------------------------
     // triclinic crystal system
@@ -732,7 +727,7 @@ namespace anrl {
 
     else{
       message << "Lattice type and centering are not possible: " << lattice_and_centering;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_VALUE_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
     }
   }
 }
@@ -752,14 +747,13 @@ namespace anrl {
     //        systems only have one centering option (P)
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getTriclinicLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check the number of inputs 
     if(lattice_parameter_values.size() != 6){
       message << "There needs to be 6 lattice parameters to build the triclinic lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -771,12 +765,12 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
-    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << function_name << " b=" << b << " (b/a=" << bovera << ")" << endl;}
-    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << function_name << " c=" << c << " (c/a=" << covera << ")" << endl;}
-    double alpha=lattice_parameter_values[i++];              if(LDEBUG) { cerr << function_name << " alpha=" << alpha << endl;}
-    double beta=lattice_parameter_values[i++];               if(LDEBUG) { cerr << function_name << " beta=" << beta << endl;}
-    double gamma=lattice_parameter_values[i++];              if(LDEBUG) { cerr << function_name << " gamma=" << gamma << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
+    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " b=" << b << " (b/a=" << bovera << ")" << endl;}
+    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c=" << c << " (c/a=" << covera << ")" << endl;}
+    double alpha=lattice_parameter_values[i++];              if(LDEBUG) { cerr << __AFLOW_FUNC__ << " alpha=" << alpha << endl;}
+    double beta=lattice_parameter_values[i++];               if(LDEBUG) { cerr << __AFLOW_FUNC__ << " beta=" << beta << endl;}
+    double gamma=lattice_parameter_values[i++];              if(LDEBUG) { cerr << __AFLOW_FUNC__ << " gamma=" << gamma << endl;}
 
     // ---------------------------------------------------------------------------
     // triclinic - tri (aP)
@@ -798,7 +792,7 @@ namespace anrl {
 
     }
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -818,14 +812,13 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getMonoclinicLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check the number of inputs 
     if(lattice_parameter_values.size() != 4){
       message << "There needs to be 4 lattice parameters to build the monoclinic lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -837,10 +830,10 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
-    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << function_name << " b=" << b << " (b/a=" << bovera << ")" << endl;}
-    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << function_name << " c=" << c << " (c/a=" << covera << ")" << endl;}
-    double beta=lattice_parameter_values[i++];               if(LDEBUG) { cerr << function_name << " beta=" << beta << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
+    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " b=" << b << " (b/a=" << bovera << ")" << endl;}
+    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c=" << c << " (c/a=" << covera << ")" << endl;}
+    double beta=lattice_parameter_values[i++];               if(LDEBUG) { cerr << __AFLOW_FUNC__ << " beta=" << beta << endl;}
 
     // ---------------------------------------------------------------------------
     // primitive lattices
@@ -876,7 +869,7 @@ namespace anrl {
     lattice(2,1)=a2(1);lattice(2,2)=a2(2);lattice(2,3)=a2(3);
     lattice(3,1)=a3(1);lattice(3,2)=a3(2);lattice(3,3)=a3(3);
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -898,14 +891,13 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getOrthorhombicLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check the number of inputs 
     if(lattice_parameter_values.size() != 3){
       message << "There needs to be 3 lattice parameters to build the orthorhombic lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -917,9 +909,9 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
-    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << function_name << " b=" << b << " (b/a=" << bovera << ")" << endl;}
-    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << function_name << " c=" << c << " (c/a=" << covera << ")" << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
+    double bovera=lattice_parameter_values[i++],b=bovera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " b=" << b << " (b/a=" << bovera << ")" << endl;}
+    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c=" << c << " (c/a=" << covera << ")" << endl;}
 
     // ---------------------------------------------------------------------------
     // primitive lattices
@@ -980,7 +972,7 @@ namespace anrl {
     lattice(2,1)=a2(1);lattice(2,2)=a2(2);lattice(2,3)=a2(3);
     lattice(3,1)=a3(1);lattice(3,2)=a3(2);lattice(3,3)=a3(3);
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -1000,14 +992,13 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getTetragonalLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check the number of inputs 
     if(lattice_parameter_values.size() != 2){
       message << "There needs to be 2 lattice parameters to build the tetragonal lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -1019,8 +1010,8 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
-    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << function_name << " c=" << c << " (c/a=" << covera << ")" << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
+    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c=" << c << " (c/a=" << covera << ")" << endl;}
 
     // ---------------------------------------------------------------------------
     // primitive lattices
@@ -1055,7 +1046,7 @@ namespace anrl {
     lattice(2,1)=a2(1);lattice(2,2)=a2(2);lattice(2,3)=a2(3);
     lattice(3,1)=a3(1);lattice(3,2)=a3(2);lattice(3,3)=a3(3);
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -1075,14 +1066,13 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getHexagonalLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check number of inputs
     if(lattice_parameter_values.size() != 2){
       message << "There needs to be 2 lattice parameters to build the hexagonal/rhombohedral lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -1094,8 +1084,8 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
-    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << function_name << " c=" << c << " (c/a=" << covera << ")" << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
+    double covera=lattice_parameter_values[i++],c=covera*a;  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c=" << c << " (c/a=" << covera << ")" << endl;}
 
     // ---------------------------------------------------------------------------
     // primitive lattices
@@ -1130,7 +1120,7 @@ namespace anrl {
     lattice(2,1)=a2(1);lattice(2,2)=a2(2);lattice(2,3)=a2(3);
     lattice(3,1)=a3(1);lattice(3,2)=a3(2);lattice(3,3)=a3(3);
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -1150,14 +1140,13 @@ namespace anrl {
     // mode : specifies primitive(=0) or the conventional(=1) lattice
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getCubicLattice():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // check number of inputs
     if(lattice_parameter_values.size() != 1){
       message << "There needs to be 1 lattice parameters to build the cubic lattice (input size=" << lattice_parameter_values.size() << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -1169,7 +1158,7 @@ namespace anrl {
     xvector<double> a1(3),a2(3),a3(3);
 
     uint i=0;
-    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << function_name << " a=" << a << endl;}
+    double a=lattice_parameter_values[i++];                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " a=" << a << endl;}
 
     // ---------------------------------------------------------------------------
     // primitive lattices
@@ -1213,7 +1202,7 @@ namespace anrl {
     lattice(2,1)=a2(1);lattice(2,2)=a2(2);lattice(2,3)=a2(3);
     lattice(3,1)=a3(1);lattice(3,2)=a3(2);lattice(3,3)=a3(3);
 
-    if(LDEBUG){ cerr << function_name << " lattice = " << lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " lattice = " << lattice << endl; }
 
     return lattice;
   }
@@ -1230,7 +1219,6 @@ namespace anrl {
     // plugging in the parameter values into the Wyckoff equations 
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getAtomsFromWyckoff():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
@@ -1264,7 +1252,7 @@ namespace anrl {
           // ensure the string is numeric
           if(!aurostd::isfloat(component_string)){
             message << "There are non-numeric characters in the string after variable-value substitution: component " << k << "=" << component_string << endl;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_VALUE_ERROR_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_);
           }
           coordinate(k+1) = aurostd::string2utype<double>(component_string);
         }
@@ -1277,7 +1265,7 @@ namespace anrl {
       }
     }
     if(LDEBUG){
-      cerr << function_name << " atoms in the conventional cell:" << endl;
+      cerr << __AFLOW_FUNC__ << " atoms in the conventional cell:" << endl;
       for(uint i=0;i<atoms_conventional_cell.size();i++){
         cerr << "atoms: " << atoms_conventional_cell[i] << " " << atoms_conventional_cell[i].name << endl;
       }
@@ -1302,7 +1290,6 @@ namespace anrl {
     // index is assigned so we can substitute values later
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::determineWyckoffVariables():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
@@ -1348,11 +1335,11 @@ namespace anrl {
       }
       else{
         message << "The equations for site " << i << "are not provided. Check symmetry.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
       }
     }
 
-    if(LDEBUG){ cerr << function_name << " parameters=" << aurostd::joinWDelimiter(Wyckoff_parameter_list,",") << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " parameters=" << aurostd::joinWDelimiter(Wyckoff_parameter_list,",") << endl; }
 
     return Wyckoff_parameter_list;
   }
@@ -1372,7 +1359,6 @@ namespace anrl {
     // (alphabetic) in accordance with the ANRL convention.
     // The format is : x1, y1, z1, x2, y2, z2, x3, ...
 
-    string function_name = XPID + "anrl::applyWyckoffValues():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
@@ -1399,7 +1385,7 @@ namespace anrl {
           if(w<Wyckoff_parameter_values.size()){ Wyckoff_positions[i].coord(1) = Wyckoff_parameter_values[w++]; }
           else{
             message << "There are too few input parameters; could not populate the x-coordinate for Wyckoff position " << i;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
           }
         }
         // ---------------------------------------------------------------------------
@@ -1409,7 +1395,7 @@ namespace anrl {
           if(w<Wyckoff_parameter_values.size()){ Wyckoff_positions[i].coord(2) = Wyckoff_parameter_values[w++]; }
           else{
             message << "There are too few input parameters; could not populate the y-coordinate for Wyckoff position " << i;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
           }
         }
         // ---------------------------------------------------------------------------
@@ -1419,13 +1405,13 @@ namespace anrl {
           if(w<Wyckoff_parameter_values.size()){ Wyckoff_positions[i].coord(3) = Wyckoff_parameter_values[w++]; }
           else{
             message << "There are too few input parameters; could not populate the z-coordinate for Wyckoff position " << i;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
           }
         }
       }
       else{
         message << "The equations for site " << i << "are not provided. Check symmetry.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
       }
     }
   }
@@ -1443,7 +1429,6 @@ namespace anrl {
     //   2) multiple instances of a variable Wyckoff position with the same 
     //      parameters
 
-    string function_name = XPID + "anrl::containsDuplicateWyckoffCoordinate():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
@@ -1467,7 +1452,7 @@ namespace anrl {
           }
           if(!contains_variable){
             message << "Contains multiple static (i.e., no variable) Wyckoff positions: " << ordered_Wyckoff_sites[i].letter;
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
             return true;
           }
           // ---------------------------------------------------------------------------
@@ -1477,7 +1462,7 @@ namespace anrl {
               aurostd::isequal(ordered_Wyckoff_sites[i].coord(2),ordered_Wyckoff_sites[j].coord(2),_WYCKOFF_FRACTIONAL_TOL_) &&
               aurostd::isequal(ordered_Wyckoff_sites[i].coord(3),ordered_Wyckoff_sites[j].coord(3),_WYCKOFF_FRACTIONAL_TOL_)){
             message << "Contains duplicate Wyckoff letters with the same degrees of freedom: " << aurostd::joinWDelimiter(xvecDouble2vecString(ordered_Wyckoff_sites[i].coord),",");
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
             return true;
           }
         }
@@ -1507,13 +1492,12 @@ namespace anrl {
     // and equations
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::getWyckoffSitesFromANRL():";
     stringstream message;
 
     vector<wyckoffsite_ITC> wyckoff_sites_ITC;
     for(uint i=0;i<Wyckoff_tokens.size();i++){
 
-      if(LDEBUG){ cerr << function_name << " Wyckoff designation=" << Wyckoff_tokens[i] << endl; }
+      if(LDEBUG){ cerr << __AFLOW_FUNC__ << " Wyckoff designation=" << Wyckoff_tokens[i] << endl; }
 
       uint Wyckoff_multiplication_factor = 1;
       stringstream ss_Wyckoff_letter, ss_factor;
@@ -1533,7 +1517,7 @@ namespace anrl {
             Wyckoff_multiplication_factor=aurostd::string2utype<uint>(ss_factor.str());
           }
         }
-        if(LDEBUG){ cerr << function_name << " " << Wyckoff_multiplication_factor << " Wyckoff position(s) with letter" << ss_Wyckoff_letter.str() << endl; }
+        if(LDEBUG){ cerr << __AFLOW_FUNC__ << " " << Wyckoff_multiplication_factor << " Wyckoff position(s) with letter" << ss_Wyckoff_letter.str() << endl; }
 
         // ---------------------------------------------------------------------------
         // populates Wyckoff with corresponding letter, multiplicity, equations, etc.
@@ -1541,7 +1525,7 @@ namespace anrl {
         Wyckoff_tmp.getWyckoffFromLetter(space_group_number, ss_Wyckoff_letter.str(), setting);
         Wyckoff_tmp.index = i;
         Wyckoff_tmp.type = species[i];
-        if(LDEBUG){ cerr << function_name << " extracted Wyckoff position:" << Wyckoff_tmp << endl; }
+        if(LDEBUG){ cerr << __AFLOW_FUNC__ << " extracted Wyckoff position:" << Wyckoff_tmp << endl; }
 
         // ---------------------------------------------------------------------------
         // store the Wyckoff position as indicated by the prefactor,
@@ -1572,7 +1556,6 @@ namespace anrl {
     // keep_anrl_lattice_parameter must be reference: toggles automatic volume scaling later
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::extractANRLPrototypeParameterValues():";
     stringstream message;
 
     // index 
@@ -1584,14 +1567,14 @@ namespace anrl {
       choice = 0; // only one possiblity
       if(number_id.size()!=0){ 
         message << label_anrl << " only has one degree of freedom (lattice parameter), i.e., no enumerated suffix necessary." << endl; 
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
       }
     }
     // ---------------------------------------------------------------------------
     // if number ID is given, i.e., 001, 002, etc.
     else if(number_id.size()!=0){
       choice = aurostd::string2utype<uint>(number_id) - 1; //number to index
-      if(LDEBUG){ cerr << function_name << " id=" << number_id << " --> choice=" << choice << endl; }
+      if(LDEBUG){ cerr << __AFLOW_FUNC__ << " id=" << number_id << " --> choice=" << choice << endl; }
     }
 
     // ---------------------------------------------------------------------------
@@ -1606,7 +1589,7 @@ namespace anrl {
 
     if(vparameters_library.size()==0){
       message << "No parameters provided; add parameter values with --params=... or use tabulated enumeration suffix (see aflow --protos)" << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     return parameters;
@@ -1973,7 +1956,6 @@ namespace anrl {
     // to a higher symmetry
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::structureAndLabelConsistent():";
 
     xstructure xstr = _xstr; // copy
 
@@ -1998,7 +1980,7 @@ namespace anrl {
     uint space_group_in_label = aurostd::string2utype<uint>(label_fields[2]);
     if(!compare::matchableSpaceGroups(xstr.space_group_ITC, space_group_in_label)){
       if(LDEBUG){
-        cerr << function_name << " the calculated and label-designated space groups are incommensurate: "
+        cerr << __AFLOW_FUNC__ << " the calculated and label-designated space groups are incommensurate: "
           << "calculated=" << xstr.space_group_ITC << " vs "
           << "label= " << space_group_in_label << endl;
       }
@@ -2032,7 +2014,7 @@ namespace anrl {
           grouped_Wyckoff_positions_structure,
           false)){ // same_species=false - the structure MAY be decorated, but the label is NOT
       if(LDEBUG){
-        cerr << function_name << " the calculated and label-designated Wyckoff positions are incommensurate: "
+        cerr << __AFLOW_FUNC__ << " the calculated and label-designated Wyckoff positions are incommensurate: "
           << "calculated=" << Wyckoff_string_structure << " vs "
           << "label= " << label_input << endl;
       }
@@ -2092,7 +2074,6 @@ namespace anrl {
     // main version
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
-    string function_name = XPID + "anrl::PrototypeANRL_Generator():";
     stringstream message;
 
     xstructure str;
@@ -2113,7 +2094,7 @@ namespace anrl {
     else{
       message << "Printing geometry file only";
     }
-    pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
 
     // ---------------------------------------------------------------------------
     // declare variables
@@ -2142,7 +2123,7 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // search for label_permutations
     aurostd::string2tokens(label,tokens,".");
-    if(LDEBUG) { cerr << function_name << ": tokens.size()=" << tokens.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": tokens.size()=" << tokens.size() << endl;}
 
     if(tokens.size()==0) { label_anrl=label; }
     if(tokens.size()==1) { label_anrl=tokens.at(0); }
@@ -2160,11 +2141,11 @@ namespace anrl {
       }
     }
     message << "The input label is " << label_anrl;
-    pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
 
     if(number_id.size()){
       message << "The preset parameters " << number_id << " will be extracted (if they exist)"; 
-      pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2176,7 +2157,7 @@ namespace anrl {
         found=TRUE;
         ifound=i;
         message << "This prototype label exists in the AFLOW library; label=" << label_anrl << "; index=" << ifound;
-        pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
       }
     }
 
@@ -2185,7 +2166,7 @@ namespace anrl {
     if(!found) {
       message << "This label does not currently exist in the AFLOW library label=" << label_anrl;
       message << " Consider adding it to the library.";
-      pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
     }
 
     // -------------------------------------------------------------------------
@@ -2211,7 +2192,7 @@ namespace anrl {
             keep_anrl_lattice_parameter);
       }
       message << "Extracted the following parameters (internal degrees of freedom) from the AFLOW parameters= " << parameters;
-      pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2219,11 +2200,11 @@ namespace anrl {
     aurostd::string2tokens(label_anrl,tokens,"_");
 
     message << "The AFLOW label has been partitioned into " << tokens.size() << " fields : " << aurostd::joinWDelimiter(tokens, " ");
-    pflow::logger(_AFLOW_FILE_NAME_, function_name, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, logstream, silence_logger, _LOGGER_MESSAGE_);
 
     if(tokens.size()<4){ 
       message << "Number of fields in label is too small, should be 4 or more: label" << label_anrl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2234,7 +2215,7 @@ namespace anrl {
     vector<uint> reduced_stoich; aurostd::reduceByGCD(stoichiometry, reduced_stoich);
     if(!compare::sameStoichiometry(stoichiometry,reduced_stoich)){
       message << "The input stoichiometry (first field in label=" << compound_string << ") is not reduced, it should be: " << aurostd::joinWDelimiter(reduced_stoich,":");
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     for(uint i=0;i<species.size();i++) { // number of species
@@ -2253,7 +2234,7 @@ namespace anrl {
     char lattice_centering = Pearson_symbol[1];
     uint number_of_atoms_conventional = aurostd::string2utype<uint>(Pearson_symbol.substr(2,Pearson_symbol.size()));
 
-    if(LDEBUG){ cerr << function_name << " # atoms in conventional cell (from Pearson): " << number_of_atoms_conventional << endl; } 
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " # atoms in conventional cell (from Pearson): " << number_of_atoms_conventional << endl; } 
 
     // ---------------------------------------------------------------------------
     // get space group number
@@ -2261,7 +2242,7 @@ namespace anrl {
 
     if(space_group_number < 1 || space_group_number > 230){
       message << "The space group number is invalid; it must be between 1-230: spacegroup=" << space_group_number;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2272,7 +2253,7 @@ namespace anrl {
       message << "Pearson symbol and space group number are incommensurate; the lattice centerings do not match:"; 
       message << "Pearson=" << Pearson_symbol << " (centering=" << lattice_and_centering_from_Pearson << ") vs ";
       message << "SG=" << space_group_number << "(centering=" << lattice_and_centering_from_sg << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2289,11 +2270,11 @@ namespace anrl {
     if(Wyckoff_tokens.size() != species.size()){
       message << "The number of species does not match the number of Wyckoff species: # species=" << species.size() << " vs ";
       message << "# Wyckoff species=" << Wyckoff_tokens.size() << " (input label=" << label << ")" << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     if(LDEBUG){
-      cerr << function_name << " the Wyckoff sequences associated with each species are:" << endl;
+      cerr << __AFLOW_FUNC__ << " the Wyckoff sequences associated with each species are:" << endl;
       for(uint i=0;i<species.size();i++){ cerr << species[i] << ": " << Wyckoff_tokens[i] << endl; }
     }
 
@@ -2308,7 +2289,7 @@ namespace anrl {
     vector<uint> number_of_each_type = SYM::numberEachTypeFromWyckoff(wyckoff_sites_ITC);
 
     if(LDEBUG){
-      cerr << function_name << " the Wyckoff positions are:" << endl;
+      cerr << __AFLOW_FUNC__ << " the Wyckoff positions are:" << endl;
       print(wyckoff_sites_ITC);
     }
 
@@ -2319,7 +2300,7 @@ namespace anrl {
     if(!compare::sameStoichiometry(stoichiometry,Wyckoff_reduced_stoich)){
       message << "The input composition and Wyckoff positions yield different stoichiometries: composition=" << aurostd::joinWDelimiter(stoichiometry,":");  
       message << ", Wyckoff=" << aurostd::joinWDelimiter(Wyckoff_reduced_stoich,":") << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2331,7 +2312,7 @@ namespace anrl {
       message << "The sum of the Wyckoff multiplicity does not add up to the number of atoms in the conventional cell (from Pearson symbol); bad prototype label: ";
       message << " Wyckoff multiplicity sum = " << Wyckoff_multiplicity_sum;
       message << ", Pearson symbol = " << Pearson_symbol;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2350,7 +2331,7 @@ namespace anrl {
 
     if(LDEBUG){ 
       for(uint i=0;i<ordered_Wyckoff_sites_ITC.size();i++){
-        cerr << function_name << "::Ordered Wyckoff site: " << ordered_Wyckoff_sites_ITC[i] << endl;
+        cerr << __AFLOW_FUNC__ << ":Ordered Wyckoff site: " << ordered_Wyckoff_sites_ITC[i] << endl;
       }
     }
 
@@ -2363,7 +2344,7 @@ namespace anrl {
     // combine parameter vectors
     parameter_list = lattice_parameter_list; 
     parameter_list.insert(parameter_list.end(), Wyckoff_parameter_list.begin(), Wyckoff_parameter_list.end());
-    if(LDEBUG){ cerr << function_name << " parameters=" << aurostd::joinWDelimiter(parameter_list,",") << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " parameters=" << aurostd::joinWDelimiter(parameter_list,",") << endl; }
 
     // -------------------------------------------------------------------------
     // if no parameters are provided and more than one parameter is needed,
@@ -2371,7 +2352,7 @@ namespace anrl {
     if(parameters.size()==0 && parameter_list.size()!=1){
       message << "No parameters provided. Since this is a new prototype label with more than one degree of freedom,";
       message << "you must add parameter values with --params=..." << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
     // if only one parameter is needed, we can generate the structure,
     // i.e., there are no degrees of freedom (other than the lattice parameter)
@@ -2390,7 +2371,7 @@ namespace anrl {
       parameters=aurostd::joinWDelimiter(vparameters_temp,",");
     }
     vector<double> vparameters = aurostd::vectorstring2vectorutype<double>(vparameters_temp);
-    if(LDEBUG){ cerr << function_name << " parameter_values=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(vparameters,AUROSTD_DEFAULT_PRECISION,FIXED_STREAM),",") << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " parameter_values=" << aurostd::joinWDelimiter(aurostd::vecDouble2vecString(vparameters,AUROSTD_DEFAULT_PRECISION,FIXED_STREAM),",") << endl; }
 
     // ---------------------------------------------------------------------------
     // check for automatic volume scaling (i.e., first parameter is negative)
@@ -2404,7 +2385,7 @@ namespace anrl {
       message << "The number of input parameters does not match the number required by the lattice and Wyckoff positions: ";
       message << "input parameters=" << parameters << " vs ";
       message << "parameter_list=" << aurostd::joinWDelimiter(parameter_list,",") << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2418,7 +2399,7 @@ namespace anrl {
     // check to ensure no duplicate 
     if(containsDuplicateWyckoffCoordinate(ordered_Wyckoff_sites_ITC,true)){
       message << "Contains duplicate Wyckoff letters with the same degrees of freedom.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     // ---------------------------------------------------------------------------
@@ -2466,7 +2447,7 @@ namespace anrl {
     }
 
     if(LDEBUG){
-      cerr << function_name << " atoms in the primitive cell (" << atoms_primitive_cell.size() << "):" << endl;
+      cerr << __AFLOW_FUNC__ << " atoms in the primitive cell (" << atoms_primitive_cell.size() << "):" << endl;
       for(uint i=0;i<atoms_primitive_cell.size();i++){
         cerr << atoms_primitive_cell[i] << " " << atoms_primitive_cell[i].name << endl;
       }
@@ -2476,14 +2457,14 @@ namespace anrl {
     // check ratio between conventional and primitive atoms
     if(atoms_conventional_cell.size()%atoms_primitive_cell.size()!=0){
       message << "The ratio of atoms between the conventional cell and primitive cell is not an integer; check the tolerance: #conventional=" << atoms_conventional_cell.size() << " vs #primitive=" << atoms_primitive_cell.size();
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
     }
     uint ratio_calculated = atoms_conventional_cell.size()/atoms_primitive_cell.size();
     uint ratio_conventional2primitive = LATTICE::Conventional2PrimitiveRatio(lattice_centering);
     if(!aurostd::isequal(ratio_calculated, ratio_conventional2primitive)){
       if(!(ratio_calculated==1 && lattice_centering=='R' && setting==SG_SETTING_ANRL)){
         message << "The calculated ratio and the expected conventional2primtive ratio do not match: calculated=" << ratio_calculated << " vs expected=" << ratio_conventional2primitive;
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
       }
     }
 
@@ -2571,7 +2552,7 @@ namespace anrl {
       // ---------------------------------------------------------------------------
       // if the SymbolicC++ code is not compiled
       message << "The SymbolicC++ source code has not been compiled, symbolic equations cannot be printed";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
 #endif
     }
 
@@ -2588,12 +2569,12 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // NOW PLAY WITH PERMUTATIONS and ATOMX
     if(vpermutation.size()>0 || vatomX.size()>0) {
-      if(LDEBUG) { cerr << function_name << " PERMUTATIONS" << endl;}
-      if(LDEBUG) { cerr << function_name << " vpermutation.size()=" << vpermutation.size() << endl;}
-      if(LDEBUG) { cerr << function_name << " vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}     
-      if(LDEBUG) { cerr << function_name << " ATOMX" << endl;}
-      if(LDEBUG) { cerr << function_name << " vatomX.size()=" << vatomX.size() << endl;}
-      if(LDEBUG) { cerr << function_name << " vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " PERMUTATIONS" << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " vpermutation.size()=" << vpermutation.size() << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}     
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " ATOMX" << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " vatomX.size()=" << vatomX.size() << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
       if(print_mode!=_PROTO_GENERATOR_EQUATIONS_ONLY_){ //equations only //DX20180618
         std::deque<_atom> atoms;
         atoms=str.atoms;
@@ -2605,7 +2586,7 @@ namespace anrl {
           if(vpermutation.size()>0)  { atoms.at(i).type=vpermutation.at(type); }  // PERMUTATIONS 
           if(vpermutation.size()>0 || vatomX.size()>0) { atoms.at(i).name=vatomX.at(atoms.at(i).type); }  // PERMUTATIONS AND ATOMX
           //	atoms.at(i).name=aurostd::mod(label_permutations.at(type)-65,32)+65;
-          str.AddAtom(atoms.at(i));
+          str.AddAtom(atoms.at(i),false);  //CO20230319 - add by type
           // DX20181205 - Volume scaling by atomic species - START
           // ---------------------------------------------------------------------------
           // if a=1.0 for prototype (i.e., no scaling factor), use atomic species to get volume
@@ -2614,11 +2595,11 @@ namespace anrl {
             for(uint i=0;i<str.num_each_type.size();i++) {
               for(uint j=0;j<(uint)str.num_each_type[i];j++){
                 volume+=vvolumeX[i];
-                if(LDEBUG) { cerr << function_name << " volume=" << volume << "  (" << vvolumeX[i] << ")" << endl; }
+                if(LDEBUG) { cerr << __AFLOW_FUNC__ << " volume=" << volume << "  (" << vvolumeX[i] << ")" << endl; }
               }
             }
             //[CO20190205 - OBSOLETE]str.scale=std::pow((double) (abs(volume)/det(str.lattice)),(double) 1.0/3.0);
-            str.SetVolume(volume); //CO20190205 - more robust
+            str.SetVolume(volume);  //CO20190205 - more robust
             str.neg_scale=TRUE;
           }
           //DX20181205 - Volume scaling by atomic species - END
@@ -2644,7 +2625,7 @@ namespace anrl {
         message << "The correct label and parameters for this structure are:" << endl;
         message << updated_label_and_params << endl;
         message << "Please feed this label and set of parameters into the prototype generator.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
       }
     } 
 
@@ -3390,18 +3371,17 @@ namespace anrl {
     //   { vector<string> tokens;aurostd::string2tokens(label,tokens,"."); if(tokens.size()>1) XHOST.DEBUG=TRUE; }
     // XHOST.DEBUG=TRUE;
 
-    string function_name = "anrl::PrototypeANRL()";
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     if(LDEBUG) { cerr << "anrl::PrototypeANRL(ostream &oss,string label,deque<string> &vatomX,deque<double> &vvolumeX,double volume_in,int mode,bool flip_option)" << endl;}
-    if(LDEBUG) { cerr << function_name << ": label=" << label << endl;}
-    if(LDEBUG) { cerr << function_name << ": parameters=" << parameters << endl;}
-    if(LDEBUG) { cerr << function_name << ": volume_in=" << volume_in << endl;}
-    if(LDEBUG) { cerr << function_name << ": mode=" << mode << endl;}
-    if(LDEBUG) { cerr << function_name << ": flip_option=" << flip_option << endl;}
-    if(LDEBUG) { cerr << function_name << ": vatomX.size()=" << vatomX.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
-    if(LDEBUG) { cerr << function_name << ": vvolumeX.size()=" << vvolumeX.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": vvolumeX ="; for(uint i=0;i<vvolumeX.size();i++) {cerr << " " << vvolumeX.at(i);} cerr << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label=" << label << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": parameters=" << parameters << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": volume_in=" << volume_in << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": mode=" << mode << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": flip_option=" << flip_option << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX.size()=" << vatomX.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vvolumeX.size()=" << vvolumeX.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vvolumeX ="; for(uint i=0;i<vvolumeX.size();i++) {cerr << " " << vvolumeX.at(i);} cerr << endl;}
 
     deque<string> vatomX_backup(vatomX);
     xvector<double> origin(3);origin.clear();
@@ -3432,7 +3412,7 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // search for label_permutations
     aurostd::string2tokens(label,tokens,".");
-    if(LDEBUG) { cerr << function_name << ": tokens.size()=" << tokens.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": tokens.size()=" << tokens.size() << endl;}
 
     if(tokens.size()==0) { label_anrl=label; }
     if(tokens.size()==1) { label_anrl=tokens.at(0); }
@@ -3450,15 +3430,15 @@ namespace anrl {
 
     for(uint i=0;i<label_permutations.size();i++) vpermutation.push_back(aurostd::mod(label_permutations.at(i)-65,32));
 
-    if(LDEBUG) { cerr << function_name << ": label=" << label << endl;}
-    if(LDEBUG) { cerr << function_name << ": label.size()=" << label.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": label_anrl=" << label_anrl << endl;}
-    if(LDEBUG) { cerr << function_name << ": label_anrl.size()=" << label_anrl.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": label_permutations=" << label_permutations << endl;}
-    if(LDEBUG) { cerr << function_name << ": vpermutation.size()=" << vpermutation.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}
-    if(LDEBUG) { cerr << function_name << ": vatomX.size()=" << vatomX.size() << endl;}
-    if(LDEBUG) { cerr << function_name << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label=" << label << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label.size()=" << label.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label_anrl=" << label_anrl << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label_anrl.size()=" << label_anrl.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": label_permutations=" << label_permutations << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vpermutation.size()=" << vpermutation.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX.size()=" << vatomX.size() << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
 
     // ---------------------------------------------------------------------------
     // search
@@ -3475,16 +3455,16 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // not found
     if(!found) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"prototype not found [label="+label+"]",_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"prototype not found [label="+label+"]",_INPUT_ILLEGAL_); //CO20200624
     }
 
-    if(LDEBUG) { cerr << function_name << ": FOUND" << endl;}
-    if(LDEBUG) { cerr << function_name << ": ifound=" << ifound << endl;}
-    if(LDEBUG) { cerr << function_name << ": vlabel.at(ifound)=" << vlabel.at(ifound) << endl;}
-    if(LDEBUG) { cerr << function_name << ": vproto_nspecies.at(ifound)=" << vproto_nspecies.at(ifound) << endl;}
-    if(LDEBUG) { cerr << function_name << ": vproto_natoms.at(ifound)=" << vproto_natoms.at(ifound) << endl;}
-    if(LDEBUG) { cerr << function_name << ": vproto_spacegroup.at(ifound)=" << vproto_spacegroup.at(ifound) << endl;}
-    if(LDEBUG) { cerr << function_name << ": vproto.at(ifound)=" << vproto.at(ifound) << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": FOUND" << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": ifound=" << ifound << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vlabel.at(ifound)=" << vlabel.at(ifound) << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vproto_nspecies.at(ifound)=" << vproto_nspecies.at(ifound) << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vproto_natoms.at(ifound)=" << vproto_natoms.at(ifound) << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vproto_spacegroup.at(ifound)=" << vproto_spacegroup.at(ifound) << endl;}
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vproto.at(ifound)=" << vproto.at(ifound) << endl;}
 
     // ---------------------------------------------------------------------------
     // check for vpermutation size and errors
@@ -3494,7 +3474,7 @@ namespace anrl {
       message << "vproto_nspecies.at(ifound)=" << vproto_nspecies.at(ifound) << endl;
       message << "vpermutation.size()=" << vpermutation.size() << endl;
       message << "vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {message << " " << vpermutation.at(i);} message << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
     // ---------------------------------------------------------------------------
     // check for vatomX size and errors
@@ -3504,7 +3484,7 @@ namespace anrl {
       message << "vproto_nspecies.at(ifound)=" << vproto_nspecies.at(ifound) << endl;
       message << "vatomX.size()=" << vatomX.size() << endl;
       message << "vatomX ="; for(uint i=0;i<vatomX.size();i++) {message << " " << vatomX.at(i);} message << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_NUMBER_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
     }
 
     for(uint i=0;i<vproto_nspecies.at(ifound);i++) { // number of species
@@ -3556,7 +3536,7 @@ namespace anrl {
           // only ONE possible structure with this label (aside from volume scaling)
           stringstream message;
           message << vlabel.at(ifound) << " only has one degree of freedom (lattice parameter), i.e., no enumerated suffix necessary." << endl; 
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
         }
       }
       // if number ID is given, i.e., 001, 002, etc.
@@ -3570,7 +3550,7 @@ namespace anrl {
     if(vparameters.size()==0){  //CO20181226 DX fix
       stringstream message;
       message << "no parameters provided; add parameter values with --params=... or use tabulated enumeration suffix (see aflow --protos)" << endl;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
     if(aurostd::string2utype<double>(vparameters[0])<=0.0){ //CO20181226 forget signbit, also include 0
       scale_volume_by_species=true;
@@ -7186,12 +7166,12 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // NOW PLAY WITH PERMUTATIONS and ATOMX
     if(vpermutation.size()>0 || vatomX.size()>0) {
-      if(LDEBUG) { cerr << function_name << ": PERMUTATIONS" << endl;}
-      if(LDEBUG) { cerr << function_name << ": vpermutation.size()=" << vpermutation.size() << endl;}
-      if(LDEBUG) { cerr << function_name << ": vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}     
-      if(LDEBUG) { cerr << function_name << ": ATOMX" << endl;}
-      if(LDEBUG) { cerr << function_name << ": vatomX.size()=" << vatomX.size() << endl;}
-      if(LDEBUG) { cerr << function_name << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": PERMUTATIONS" << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vpermutation.size()=" << vpermutation.size() << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vpermutation ="; for(uint i=0;i<vpermutation.size();i++) {cerr << " " << vpermutation.at(i);} cerr << endl;}     
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": ATOMX" << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX.size()=" << vatomX.size() << endl;}
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << ": vatomX ="; for(uint i=0;i<vatomX.size();i++) {cerr << " " << vatomX.at(i);} cerr << endl;}
       if(print_mode!=1){ //equations only //DX20180618
         std::deque<_atom> atoms;
         atoms=str.atoms;
@@ -7203,15 +7183,16 @@ namespace anrl {
           if(vpermutation.size()>0)  { atoms.at(i).type=vpermutation.at(type); }  // PERMUTATIONS 
           if(vpermutation.size()>0 || vatomX.size()>0) { atoms.at(i).name=vatomX.at(atoms.at(i).type); }  // PERMUTATIONS AND ATOMX
           //	atoms.at(i).name=aurostd::mod(label_permutations.at(type)-65,32)+65;
-          str.AddAtom(atoms.at(i));
-          //DX20181205 - Volume scaling by atomic species - START
+          str.AddAtom(atoms.at(i),false);  //CO20230319 - add by type
+          // DX20181205 - Volume scaling by atomic species - START
+          // ---------------------------------------------------------------------------
           // if a=1.0 for prototype (i.e., no scaling factor), use atomic species to get volume
           if(scale_volume_by_species==true){
             double volume=0.0;
             for(uint i=0;i<str.num_each_type.size();i++) {
               for(uint j=0;j<(uint)str.num_each_type[i];j++){
                 volume+=vvolumeX[i];
-                if(LDEBUG) { oss << "DEBUG: (anrl::PrototypeANRL) volume=" << volume << "  (" << vvolumeX[i] << ")" << endl; }
+                if(LDEBUG) { cerr << __AFLOW_FUNC__ << " volume=" << volume << "  (" << vvolumeX[i] << ")" << endl; }
               }
             }
             //[CO20190205 - OBSOLETE]str.scale=std::pow((double) (abs(volume)/det(str.lattice)),(double) 1.0/3.0);
@@ -7237,7 +7218,7 @@ namespace anrl {
 // Written by David Hicks (DX) - 2016/2020 (generic prototype generator)
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow DAVID HICKS - Duke University 2014-2021                 *
 // *                                                                         *
 // ***************************************************************************

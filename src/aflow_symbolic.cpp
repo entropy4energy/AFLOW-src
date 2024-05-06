@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow DAVID HICKS - Duke University 2014-2021                 *
 // *                                                                         *
 // ***************************************************************************
@@ -115,7 +115,6 @@ namespace symbolic {
     // operators/functions (e.g., sin, cos, exponentials, etc.)
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "symbolic::string2symbolic():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
@@ -127,7 +126,7 @@ namespace symbolic {
     Symbolic out;
     for(uint i=0;i<sdouble_temp.size();i++){
       if(LDEBUG){
-        cerr << function_name << " sdouble_temp: (dbl) " << sdouble_temp[i].dbl 
+        cerr << __AFLOW_FUNC__ << " sdouble_temp: (dbl) " << sdouble_temp[i].dbl 
           << " (chr) " << sdouble_temp[i].chr << endl;
       }
       // ---------------------------------------------------------------------------
@@ -143,7 +142,7 @@ namespace symbolic {
       }
     }
 
-    if(LDEBUG){ cerr << function_name << " symbolic expression: out=" << out << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " symbolic expression: out=" << out << endl; }
     return out;
   }
 }
@@ -162,8 +161,7 @@ namespace symbolic {
     Symbolic diff = a - b;
 
     if(VERBOSE){ 
-      string function_name = XPID + "symbolic::isEqual():"; // definition in loop for efficiency
-      cerr << function_name << " a-b=" << diff << endl;
+      cerr << __AFLOW_FUNC__ << " a-b=" << diff << endl;
     }
 
     return (diff==_SYMBOLIC_ZERO_);
@@ -184,20 +182,18 @@ namespace symbolic {
     const char* b_vec_info = get_type(b_vec); //DX20200901
     if(a_vec_info != typeid(SymbolicMatrix).name() ||
         b_vec_info != typeid(SymbolicMatrix).name()){
-      string function_name = XPID + "symbolic::isEqualVector():"; // definition in loop for efficiency
       stringstream message;
       message << "One or both of the inputs are not a SymbolicMatrix (i.e., typeids are different):"
         << " a_vec (input) id: " << a_vec_info
         << " b_vec (input) id: " << b_vec_info
         << " SymbolicMatrix id: " << typeid(SymbolicMatrix).name();
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     bool VERBOSE=FALSE; // VERBOSE INSTEAD OF LDEBUG SINCE FUNCITON IS NESTED
 
     if(VERBOSE){ 
-      string function_name = XPID + "symbolic::isEqualVector():"; // definition in loop for efficiency
-      cerr << function_name << " a_vec-b_vec=" << (a_vec-b_vec) << endl;
+      cerr << __AFLOW_FUNC__ << " a_vec-b_vec=" << (a_vec-b_vec) << endl;
     }
 
     for(uint i=0;i<3;i++){
@@ -221,11 +217,10 @@ namespace symbolic {
     // check that input type is a SymbolicMatrix 
     const char* lattice_info = get_type(lattice); //DX20200901
     if(lattice_info != typeid(SymbolicMatrix).name()){
-      string function_name = XPID + "symbolic::matrix2VectorVectorString():";
       stringstream message;
       message << "The input is not a SymbolicMatrix (i.e., typeids are different): lattice (input) id: "
         << lattice_info << " SymbolicMatrix id: " << typeid(SymbolicMatrix).name();
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
     }
 
     vector<vector<string> > vvstring;
@@ -290,11 +285,10 @@ namespace anrl {
     // Grab symbolic representation of primitive lattice in the ANRL convention.
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "anrl::SymbolicANRLPrimitiveLattices():";
 
     if(LDEBUG){
-      cerr << function_name << " lattice and centering: " << lattice_and_centering << endl;
-      cerr << function_name << " first character of space group symbol: " << space_group_letter << endl;
+      cerr << __AFLOW_FUNC__ << " lattice and centering: " << lattice_and_centering << endl;
+      cerr << __AFLOW_FUNC__ << " first character of space group symbol: " << space_group_letter << endl;
     }
 
     symbolic::Symbolic lattice("L",3,3);
@@ -430,7 +424,7 @@ namespace anrl {
     }
 
     if(LDEBUG){
-      cerr << function_name << " lattice: " << lattice << endl;
+      cerr << __AFLOW_FUNC__ << " lattice: " << lattice << endl;
     }
 
     return lattice;
@@ -446,7 +440,6 @@ namespace anrl {
     // Convert equations (vector<vector<string> >) to symbolic notation.
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "anrl::equations2SymbolicEquations():";
     stringstream message;
 
     vector<symbolic::Symbolic> symbolic_equations;
@@ -455,7 +448,7 @@ namespace anrl {
       symbolic::Symbolic position("pos", 3);
       if(equations[i].size()!=3){
         message << "Equation " << i << " does not have 3 coordinates (problem with ITC library coordinates): " << aurostd::joinWDelimiter(equations[i],",");
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_GENERIC_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_GENERIC_ERROR_);
       }
       for(uint j=0;j<equations[i].size();j++){
         if(equations[i][j] == "0"){
@@ -470,7 +463,7 @@ namespace anrl {
 
     if(LDEBUG){
       for(uint i=0;i<symbolic_equations.size();i++){
-        cerr << function_name << " equations (string): " << aurostd::joinWDelimiter(equations[i],",") << " --> equations (Symbolic): " << symbolic_equations[i] << endl;
+        cerr << __AFLOW_FUNC__ << " equations (string): " << aurostd::joinWDelimiter(equations[i],",") << " --> equations (Symbolic): " << symbolic_equations[i] << endl;
       }
     }
 
@@ -488,13 +481,12 @@ namespace anrl {
     // this is the symbolic math equivalent to C2F()
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "anrl::cartesian2lattice():";
 
     // ---------------------------------------------------------------------------
     // calculate volume (symbolic) 
     symbolic::Symbolic volume = lattice.row(0)|((lattice.row(1)%(lattice.row(2))).transpose()); // | is dot product, % is cross product
     if(LDEBUG){
-      cerr << function_name << " symbolic volume=" << volume << endl;
+      cerr << __AFLOW_FUNC__ << " symbolic volume=" << volume << endl;
     }
 
     // ---------------------------------------------------------------------------
@@ -504,9 +496,9 @@ namespace anrl {
     symbolic::Symbolic b3 = (lattice.row(0)%(lattice.row(1)))/volume;
 
     if(LDEBUG){
-      cerr << function_name << " transformation vectors b1=" << b1 << endl;
-      cerr << function_name << " transformation vectors b2=" << b2 << endl;
-      cerr << function_name << " transformation vectors b3=" << b3 << endl;
+      cerr << __AFLOW_FUNC__ << " transformation vectors b1=" << b1 << endl;
+      cerr << __AFLOW_FUNC__ << " transformation vectors b2=" << b2 << endl;
+      cerr << __AFLOW_FUNC__ << " transformation vectors b3=" << b3 << endl;
     }
 
     // ---------------------------------------------------------------------------
@@ -517,7 +509,7 @@ namespace anrl {
     lattice_coordinate(2)=(cartesian_coordinate|b3).simplify();
 
     if(LDEBUG){
-      cerr << function_name << " cartesian coord=" << cartesian_coordinate << " --> " << lattice_coordinate << endl;
+      cerr << __AFLOW_FUNC__ << " cartesian coord=" << cartesian_coordinate << " --> " << lattice_coordinate << endl;
     }
 
     return lattice_coordinate;
@@ -595,7 +587,6 @@ namespace anrl {
     // convert equations to lattice equations for centered lattice (C, I, F).
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "anrl:getEquationsForCenteredLattices():";
     stringstream message;
 
     vector<symbolic::Symbolic> lattice_equations;
@@ -603,7 +594,7 @@ namespace anrl {
     // ---------------------------------------------------------------------------
     // get symbolic transformation matrix for a particular lattice 
     symbolic::Symbolic xyz2lattice = getXYZ2LatticeTransformation(lattice_and_centering);
-    if(LDEBUG){ cerr << function_name << " symbolic transformation from xyz to lattice: " << xyz2lattice << endl; }
+    if(LDEBUG){ cerr << __AFLOW_FUNC__ << " symbolic transformation from xyz to lattice: " << xyz2lattice << endl; }
 
     // ---------------------------------------------------------------------------
     // transform symbolic coordinates 
@@ -702,14 +693,13 @@ namespace anrl {
     // DEFAULT: update atom.fpos_equation
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_SYMBOLIC_);
-    string function_name = XPID + "anrl::addSymbolicEquation2Atoms():";
     stringstream message;
 
     // ---------------------------------------------------------------------------
     // ensure sizes of atoms and symbolic equations match 
     if(equations.size() != atoms.size()){
       message << "The number of equations and atoms do not match. Check tolerances. #equations=" << equations.size() << ", #atoms=" << atoms.size();
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
     }
 
     // ---------------------------------------------------------------------------
@@ -729,12 +719,12 @@ namespace anrl {
     if(LDEBUG){
       if(isfpos){
         for(uint i=0;i<atoms.size();i++){
-          cerr << function_name << " fpos_equation=" << aurostd::joinWDelimiter(atoms[i].fpos_equation,",") << endl;
+          cerr << __AFLOW_FUNC__ << " fpos_equation=" << aurostd::joinWDelimiter(atoms[i].fpos_equation,",") << endl;
         } 
       }
       else{
         for(uint i=0;i<atoms.size();i++){
-          cerr << function_name << " cpos_equation=" << aurostd::joinWDelimiter(atoms[i].cpos_equation,",") << endl;
+          cerr << __AFLOW_FUNC__ << " cpos_equation=" << aurostd::joinWDelimiter(atoms[i].cpos_equation,",") << endl;
         } 
       }
     }

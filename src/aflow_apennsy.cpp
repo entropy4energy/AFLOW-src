@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -248,21 +248,20 @@ bool APENNSY_Parameters::SplitAlloyPseudoPotentials(void) {
 // Is_alphabetic - tells if an alloy is alphabetic or not
 // ***************************************************************************
 bool _NEW_is_alphabetic(string alloy_dir) {
-  string soliloquy=XPID+"_NEW_is_alphabetic():";
   string in_file_name_aflowlib_entry=alloy_dir+string("/3/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT);
   vector<string> vaflowlib_entry,tokens;
   if(XHOST.APENNSY_USE_SERVER) { // FINDING ALPHABETIC FROM aflowlib.out - local
     if(aurostd::FileExist(in_file_name_aflowlib_entry)) {
       aurostd::string2tokens(aurostd::file2string(in_file_name_aflowlib_entry),vaflowlib_entry,"|");
     } else {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"file not found [1]: "+in_file_name_aflowlib_entry,_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"file not found [1]: "+in_file_name_aflowlib_entry,_FILE_CORRUPT_); //CO20200624
     }
   }
   if(XHOST.APENNSY_SERVER_AFLOWLIB_ORG) { // FINDING ALPHABETIC FROM aflowlib.out - web
     aurostd::url2tokens(in_file_name_aflowlib_entry,vaflowlib_entry,"|"); 
     // [OBSOLETE]  aurostd::string2tokens(aurostd::url2string(in_file_name_aflowlib_entry),vaflowlib_entry,"|");
     if(!vaflowlib_entry.size()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"file not found [2]: "+in_file_name_aflowlib_entry,_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"file not found [2]: "+in_file_name_aflowlib_entry,_FILE_CORRUPT_); //CO20200624
     }
   }
   vector<string> vspeciesD,vspeciesP;
@@ -276,7 +275,7 @@ bool _NEW_is_alphabetic(string alloy_dir) {
         //	cout << "[5] " << "[" << vspeciesD.at(0) << "," << vspeciesD.at(1) << "]" << endl;
       }
       if(vspeciesD.size()>=3) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"unsupported number of species (vspecies) in "+in_file_name_aflowlib_entry,_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"unsupported number of species (vspecies) in "+in_file_name_aflowlib_entry,_INPUT_ILLEGAL_); //CO20200624
       }
     }
     if(aurostd::substring2bool(vaflowlib_entry.at(i),"species=") && !aurostd::substring2bool(vaflowlib_entry.at(i),"nspecies=")) {
@@ -287,7 +286,7 @@ bool _NEW_is_alphabetic(string alloy_dir) {
         //	cout << "[5] " << "[" << vspeciesP.at(0) << "," << vspeciesP.at(1) << "]" << endl;
       }
       if(vspeciesP.size()>=3) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"unsupported number of species (vspeciesP) in "+in_file_name_aflowlib_entry,_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"unsupported number of species (vspeciesP) in "+in_file_name_aflowlib_entry,_INPUT_ILLEGAL_); //CO20200624
       }
     }
   }
@@ -300,12 +299,11 @@ bool _NEW_is_alphabetic(string alloy_dir) {
   stringstream message;
   message << vspeciesD.size() << " " << vspeciesP.size() << endl;
   message << vspeciesD.at(0) << " " << vspeciesD.at(1) << " " << vspeciesP.at(0) << " " << vspeciesP.at(1) << endl;
-  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
   return FALSE;
 }
 
 bool _OLD_is_alphabetic(string alloy_dir) {
-  string soliloquy=XPID+"_OLD_is_alphabetic():";
   FILE *in_file_pointer;
   string in_file_name;
   static char string_line[1024],*strptr;
@@ -317,7 +315,7 @@ bool _OLD_is_alphabetic(string alloy_dir) {
   in_file_name=alloy_dir+string("/3/POSCAR.relax1"); // OBSOLETE
   in_file_pointer=fopen(in_file_name.c_str(),"r");
   if(in_file_pointer==NULL) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"file not found: "+in_file_name,_FILE_CORRUPT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"file not found: "+in_file_name,_FILE_CORRUPT_); //CO20200624
   }
 
   while(fgets(string_line,1024,in_file_pointer)) {
@@ -325,7 +323,7 @@ bool _OLD_is_alphabetic(string alloy_dir) {
     if(i==1) {
       A1=string_line[0];A2=string_line[1];
       if(A1<65 || A1>90) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Error alphabetic (1)",_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Error alphabetic (1)",_INPUT_ILLEGAL_); //CO20200624
       }
       A1=A1-65;
       if(A2<97 || A2>122)  A2=0; else A2=A2-97;
@@ -337,7 +335,7 @@ bool _OLD_is_alphabetic(string alloy_dir) {
       while(strptr[0]==32) strptr++;
       B1=strptr[0];B2=strptr[1];
       if(B1<65 || B1>90) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Error alphabetic (2)",_INPUT_ILLEGAL_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Error alphabetic (2)",_INPUT_ILLEGAL_); //CO20200624
       }
       B1=B1-65;
       if(B2<97 || B2>122)  B2=0; else B2=B2-97;
@@ -362,6 +360,6 @@ bool _is_alphabetic(string alloy_dir) {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 //****************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *           Aflow Andriy Smolyanyuk - Duke University 2021-2021           *
 // *                                                                         *
 //****************************************************************************
@@ -126,7 +126,7 @@ namespace pocc {
       if (!aurostd::EFileExist(file)){
         msg = "File " + file + " does not exists:";
         msg += " the calculation will be stopped.";
-        pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, directories[i],
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, msg, directories[i],
          *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
         return;
       }
@@ -156,7 +156,7 @@ namespace pocc {
           msg = "No data was extracted for " + calc_type;
           msg += " with " + apl::EOSmethod2label(eos_method) + " EOS.";
           msg += " The calculation will be stopped.";
-          pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, directories[i],
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, msg, directories[i],
             *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
           return;
         }
@@ -182,7 +182,7 @@ namespace pocc {
     Nstructures = T_list.size();
     if (!Nstructures){
       msg="No data was extracted: check that all QHA calculations are complete.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
     }
 
     // the temperature range, where QHA is able to calculate the thermodynamic
@@ -205,7 +205,7 @@ namespace pocc {
         if (!aurostd::isequal(T_list[i][row], T_list[i+1][row])){
           msg="Inconsistent list of temperatures among different ";
           msg+="POCC::QHA calculations.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg,
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg,
               _VALUE_ILLEGAL_);
         }
       }
@@ -219,7 +219,7 @@ namespace pocc {
       if (ncols != coeffs_list[i].cols){
         msg="Inconsistent number of fitting coefficients among different ";
         msg+="POCC::QHA calculations.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg,
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg,
               _VALUE_ILLEGAL_);
       }
     }
@@ -267,7 +267,7 @@ namespace pocc {
         }
         else{
           msg = "Failed to extract N_VOLUMES parameter.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
         }
       }
 
@@ -278,7 +278,7 @@ namespace pocc {
         }
         else{
           msg = "Failed to extract N_TEMPERATURES parameter.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
         }
       }
     }
@@ -324,7 +324,7 @@ namespace pocc {
 
     if (v_data_block.size() != (n_volumes+1)*n_temperatures){ // +1 to account for the line with the value of temperature
       msg = "Inconsistent size of the block of data with N_VOLUMES and N_TEMPERATURES parameters.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
     }
 
     vector<double> temperatures;
@@ -339,7 +339,7 @@ namespace pocc {
       aurostd::string2tokens(v_data_block[id], d_tokens, "=");
       if (d_tokens.size() != 2){
         msg = "Failed to extract the value of the temperature.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_CORRUPT_);
       }
 
       T = d_tokens[1];
@@ -412,7 +412,7 @@ namespace pocc {
       if (ncols <= 1){
         msg = "Data block " + blockname + " contains only one column or no data";
         msg += " at all: the file might be corrupt.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
       }
     }
     else{
@@ -429,7 +429,7 @@ namespace pocc {
       if (tokens.size() != ncols){
         msg = "Data block " + blockname + " does not have the same amount of";
         msg += " columns in each line: the file " + filename + " might be corrupt.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
       }
 
       T[i+1] = tokens[0];
@@ -469,7 +469,7 @@ namespace pocc {
           msg = "Number of tokens for VMIN parameter is ";
           msg += aurostd::utype2string(tokens.size()) + " instead of 2:";
           msg += "file " + filename + " might be corrupt.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
         }
         Vmin = tokens[1];
         Vmin_found = true;
@@ -481,7 +481,7 @@ namespace pocc {
           msg = "Number of tokens for VMAX parameter is ";
           msg += aurostd::utype2string(tokens.size()) + " instead of 2:";
           msg += "file " + filename + " might be corrupt.";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
+          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _FILE_CORRUPT_);
         }
         Vmax = tokens[1];
         Vmax_found = true;
@@ -521,7 +521,7 @@ namespace pocc {
       msg += aurostd::utype2string(npoints) + " were provided.";
       msg += " Make sure that the minimum range among the set of POCC structures,";
       msg += "defined by the [AFLOW_APL]TPT parameter for each, is reasonable.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _INDEX_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _INDEX_ILLEGAL_);
     }
 
     xvector<double> beta = aurostd::diffSG(volumes, dT);
@@ -567,7 +567,7 @@ namespace pocc {
       msg += aurostd::utype2string(npoints) + " were provided.";
       msg += " Make sure that the minimum range among the set of POCC structures,";
       msg += "defined by the [AFLOW_APL]TPT parameter for each, is reasonable.";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, _INDEX_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, msg, _INDEX_ILLEGAL_);
     }
 
     xvector<double> endpoints(5), dummy(5);
@@ -723,13 +723,13 @@ namespace pocc {
     if (aurostd::FileExist(filename)){
       if (!aurostd::stringstream2file(file, filename, "APPEND")){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
     else{
       if (!aurostd::stringstream2file(file, filename)){
         msg = "Error writing to " + filename + " file.";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,msg,_FILE_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,msg,_FILE_ERROR_);
       }
     }
   }
@@ -741,7 +741,7 @@ namespace pocc {
     string msg = "";
     msg = "Calculating thermodynamic properties for the POCC ensemble using";
     msg += " the data obtained by QHA";
-    pflow::logger(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, msg, aurostd::getPWD(),
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, msg, aurostd::getPWD(),
             *p_FileMESSAGE, *p_oss, _LOGGER_MESSAGE_);
 
     apl::QHAmethod qha_method = apl::QHA_CALC;

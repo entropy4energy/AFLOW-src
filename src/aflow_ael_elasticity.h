@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *              AFlow CORMAC TOHER - Duke University 2013-2021             *
 // *                                                                         *
 // ***************************************************************************
@@ -208,7 +208,7 @@ namespace AEL_functions {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *              AFlow CORMAC TOHER - Duke University 2013-2021             *
 // *                                                                         *
 // ***************************************************************************

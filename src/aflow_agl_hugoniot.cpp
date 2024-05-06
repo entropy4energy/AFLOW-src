@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow CORMAC TOHER - Duke University 2013-2021           *
 // *               Aflow PATRICK AVERY - Duke University 2016-2018           *
 // *                                                                         *
@@ -1026,7 +1026,7 @@ namespace AGL_functions {
 #endif // _AFLOW_AGL_HUGONIOT_CPP
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                Aflow CORMAC TOHER - Duke University 2013-2021           *
 // *               Aflow PATRICK AVERY - Duke University 2016-2018           *
 // *                                                                         *

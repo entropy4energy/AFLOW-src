@@ -32,7 +32,6 @@ void AConvaspBandgap(vector<string>& argv) {
   //  determine the occupied/unocc bands in the EIGENVAL.bands.EXT
   //  Egap = CBM-VBM
   // in the bandsdir, there must be OUTCAR.bands.EXT and EIGENVAL.bands.EXT
-  string soliloquy=XPID+"AConvaspBandgap():";
   char gaptype;
   float Egap,Efermi;
   string directory,stmp,tag="";
@@ -47,7 +46,7 @@ void AConvaspBandgap(vector<string>& argv) {
   aurostd::RemoveFile(file_tmp);
 
   if(XHOST.vext.size()!=XHOST.vcat.size()) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
   }
 
   // OUTCAR.bands
@@ -59,7 +58,7 @@ void AConvaspBandgap(vector<string>& argv) {
     }
   }
   if(!found) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"OUTCAR.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"OUTCAR.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
   }
   straus.clear();straus.str(std::string());
   aurostd::file2stringstream(file_tmp,straus);
@@ -75,7 +74,7 @@ void AConvaspBandgap(vector<string>& argv) {
     }
   }
   if(!found) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"EIGENVAL.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"EIGENVAL.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
   }
   straus.clear();straus.str(std::string());
   aurostd::file2stringstream(file_tmp,straus);
@@ -114,7 +113,6 @@ void AConvaspBandgaps(istream& bandsdir, ostringstream& oss) {
   //-determine the occupied/unocc bands in the EIGENVAL.bands.EXT
   //-Eg=CBM-VBM
   //in the bandsdir, there must be OUTCAR.bands.EXT and EIGENVAL.bands.EXT
-  string soliloquy=XPID+"AConvaspBandgaps():";
   char gaptype;
   float Egap,Efermi;
   string directory,stmp,tag="";
@@ -122,7 +120,7 @@ void AConvaspBandgaps(istream& bandsdir, ostringstream& oss) {
   bool found=FALSE;
 
   if(XHOST.vext.size()!=XHOST.vcat.size()) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
   }
 
   while(bandsdir.good()) {
@@ -142,7 +140,7 @@ void AConvaspBandgaps(istream& bandsdir, ostringstream& oss) {
       }
     }
     if(!found) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"OUTCAR.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"OUTCAR.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
     }
     straus.clear();straus.str(std::string());
     aurostd::file2stringstream(file_tmp,straus);
@@ -158,7 +156,7 @@ void AConvaspBandgaps(istream& bandsdir, ostringstream& oss) {
       }
     }
     if(!found) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"EIGENVAL.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"EIGENVAL.bands[.EXT] not found in the directory, aborting",_FILE_CORRUPT_); //CO20200624
     }
     straus.clear();straus.str(std::string());
     aurostd::file2stringstream(file_tmp,straus);
@@ -864,10 +862,9 @@ namespace pflow {
     //init::AFLOW_Projects_Directories("ICSD")/LIB/../../  NotInRAW
     //and so on
     //the MISSING lines mean that the structures are in LIB but not in RAW	
-    string soliloquy=XPID+"pflow::ICSD_CheckRaw():";
 
     if(XHOST.vext.size()!=XHOST.vcat.size()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"XHOST.vext.size()!=XHOST.vcat.size(), aborting",_RUNTIME_ERROR_); //CO20200624
     }
 
     vector<string> LIBlist,RAWlist,LIBnotRAW,RAWnotLIB,LIBRAW;
@@ -901,7 +898,7 @@ namespace pflow {
     LIBlist.clear();
     iftmp.open("wLIBlist.tmp");
     if(!iftmp) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"can not open wLIBlist.tmp, aborted",_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"can not open wLIBlist.tmp, aborted",_FILE_CORRUPT_); //CO20200624
     }
     while(!iftmp.eof()) {
       iftmp >> stmp;
@@ -912,7 +909,7 @@ namespace pflow {
     RAWlist.clear();
     iftmp.open("wRAWlist.tmp");
     if(!iftmp) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"can not open wRAWlist.tmp, aborted",_FILE_CORRUPT_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"can not open wRAWlist.tmp, aborted",_FILE_CORRUPT_); //CO20200624
     }
     while(!iftmp.eof()) {
       iftmp >> stmp;
@@ -1701,7 +1698,6 @@ float GetBandGap_WAHYU(stringstream& ein,float Efermi,char& gaptype) {
   //Egap = CBM-VBM
   //Set Egap = -1.0 if not found.
   //gaptype is either 'D' or 'I'
-  string soliloquy=XPID+"GetBandGap_WAHYU():";
 
   float metal_gap_tol = DEFAULT_METAL_GAP_TOLERANCE;
   int Nk,Nbands,i,ik,ib,ispin=1,count,itmp;
@@ -1723,7 +1719,7 @@ float GetBandGap_WAHYU(stringstream& ein,float Efermi,char& gaptype) {
   if(count==2) ispin=1;
   if(count==3) ispin=2;
   if(ispin==0) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"ispin = 0, aborted",_INPUT_ILLEGAL_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"ispin = 0, aborted",_INPUT_ILLEGAL_); //CO20200624
   }
   vector<vector<float> > data(Nk);
   for(i=0;i<Nk;i++) {

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -31,7 +31,7 @@ namespace KBIN {
     //
     kflags.KBIN_QSUB=aurostd::substring2bool(AflowIn,"[AFLOW_MODE_QSUB]");                         // search for QSUB string
     if(kflags.KBIN_QSUB) {
-      aus      << "00000  [AFLOW_MODE_QSUB] found in " << _AFLOWIN_ << " "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+      aus      << "00000  [AFLOW_MODE_QSUB] found in " << _AFLOWIN_ << " "  << Message(__AFLOW_FILE__,aflags) << endl;
       aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
       Krun=kflags.KBIN_QSUB;
 
@@ -57,46 +57,46 @@ namespace KBIN {
       // get (string) kflags.KBIN_QSUB_COMMAND
       if(!aurostd::substring2bool(AflowIn,"[AFLOW_QSUB_MODE]COMMAND=",TRUE)) {
         kflags.KBIN_QSUB_COMMAND=QSUB_COMMAND_DEFAULT;
-        aus << "00000  MESSAGE QSUB: COMMAND string is missing, taking COMMAND=\"" << kflags.KBIN_QSUB_COMMAND << "\"  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "00000  MESSAGE QSUB: COMMAND string is missing, taking COMMAND=\"" << kflags.KBIN_QSUB_COMMAND << "\"  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);    
       } else {
         kflags.KBIN_QSUB_COMMAND=aurostd::RemoveCharacter(aurostd::substring2string(AflowIn,"[AFLOW_QSUB_MODE]COMMAND=",1,TRUE),'"');
-        aus << "00000  MESSAGE QSUB: found COMMAND=\"" << kflags.KBIN_QSUB_COMMAND << "\"  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "00000  MESSAGE QSUB: found COMMAND=\"" << kflags.KBIN_QSUB_COMMAND << "\"  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);    
       }
       // get (string) kflags.KBIN_QSUB_PARAMS
       if(!aurostd::substring2bool(AflowIn,"[AFLOW_QSUB_MODE]PARAMS=",TRUE)) {
         kflags.KBIN_QSUB_PARAMS=QSUB_PARAMS_DEFAULT;
-        aus << "00000  MESSAGE QSUB: PARAMS string is missing, taking PARAMS=\"" << kflags.KBIN_QSUB_PARAMS << "\"  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "00000  MESSAGE QSUB: PARAMS string is missing, taking PARAMS=\"" << kflags.KBIN_QSUB_PARAMS << "\"  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);    
       } else {
         kflags.KBIN_QSUB_PARAMS=aurostd::RemoveCharacter(aurostd::substring2string(AflowIn,"[AFLOW_QSUB_MODE]PARAMS=",1,TRUE),'"');
-        aus << "00000  MESSAGE QSUB: found PARAMS=\"" << kflags.KBIN_QSUB_PARAMS << "\"  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "00000  MESSAGE QSUB: found PARAMS=\"" << kflags.KBIN_QSUB_PARAMS << "\"  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);    
       }
 
       Krun=(Krun && kflags.KBIN_QSUB_MODE_EXPLICIT);
       if(!Krun) {
-        aus << "EEEEE  [AFLOW_QSUB_MODE_IMPLICIT] is the only supported mode "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+        aus << "EEEEE  [AFLOW_QSUB_MODE_IMPLICIT] is the only supported mode "  << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintErrorStream(FileMESSAGE,aus,XHOST.QUIET);    
         Krun=FALSE;
         return Krun;
       }
       if(Krun && kflags.KBIN_QSUB_MODE_EXPLICIT) {  // [AFLOW_QSUB_MODE_EXPLICIT] construction
         if(kflags.KBIN_QSUB_FILE && !kflags.KBIN_QSUB_MODE_EXPLICIT_START_STOP) {
-          aus << "00000  MESSAGE QSUB   generation EXPLICIT file from " << _AFLOWIN_ << " " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "00000  MESSAGE QSUB   generation EXPLICIT file from " << _AFLOWIN_ << " " << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);    
           xqsub.QSUB.str(aurostd::substring2string(FileAFLOWIN,"[AFLOW_QSUB_FILE]"));
           //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(FileAFLOWIN,xqsub.QSUB,"[AFLOW_QSUB_FILE]");
         } else if(!kflags.KBIN_QSUB_FILE && kflags.KBIN_QSUB_MODE_EXPLICIT_START_STOP) {
-          aus << "00000  MESSAGE QSUB   generation EXPLICIT file from " << _AFLOWIN_ << " with START/STOP  " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "00000  MESSAGE QSUB   generation EXPLICIT file from " << _AFLOWIN_ << " with START/STOP  " << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
           if(aurostd::substring2bool(AflowIn,"[AFLOW_QSUB_MODE_EXPLICIT]START") && aurostd::substring2bool(AflowIn,"[AFLOW_QSUB_MODE_EXPLICIT]STOP"))
           xqsub.QSUB.str(aurostd::substring2string(FileAFLOWIN,"[AFLOW_QSUB_MODE_EXPLICIT]START","[AFLOW_QSUB_MODE_EXPLICIT]STOP"));
             //[SD20220520 - OBSOLETE]aurostd::ExtractToStringstreamEXPLICIT(FileAFLOWIN,xqsub.QSUB,"[AFLOW_QSUB_MODE_EXPLICIT]START","[AFLOW_QSUB_MODE_EXPLICIT]STOP");
         } else {
-          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] do not confuse aflow !!"  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
-          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] Possible modes "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] do not confuse aflow !!"  << Message(__AFLOW_FILE__,aflags) << endl;
+          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] Possible modes "  << Message(__AFLOW_FILE__,aflags) << endl;
           aus << "----------------------------------------------------------------------------------------------------" << endl;
           aus << "[AFLOW] QSUB EXPLICIT MODE without START/STOP (default)" << endl;
           aus << "[AFLOW_QSUB_MODE_EXPLICIT] " << endl;
@@ -172,10 +172,10 @@ namespace KBIN {
           aus << "[AFLOW_QSUB_MODE_EXPLICIT]STOP" << endl;
           aus << "[AFLOW]" << endl;
           aus << "----------------------------------------------------------------------------------------------------" << endl;
-          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] Note "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
-          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT]START must be present and no [AFLOW_QSUB_FILE]"  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
-          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT]STOP  must be present and no [AFLOW_QSUB_FILE]"  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
-          aus << "EEEEE  or [AFLOW_QSUB_FILE] present and NO START/STOP"  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT] Note "  << Message(__AFLOW_FILE__,aflags) << endl;
+          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT]START must be present and no [AFLOW_QSUB_FILE]"  << Message(__AFLOW_FILE__,aflags) << endl;
+          aus << "EEEEE  [AFLOW_QSUB_MODE_EXPLICIT]STOP  must be present and no [AFLOW_QSUB_FILE]"  << Message(__AFLOW_FILE__,aflags) << endl;
+          aus << "EEEEE  or [AFLOW_QSUB_FILE] present and NO START/STOP"  << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintErrorStream(FileMESSAGE,aus,XHOST.QUIET);    
           Krun=FALSE;
           return Krun;
@@ -202,30 +202,30 @@ namespace KBIN {
     ostringstream aus_exec,aus;
     aurostd::StringstreamClean(aus_exec);
     aurostd::StringstreamClean(aus);
-    // if(verbose) aus << "00000  MESSAGE RUN CHECK FINISHED : " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    // if(verbose) aus << "00000  MESSAGE RUN CHECK FINISHED : " << Message(__AFLOW_FILE__,aflags) << endl;
     // if(verbose) aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     // aflow.qsub.done DOES NOT EXIST
     if(!aurostd::FileExist(aflags.Directory+"/aflow.qsub.done")) {
-      if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done does not exist) : " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+      if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done does not exist) : " << Message(__AFLOW_FILE__,aflags) << endl;
       if(verbose) aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
       return FALSE;
     }
     // OTUCAR ESISTS BUT EMPTY
     if(aurostd::FileEmpty(aflags.Directory+"/aflow.qsub.done")) {
-      if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done is empty) : " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+      if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done is empty) : " << Message(__AFLOW_FILE__,aflags) << endl;
       if(verbose) aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
       return FALSE;
     }
     // aflow.qsub.done EXISTS
     if(aurostd::substring_present_file(aflags.Directory+"/aflow.qsub.done","DONE",TRUE) ||
         aurostd::substring_present_file(aflags.Directory+"/aflow.qsub.done","done",TRUE)) {
-      if(verbose) aus << "00000  MESSAGE RUN FINISHED (aflow.qsub.done is complete) : " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+      if(verbose) aus << "00000  MESSAGE RUN FINISHED (aflow.qsub.done is complete) : " << Message(__AFLOW_FILE__,aflags) << endl;
       if(verbose) aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
       aurostd::execute(aus_exec);    
       return TRUE;
     }
     aurostd::execute(aus_exec);
-    if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done is incomplete) : " << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    if(verbose) aus << "00000  MESSAGE RUN NOT FINISHED (aflow.qsub.done is incomplete) : " << Message(__AFLOW_FILE__,aflags) << endl;
     if(verbose) aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
 
     return FALSE;
@@ -257,7 +257,7 @@ namespace KBIN {
     xqsub.QSUB_changed=FALSE;
     //
     kflags.KBIN_QSUB=TRUE;                         // search for QSUB string
-    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode1 "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode1 "  << Message(__AFLOW_FILE__,aflags) << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     Krun=kflags.KBIN_QSUB;
 
@@ -324,7 +324,7 @@ namespace KBIN {
     xqsub.QSUB_changed=FALSE;
     //
     kflags.KBIN_QSUB=TRUE;                         // search for QSUB string
-    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode2 "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode2 "  << Message(__AFLOW_FILE__,aflags) << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     Krun=kflags.KBIN_QSUB;
 
@@ -371,7 +371,7 @@ namespace KBIN {
     xqsub.QSUB_changed=FALSE;
     //
     kflags.KBIN_QSUB=TRUE;                         // search for QSUB string
-    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode3 "  << Message(_AFLOW_FILE_NAME_,aflags) << endl;
+    aus      << "00000  [AFLOW_MODE_QSUB] QSUB Mode3 "  << Message(__AFLOW_FILE__,aflags) << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
     Krun=kflags.KBIN_QSUB;
 
@@ -400,7 +400,7 @@ namespace KBIN {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************
 

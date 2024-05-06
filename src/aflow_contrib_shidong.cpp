@@ -30,7 +30,7 @@ bool ACEGetStructureType(const string& structure_type_in) {
   if( structure_type == "fcc" || structure_type == "bcc" || structure_type == "hcp") {
     ACEFlag = true;
   } else {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"ACEGetStructureType():","The structure given must be one of fcc[FCC]/bcc[BCC]/hcp[HCP]",_INPUT_ILLEGAL_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,"ACEGetStructureType():","The structure given must be one of fcc[FCC]/bcc[BCC]/hcp[HCP]",_INPUT_ILLEGAL_); //CO20200624
   }
 
   return ACEFlag;
@@ -112,7 +112,7 @@ vector<cestructure>  ReadInFitStructure(istream & ins, string & structure_type) 
 
 
   if( str_out_list.size() == 0) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"ReadInFitStructure():","No "+structure_type+" structure is found. Check your input file",_FILE_CORRUPT_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,"ReadInFitStructure():","No "+structure_type+" structure is found. Check your input file",_FILE_CORRUPT_); //CO20200624
   }
 
   return str_out_list;
@@ -2728,7 +2728,6 @@ void GenerateAflowInputFile(string structure_type,
 // ***************************************************************************
 
 void CheckAllInputFileExistence(string structure_type) {
-  string soliloquy=XPID+"CheckAllInputFileExistence():";
   // if no cluster data exists, ask user to
   // obtain it first
   string filename;
@@ -2787,7 +2786,7 @@ void CheckAllInputFileExistence(string structure_type) {
   }
 
   if( flag_cluster_cal || flag_SL_cal ) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no input",_INPUT_MISSING_); //CO20200624
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no input",_INPUT_MISSING_); //CO20200624
   } else {
     cerr << "All input files are found. Calculation begins.\n"
       << endl;

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -8,8 +8,6 @@
 #ifndef _AFLOW_CLASSES_CPP
 #define _AFLOW_CLASSES_CPP
 #include "aflow.h"
-
-#define _AFLOW_FILE_NAME_ "aflow_xclasses.cpp"  //CO20191112 - this file is not compiled like the rest
 
 // ***************************************************************************
 // ***************************************************************************
@@ -30,6 +28,7 @@ _XHOST::_XHOST() {  // constructor PUBLIC
   showPID=FALSE;
   showTID=FALSE;
   QUIET=FALSE;
+  QUIET_GLOBAL=FALSE; //CO20220630
   QUIET_CERR=FALSE; // extra quiet SC20210617
   QUIET_COUT=FALSE; // extra quiet SC20210617
   LOGGER_WHITELIST.clear();  //HE+ME20220305
@@ -151,6 +150,7 @@ void _XHOST::copy(const _XHOST& b) { // copy PRIVATE
   showPID=b.showPID;
   showTID=b.showTID;
   QUIET=b.QUIET;
+  QUIET_GLOBAL=b.QUIET_GLOBAL;  //CO20220630
   QUIET_CERR=b.QUIET_CERR; // extra quiet SC20210617
   QUIET_COUT=b.QUIET_COUT; // extra quiet SC20210617
   LOGGER_WHITELIST = b.LOGGER_WHITELIST;  //HE+ME20220305
@@ -301,7 +301,6 @@ void _XHOST::clear() {  // clear PRIVATE
 pthread_mutex_t mutex_XAFLOW_XHOST=PTHREAD_MUTEX_INITIALIZER;
 
 std::string _XHOST::command(const string& command) {
-  string soliloquy = XPID + "_XHOST::command():";  //CO20190629
   string _command=command;
 #ifdef _MACOSX_
   if(command=="beep") return string("echo -ne '\007'");
@@ -335,7 +334,7 @@ std::string _XHOST::command(const string& command) {
     }
   }
   //CO20180705 STOP
-  throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"command="+command+" not found",_INPUT_MISSING_);
+  throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"command="+command+" not found",_INPUT_MISSING_);
   return string();
 }
 
@@ -1942,7 +1941,7 @@ void _xinput::setXALIEN(_xalien& in_xalien) {
 
 xstructure& _xinput::getXStr() {
   if(!(AFLOW_MODE_VASP || AFLOW_MODE_AIMS)) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"_xinput::getXStr():","No structure available.",_INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,XPID+"_xinput::getXStr():","No structure available.",_INPUT_MISSING_);
   }
   if(AFLOW_MODE_VASP) {return xvasp.str;}
   if(AFLOW_MODE_AIMS) {return xaims.str;}
@@ -1951,7 +1950,7 @@ xstructure& _xinput::getXStr() {
 
 string& _xinput::getDirectory() {
   if(!(AFLOW_MODE_VASP || AFLOW_MODE_AIMS || AFLOW_MODE_ALIEN)) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"_xinput::getDirectory():","No directory available.",_INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,XPID+"_xinput::getDirectory():","No directory available.",_INPUT_MISSING_);
   }
   if(AFLOW_MODE_VASP) {return xvasp.Directory;}
   if(AFLOW_MODE_AIMS) {return xaims.Directory;}
@@ -1961,7 +1960,7 @@ string& _xinput::getDirectory() {
 
 void _xinput::setXStr(const xstructure& str,bool set_all) {
   if(!(AFLOW_MODE_VASP || AFLOW_MODE_AIMS)) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"_xinput::setXStr():","No structure available.",_INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,XPID+"_xinput::setXStr():","No structure available.",_INPUT_MISSING_);
   }
   if(AFLOW_MODE_VASP || set_all) {xvasp.str=str;}
   if(AFLOW_MODE_AIMS || set_all) {xaims.str=str;}
@@ -1969,7 +1968,7 @@ void _xinput::setXStr(const xstructure& str,bool set_all) {
 
 void _xinput::setDirectory(string Directory,bool set_all) {
   if(!(AFLOW_MODE_VASP || AFLOW_MODE_AIMS || AFLOW_MODE_ALIEN)) {
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,XPID+"_xinput::setDirectory():","No directory available.",_INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,XPID+"_xinput::setDirectory():","No directory available.",_INPUT_MISSING_);
   }
   if(AFLOW_MODE_VASP  || set_all) {xvasp.Directory=  Directory;}
   if(AFLOW_MODE_AIMS  || set_all) {xaims.Directory=  Directory;}
@@ -2093,6 +2092,6 @@ void xStream::initialize(ofstream& ofs,ostream& oss) {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

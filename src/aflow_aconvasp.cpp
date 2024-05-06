@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo and Dane Morgan
@@ -377,38 +377,38 @@ _atom ConvertAtomToLat(const _atom& in_at, const xmatrix<double>& lattice) {
 // [OBSOLETE]   }
 // [OBSOLETE] }
 
-// **************************************************************************
-// Function GetStrNeighData
-// **************************************************************************
-// This function collects all the neighbor data out to some
-//  cutoff and stores it for each atom in the structure.
-namespace pflow {
-  void GetStrNeighData(const xstructure& str, const double cutoff,
-      deque<deque<_atom> >& neigh_mat) {
-    deque<_atom> atom_vec;
-    neigh_mat.clear();
-    // Get data from str.
-    // Set scale to 1 so you don't need to rescale coordinates.
-    xstructure sstr=str;
-    sstr=ReScale(sstr,1.0);
-
-    // Create atom objects for each atom in structure.
-    xvector<int> ijk(3);ijk.clear();
-    for(uint iat=0;iat<sstr.atoms.size();iat++) {
-      _atom a=sstr.atoms.at(iat);
-      a.name=sstr.atoms.at(iat).name;
-      a.basis=iat; //[CO20200130 - number->basis]a.number=iat;
-      a.ijk=sstr.atoms.at(iat).ijk;
-      a.cpos=sstr.atoms.at(iat).cpos;
-      a.fpos=sstr.atoms.at(iat).fpos;//cerr << sstr.atoms.at(iat).fpos << endl;
-      a.type=sstr.atoms.at(iat).type;
-      atom_vec.push_back(a);
-    }
-    double rmin=1e-6;
-    // [OBSOLETE]    GetNeighData(atom_vec,sstr,rmin,cutoff,neigh_mat);
-    sstr.GetNeighData(atom_vec,rmin,cutoff,neigh_mat);
-  }
-}
+//[CO20220623 - OBSOLETE]// **************************************************************************
+//[CO20220623 - OBSOLETE]// Function GetStrNeighData
+//[CO20220623 - OBSOLETE]// **************************************************************************
+//[CO20220623 - OBSOLETE]// This function collects all the neighbor data out to some
+//[CO20220623 - OBSOLETE]//  cutoff and stores it for each atom in the structure.
+//[CO20220623 - OBSOLETE]namespace pflow {
+//[CO20220623 - OBSOLETE]  void GetStrNeighData(const xstructure& str, const double cutoff,
+//[CO20220623 - OBSOLETE]      deque<deque<_atom> >& neigh_mat) {
+//[CO20220623 - OBSOLETE]    deque<_atom> atom_vec;
+//[CO20220623 - OBSOLETE]    neigh_mat.clear();
+//[CO20220623 - OBSOLETE]    // Get data from str.
+//[CO20220623 - OBSOLETE]    // Set scale to 1 so you don't need to rescale coordinates.
+//[CO20220623 - OBSOLETE]    xstructure sstr=str;
+//[CO20220623 - OBSOLETE]    sstr=ReScale(sstr,1.0);
+//[CO20220623 - OBSOLETE]
+//[CO20220623 - OBSOLETE]    // Create atom objects for each atom in structure.
+//[CO20220623 - OBSOLETE]    xvector<int> ijk(3);ijk.clear();
+//[CO20220623 - OBSOLETE]    for(uint iat=0;iat<sstr.atoms.size();iat++) {
+//[CO20220623 - OBSOLETE]      _atom a=sstr.atoms.at(iat);
+//[CO20220623 - OBSOLETE]      a.name=sstr.atoms.at(iat).name;
+//[CO20220623 - OBSOLETE]      a.basis=iat; //[CO20200130 - number->basis]a.number=iat;
+//[CO20220623 - OBSOLETE]      a.ijk=sstr.atoms.at(iat).ijk;
+//[CO20220623 - OBSOLETE]      a.cpos=sstr.atoms.at(iat).cpos;
+//[CO20220623 - OBSOLETE]      a.fpos=sstr.atoms.at(iat).fpos;//cerr << sstr.atoms.at(iat).fpos << endl;
+//[CO20220623 - OBSOLETE]      a.type=sstr.atoms.at(iat).type;
+//[CO20220623 - OBSOLETE]      atom_vec.push_back(a);
+//[CO20220623 - OBSOLETE]    }
+//[CO20220623 - OBSOLETE]    double rmin=1e-6;
+//[CO20220623 - OBSOLETE]    // [OBSOLETE]    GetNeighData(atom_vec,sstr,rmin,cutoff,neigh_mat);
+//[CO20220623 - OBSOLETE]    sstr.GetNeighData_20220101(atom_vec,rmin,cutoff,neigh_mat);
+//[CO20220623 - OBSOLETE]  }
+//[CO20220623 - OBSOLETE]}
 
 // **************************************************************************
 // Function GetXrayScattFactor
@@ -788,10 +788,9 @@ namespace pflow {
 // ***************************************************************************
 namespace pflow {
   xstructure SetAllAtomNames(const xstructure& a, const vector<string>& in) {
-    string soliloquy=XPID+"pflow::SetAllAtomNames():";
     xstructure b(a);
     if(in.size()==a.num_each_type.size()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"this routine must be fixed, it does not work here",_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"this routine must be fixed, it does not work here",_RUNTIME_ERROR_);
 
       for(uint iat=0;iat<b.num_each_type.size();iat++) {
         b.atoms.at(iat).name=in.at(b.atoms.at(iat).type);       // CONVASP_MODE
@@ -816,7 +815,7 @@ namespace pflow {
     message << "Must specify as many names as types/bases: in.size()=" << in.size();  //[CO20200130 - number->basis]
     message << "   =a.num_each_type.size()=" << a.num_each_type.size();
     message << "   =a.atoms.size()=" << a.atoms.size();
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_NUMBER_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
   }
 }
 
@@ -825,10 +824,9 @@ namespace pflow {
 // ***************************************************************************
 namespace pflow {
   xstructure SetNamesWereGiven(const xstructure& a, const vector<int>& in) {
-    string soliloquy=XPID+"pflow::SetNamesWereGiven():";
     xstructure b(a);
     if(in.size()==a.num_each_type.size()) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"this routine must be fixed... it does not work here",_RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"this routine must be fixed... it does not work here",_RUNTIME_ERROR_);
       for(uint iat=0;iat<b.num_each_type.size();iat++)
         b.atoms.at(iat).name_is_given=in.at(b.atoms.at(iat).type);      // CONVASP_MODE
       return b;
@@ -843,7 +841,7 @@ namespace pflow {
     message << "Must specify as many names as types/bases: in.size()=" << in.size();  //[CO20200130 - number->basis]
     message << "   =a.num_each_type.size()=" << a.num_each_type.size();
     message << "   =a.atoms.size()=" << a.atoms.size();
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_NUMBER_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_NUMBER_);
   }
 }
 
@@ -1411,8 +1409,7 @@ namespace pflow {
     }
     h=xa[khi]-xa[klo];
     if(h == 0.0) {
-      string soliloquy=XPID+"pflow::GetSplineInt():";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Bad xa input to routine splint",_INPUT_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Bad xa input to routine splint",_INPUT_ERROR_);
     }
     a=(xa[khi]-x)/h;
     b=(x-xa[klo])/h;
@@ -1485,6 +1482,6 @@ bool never_call_this_function(void) {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

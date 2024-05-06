@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo - Kesong Yang - Camilo Calderon - Corey Oses
@@ -508,10 +508,9 @@ bool xOUTCAR::GetPropertiesFile(const string& fileIN,uint natoms_check,bool QUIE
   bool flag=GetPropertiesFile(fileIN,QUIET);
   if(aurostd::abs(natoms_check-(double) natoms)>0.1) { 
     //[CO20200404 - OBSOLETE]cerr << "ERROR xOUTCAR::GetPropertiesFile: natoms_check(" << natoms_check << ")!= (int) natoms(" << natoms << ") ..." << endl;
-    string soliloquy="xOUTCAR::GetPropertiesFile():";
     stringstream message;
     message << "natoms_check(" << natoms_check << ")!= (int) natoms(" << natoms << ")";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _VALUE_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _VALUE_ERROR_);
   }
   return flag;
 }
@@ -542,11 +541,10 @@ vector<string> xOUTCAR::GetCorrectPositions(const string& line,uint expected_cou
   //    2.156793936  3.735676679  0.000000000     0.231825578  0.133844560  0.000000000
   //    0.000000000  0.000000000109.286277550     0.000000000  0.000000000  0.009150280
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xOUTCAR::GetCorrectPositions():";
   vector<string> tokens;
   aurostd::string2tokens(line,tokens);
   if(tokens.size()==expected_count){return tokens;}
-  if(0||LDEBUG) cerr << soliloquy << " issuing fix for bad lattice vectors (negative sign) on this line: " << line << endl;
+  if(0||LDEBUG) cerr << __AFLOW_FUNC__ << " issuing fix for bad lattice vectors (negative sign) on this line: " << line << endl;
   //try fixing negative sign first
   vector<string> neg_tokens,_tokens;
   std::size_t pos;
@@ -563,7 +561,7 @@ vector<string> xOUTCAR::GetCorrectPositions(const string& line,uint expected_cou
   }
   if(neg_tokens.size()==expected_count){return neg_tokens;}
   //negative sign fix not enough, now  we need to look at large number problems
-  if(0||LDEBUG) cerr << soliloquy << " issuing fix for bad lattice vectors (large numbers) on this line: " << line << endl;
+  if(0||LDEBUG) cerr << __AFLOW_FUNC__ << " issuing fix for bad lattice vectors (large numbers) on this line: " << line << endl;
   vector<string> dec_tokens;
   string good_num;
   _tokens.clear();
@@ -575,7 +573,7 @@ vector<string> xOUTCAR::GetCorrectPositions(const string& line,uint expected_cou
   if(good_num.empty()){dec_tokens.clear();return dec_tokens;} //we have no hope
   //_tokens contains precision
   uint precision=_tokens[1].size();
-  if(0||LDEBUG) cerr << soliloquy << " precision of numbers on this line: " << precision << endl;
+  if(0||LDEBUG) cerr << __AFLOW_FUNC__ << " precision of numbers on this line: " << precision << endl;
   //let's build numbers with the right count of digits
   string num;
   bool fidelity=true;
@@ -614,7 +612,7 @@ vector<string> xOUTCAR::GetCorrectPositions(const string& line,uint expected_cou
   }
   if(!fidelity || dec_tokens.size()!=expected_count){dec_tokens.clear();return dec_tokens;}
   if(0||LDEBUG){ 
-    cerr << soliloquy << " repaired vector: ";
+    cerr << __AFLOW_FUNC__ << " repaired vector: ";
     for(uint i=0;i<dec_tokens.size();i++){cerr << dec_tokens[i] << " ";}
     cerr << endl;
   }
@@ -624,7 +622,6 @@ vector<string> xOUTCAR::GetCorrectPositions(const string& line,uint expected_cou
 
 bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xOUTCAR::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
@@ -632,14 +629,14 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   clear(); // so it does not mess up vector/deque
 
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   stringstream sss; sss.str(stringstreamIN.str());
   content=stringstreamIN.str();
   vcontent.clear();
   vector<string> vline,tokens,vcontentRED;
   aurostd::string2vectorstring(content,vcontent);
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << " (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << " (" << time_delay(seconds) << ")" << endl;
   for(uint iline=0;iline<vcontent.size();iline++) { // NEW - FROM THE BACK
     string saus=vcontent.at(iline);
     if(aurostd::substring2bool(saus,"="))  vcontentRED.push_back(saus);
@@ -647,18 +644,18 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(saus,"number")) vcontentRED.push_back(saus); // number
     if(aurostd::substring2bool(saus,"bands")) vcontentRED.push_back(saus); // bands
   }
-  if(LDEBUG) cerr << soliloquy << " vcontentRED.size()=" << vcontentRED.size() << " (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontentRED.size()=" << vcontentRED.size() << " (" << time_delay(seconds) << ")" << endl;
 
   string line;
   if(filename=="") filename="stringstream";
-  if(LDEBUG) cerr << soliloquy << " filename=[" << filename << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " filename=[" << filename << "]" << endl;
   if(LDEBUG) cerr.precision(12);
 
   // ----------------------------------------------------------------------
   //SC
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
 
-  if(LDEBUG) cerr << soliloquy << " LOAD SYSTEM (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD SYSTEM (" << time_delay(seconds) << ")" << endl;
   SYSTEM="";
   line="";
   for(uint iline=0;iline<vcontent.size();iline++) { // NEW - FROM THE BACK 
@@ -668,17 +665,17 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         break;
       }
   }
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   if(line!="") {
     aurostd::string2tokens(line,tokens,"="); // cerr << tokens.size() << endl;
     SYSTEM=aurostd::RemoveWhiteSpaces(tokens.at(1));
   }
-  if(LDEBUG) cerr << soliloquy << " SYSTEM=" << SYSTEM << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " SYSTEM=" << SYSTEM << endl; 
   // ----------------------------------------------------------------------
   //KY STUFF DONT TOUCH - GET Number of IONS and Fermi
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD KESONG STUFF (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD KESONG STUFF (" << time_delay(seconds) << ")" << endl;
   string anchor_word_NELM="NELM"; //CO20200624
   string anchor_word_NIONS="NIONS";
   string anchor_word_LSORBIT="LSORBIT =";
@@ -721,10 +718,10 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " NELM=" << NELM << endl; //CO20200624
-  if(LDEBUG) cerr << soliloquy << " NIONS=" << NIONS << endl;
-  if(LDEBUG) cerr << soliloquy << " isLSCOUPLING=" << isLSCOUPLING << endl;
-  if(LDEBUG) cerr << soliloquy << " Efermi=" << Efermi << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " NELM=" << NELM << endl; //CO20200624
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " NIONS=" << NIONS << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " isLSCOUPLING=" << isLSCOUPLING << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " Efermi=" << Efermi << endl;
   // return TRUE;
   // ----------------------------------------------------------------------
   // DO SC STUFF
@@ -732,8 +729,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   natoms=(double) NIONS;
   // ----------------------------------------------------------------------
   // LOAD EENTROPY DATA
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD EENTROPY DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD EENTROPY DATA (" << time_delay(seconds) << ")" << endl;
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW - FROM THE BACK 
     if(aurostd::substring2bool(vcontent.at(iline),"entropy"))
       if(aurostd::substring2bool(vcontent.at(iline),"EENTRO"))
@@ -741,18 +738,18 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           line=vcontent.at(iline);
           break;
         }
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl; 
   aurostd::string2tokens(line,tokens,"=");
   if(tokens.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of entries (entropy) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of entries (entropy) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of entries (entropy) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   eentropy_cell=0;
   if(tokens.size()>1) eentropy_cell=aurostd::string2utype<double>(tokens.at(1));
   eentropy_atom=eentropy_cell/natoms;
-  if(LDEBUG) cerr << soliloquy << " eentropy_cell=" << eentropy_cell << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " eentropy_cell=" << eentropy_cell << endl;
   // LOAD ENERGY DATA  // without energy of electrons
   // CO20211109 - notes about which energy to pick
   // we report the energy without entropy (0K energy).
@@ -761,7 +758,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // 0, but then the system would not converge.
   // it does not matter much which energy to pick: raw energy values of VASP are arbitrary.
   // focus on delta energy (just be consistent).
-  if(LDEBUG) cerr << soliloquy << " LOAD ENERGY DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD ENERGY DATA" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW - FROM THE BACK 
     if(aurostd::substring2bool(vcontent.at(iline),"energy")) // VASP
@@ -770,29 +767,29 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           line=vcontent.at(iline);
           break;
         }  // VASP
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   aurostd::string2tokens(line,tokens,"=");
   if(tokens.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of entries (energy_1) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of entries (energy_1) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of entries (energy_1) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   if(tokens.size()>1) line=tokens.at(1);
   aurostd::string2tokens(line,tokens,"e");
   if(tokens.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of entries (energy_2) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of entries (energy_2) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of entries (energy_2) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   if(tokens.size()>0) energy_cell=aurostd::string2utype<double>(tokens.at(0));
   energy_atom=energy_cell/natoms;
-  if(LDEBUG) cerr << soliloquy << " energy_cell=" << energy_cell << " energy_atom=" << energy_atom << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " energy_cell=" << energy_cell << " energy_atom=" << energy_atom << endl; 
   // ----------------------------------------------------------------------
   // LOAD PV DATA (IF PRESENT)
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD PV DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD PV DATA (" << time_delay(seconds) << ")" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW - FROM THE BACK 
     if(aurostd::substring2bool(vcontent.at(iline),"TOTEN"))  // VASP
@@ -803,21 +800,21 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
               line=vcontent.at(iline);
               break;
             } 
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   if(line.length()<10) {
     PV_cell=0.0;
     PV_atom=PV_cell/natoms;
   } else {
     aurostd::string2tokens(line,tokens,"=");
     if(tokens.size()!=3) {
-      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of entries (PV) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
+      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of entries (PV) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
       message << "Wrong number of entries (PV) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]";
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
       ERROR_flag=TRUE;
     }
     if(tokens.size()>2) PV_cell=aurostd::string2utype<double>(tokens.at(2));
     PV_atom=PV_cell/natoms;
-    if(LDEBUG) cerr << soliloquy << " PV_cell=" << PV_cell << " PV_atom=" << PV_atom << endl; 
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " PV_cell=" << PV_cell << " PV_atom=" << PV_atom << endl; 
   }
 
   // correct if PV
@@ -826,7 +823,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     enthalpy_cell=energy_cell;  // default without PV
     enthalpy_atom=energy_atom;   // default without PV
   } else {
-    if(LDEBUG) cerr << soliloquy << " pressure=" << pressure << endl; 
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " pressure=" << pressure << endl; 
     // LOAD ENTHALPY DATA IF P!=0
     line="";
     for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW
@@ -835,7 +832,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           line=vcontent.at(iline);
           break;
         } 
-    if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
     aurostd::string2tokens(line,tokens," ");
 
     if(tokens.size()!=0) {
@@ -846,20 +843,20 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           if(aurostd::substring2bool(tokens.at(i-1),"TOTEN")) {
             enthalpy_cell=aurostd::string2utype<double>(tokens.at(i+1));
             enthalpy_atom=enthalpy_cell/natoms;
-            if(LDEBUG) cerr << soliloquy << " enthalpy_cell=" << enthalpy_cell << " enthalpy_atom=" << enthalpy_atom << endl; 
+            if(LDEBUG) cerr << __AFLOW_FUNC__ << " enthalpy_cell=" << enthalpy_cell << " enthalpy_atom=" << enthalpy_atom << endl; 
           }
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " enthalpy_cell=" << enthalpy_cell << " enthalpy_atom=" << enthalpy_atom << endl; 
-  if(LDEBUG) cerr << soliloquy << " energy_cell=" << energy_cell << " energy_atom=" << energy_atom << endl; 
-  if(LDEBUG) cerr << soliloquy << " PV_cell=" << PV_cell << " PV_atom=" << PV_atom << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " enthalpy_cell=" << enthalpy_cell << " enthalpy_atom=" << enthalpy_atom << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " energy_cell=" << energy_cell << " energy_atom=" << energy_atom << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " PV_cell=" << PV_cell << " PV_atom=" << PV_atom << endl; 
 
   // ----------------------------------------------------------------------
   // LOAD PVstress DATA (IF PRESENT)
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD STRESS DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD STRESS DATA (" << time_delay(seconds) << ")" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW - FROM THE BACK 
     if(aurostd::substring2bool(vcontent.at(iline),"external"))  // VASP
@@ -869,7 +866,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
             line=vcontent.at(iline-1);
             break;
           }
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   stress.clear();
   aurostd::string2tokens(line,tokens," ");
   if(tokens.size()>=8) {
@@ -883,13 +880,13 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     stress(1,3)=aurostd::string2utype<double>(tokens.at(7));
     stress(3,1)=aurostd::string2utype<double>(tokens.at(7));
   }
-  if(LDEBUG) cerr << soliloquy << " stress=" << endl << stress << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " stress=" << endl << stress << endl; 
   //   Direction    XX        YY        ZX        XY       YZ       ZX
   //   in kB       -5.93     -5.93    -19.31      0.00      0.00     -0.00
   // ----------------------------------------------------------------------
   // LOAD VOLUME DATA (IF PRESENT)
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD volume DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD volume DATA (" << time_delay(seconds) << ")" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"volume"))
@@ -898,7 +895,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           line=vcontent.at(iline);
           break;
         } 
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl; 
   volume_cell=0.0;
   aurostd::string2tokens(line,tokens," ");
   if(tokens.size()>=5) {
@@ -907,11 +904,11 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     }
   }
   volume_atom=volume_cell/natoms;
-  if(LDEBUG) cerr << soliloquy << " volume_cell=" << volume_cell << " volume_atom=" << volume_atom << endl;   
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " volume_cell=" << volume_cell << " volume_atom=" << volume_atom << endl;   
   // ----------------------------------------------------------------------
   // LOAD PRESSURE_RESIDUAL/PULAY DATA
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD PRESSURE_RESIDUAL/PULAY DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD PRESSURE_RESIDUAL/PULAY DATA (" << time_delay(seconds) << ")" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW - FROM THE BACK 
     if(aurostd::substring2bool(vcontent.at(iline),"Pullay") || aurostd::substring2bool(vcontent.at(iline),"pullay") ||
@@ -920,12 +917,12 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         line=vcontent.at(iline);
         break;
       } 
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   aurostd::string2tokens(line,tokens,"=");
   if(tokens.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of entries (Pulay stress) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of entries (Pulay stress) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of entries (Pulay stress) in OUTCAR; line=[ " << line << "]" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
 
@@ -945,13 +942,13 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(tokens.size()>0) Pulay_stress=aurostd::string2utype<double>(tokens.at(0));
   }
 
-  if(LDEBUG) cerr << soliloquy << " pressure_residual=" << pressure_residual << endl;
-  if(LDEBUG) cerr << soliloquy << " Pulay_stress=" << Pulay_stress << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " pressure_residual=" << pressure_residual << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " Pulay_stress=" << Pulay_stress << endl;
 
   // ----------------------------------------------------------------------
   // LOAD SPIN
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD SPIN DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD SPIN DATA (" << time_delay(seconds) << ")" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"magnetization"))
@@ -959,7 +956,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         line=vcontent.at(iline);
         break;
       } 
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl; 
   mag_cell=0.0;
   aurostd::string2tokens(line,tokens," ");
   if(tokens.size()>=6) {
@@ -967,11 +964,11 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       mag_cell=aurostd::string2utype<double>(tokens.at(5)); //JX seems to work
   }
   mag_atom=mag_cell/natoms;
-  if(LDEBUG) cerr << soliloquy << " mag_cell=" << mag_cell << " mag_atom=" << mag_atom << endl;   
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " mag_cell=" << mag_cell << " mag_atom=" << mag_atom << endl;   
   // ----------------------------------------------------------------------
   // LOAD SPIN DECOMPOSITION
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD SPIN DECOMPOSITION DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD SPIN DECOMPOSITION DATA" << endl;
   line="";
   uint mline=0;
   //DX20171205 - Check for magnetization z (non-collinear) - START
@@ -984,8 +981,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         found_magz_line=true;
         break;
       } 
-  if(LDEBUG) cerr << soliloquy << " magnetization (z) line=" << line << endl; 
-  if(LDEBUG) cerr << soliloquy << " magnetization (z) mline=" << mline << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (z) line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (z) mline=" << mline << endl; 
   if(found_magz_line) {
     for(uint iline=mline;iline<mline+natoms;iline++) {
       aurostd::string2tokens(vcontent.at(iline),tokens," ");
@@ -1004,8 +1001,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         found_magy_line=true;
         break;
       } 
-  if(LDEBUG) cerr << soliloquy << " magnetization (y) line=" << line << endl; 
-  if(LDEBUG) cerr << soliloquy << " magnetization (y) mline=" << mline << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (y) line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (y) mline=" << mline << endl; 
   if(found_magy_line) {
     for(uint iline=mline;iline<mline+natoms;iline++) {
       aurostd::string2tokens(vcontent.at(iline),tokens," ");
@@ -1023,8 +1020,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         found_magx_line=true;
         break;
       } 
-  if(LDEBUG) cerr << soliloquy << " magnetization (x) line=" << line << endl; 
-  if(LDEBUG) cerr << soliloquy << " magnetization (x) mline=" << mline << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (x) line=" << line << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " magnetization (x) mline=" << mline << endl; 
   if(found_magx_line) {
     for(uint iline=mline;iline<mline+natoms;iline++) {
       aurostd::string2tokens(vcontent.at(iline),tokens," ");
@@ -1034,11 +1031,11 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   }
   //DX20171205 - Non-collinear vs collinear - START
   if(found_magx_line && found_magy_line && found_magz_line){ //non-collinear calculation
-    if(LDEBUG) cerr << soliloquy << " non-collinear magnetization found." << endl; 
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " non-collinear magnetization found." << endl; 
     if(vmag_x.size()!=vmag_y.size() || vmag_x.size()!=vmag_z.size()){
-      //[CO20200404 - OBSOLETE]if(!QUIET){cerr << "WARNING - "<< soliloquy << " number of magnetization components (x, y, z) are not the same in OUTCAR; filename=[" << filename << "]" << endl;}
+      //[CO20200404 - OBSOLETE]if(!QUIET){cerr << "WARNING - "<< __AFLOW_FUNC__ << " number of magnetization components (x, y, z) are not the same in OUTCAR; filename=[" << filename << "]" << endl;}
       message << "Number of magnetization components (x, y, z) are not the same in OUTCAR; filename=[" << filename << "]";
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
       ERROR_flag=TRUE;
     }
     for(uint m=0;m<vmag_x.size();m++){
@@ -1047,16 +1044,16 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     }
   }
   else if(found_magx_line && !found_magy_line && !found_magz_line){ //collinear calculation (x only)
-    if(LDEBUG) cerr << soliloquy << " collinear magnetization found." << endl; 
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " collinear magnetization found." << endl; 
     for(uint m=0;m<vmag_x.size();m++){
       vmag.push_back(vmag_x[m]);
     }
   }
-  //  if(LDEBUG) cerr << soliloquy << " mag_cell=" << mag_cell << " mag_atom=" << mag_atom << endl;   
+  //  if(LDEBUG) cerr << __AFLOW_FUNC__ << " mag_cell=" << mag_cell << " mag_atom=" << mag_atom << endl;   
   // ----------------------------------------------------------------------
   // LOAD FORCES/POSITIONS
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD FORCES/POSITIONS DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD FORCES/POSITIONS DATA (" << time_delay(seconds) << ")" << endl;
   vforces.clear();                    // QM FORCES calculation
   vpositions_cartesian.clear();                 // QM POSITIONS calculation
   for(uint i=0;i<(uint) natoms;i++) {
@@ -1071,9 +1068,9 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         aurostd::string2tokens(vcontent.at(iline+iat+2),tokens," ");
         //cerr << natoms << " " << tokens.size() << "    " << vcontent.at(iline+iat+2) << endl;
         if(tokens.size()<6) {
-          //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of force/positions entries in OUTCAR; line=[ " << vcontent.at(iline+iat+2) << "]" << "   filename=[" << filename << "]" << endl;
+          //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of force/positions entries in OUTCAR; line=[ " << vcontent.at(iline+iat+2) << "]" << "   filename=[" << filename << "]" << endl;
           message << "Wrong number of force/positions entries in OUTCAR; line=[ " << vcontent.at(iline+iat+2) << "]" << "   filename=[" << filename << "]";
-          pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
           ERROR_flag=TRUE;
         }
         vpositions_cartesian.at(iat)[1]=aurostd::string2utype<double>(tokens.at(0));
@@ -1089,8 +1086,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // ----------------------------------------------------------------------
   // ENCUT EDIFF EDIFFG POTIM TEIN TEBEG TEEND SMASS NPACO APACO PSTRESS  
   // NBANDS NKPTS NSW NBLOCK KBLOCK IBRION NFREE ISIF IWAVPR ISYM TEIN TEBEG ISPIN
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD \"Electronic convergence/Ionic relaxation\" DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD \"Electronic convergence/Ionic relaxation\" DATA (" << time_delay(seconds) << ")" << endl;
   vline.clear();
   ENCUT=0.0;EDIFF=0.0;EDIFFG=0.0;POTIM=0.0;TEIN=0.0;TEBEG=0.0;TEEND=0.0;SMASS=0.0;NPACO=0.0;APACO=0.0;PSTRESS=0.0;pressure=0.0;     // 
   NBANDS=0;NKPTS=0;NSW=0;NBLOCK=0;KBLOCK=0;IBRION=0;NFREE=0;ISIF=0;IWAVPR=0;ISYM=0;TEIN=0;TEBEG=0;ISPIN=0; //
@@ -1122,15 +1119,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontentRED.at(iline),"NBANDS") && aurostd::substring2bool(vcontentRED.at(iline),"number of bands")) vline.push_back(vcontentRED.at(iline));
     if(aurostd::substring2bool(vcontentRED.at(iline),"total energy-change") && aurostd::substring2bool(vcontentRED.at(iline),"(2. order)")) vline.push_back(vcontentRED.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << " (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << " (" << time_delay(seconds) << ")" << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \"Ionic relaxation\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \"Ionic relaxation\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of \"Ionic relaxation\" in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {   // to the back
-    //   if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    //   if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     aurostd::StringSubst(vline.at(j),":"," ");
@@ -1178,37 +1175,37 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     }
   }
   if(LDEBUG) {
-    cerr << soliloquy << " ENCUT=" << ENCUT << endl;
-    cerr << soliloquy << " EDIFF=" << EDIFF << endl;
-    cerr << soliloquy << " EDIFFG=" << EDIFFG << endl;
-    cerr << soliloquy << " NSW=" << NSW << endl;
-    cerr << soliloquy << " NBLOCK=" << NBLOCK << endl;
-    cerr << soliloquy << " KBLOCK=" << KBLOCK << endl;
-    cerr << soliloquy << " IBRION=" << IBRION << endl;
-    cerr << soliloquy << " NFREE=" << NFREE << endl;
-    cerr << soliloquy << " ISIF=" << ISIF << endl;
-    cerr << soliloquy << " IWAVPR=" << IWAVPR << endl;
-    cerr << soliloquy << " ISYM=" << ISYM << endl;
-    cerr << soliloquy << " POTIM=" << POTIM << endl;
-    cerr << soliloquy << " TEIN=" << TEIN << endl;
-    cerr << soliloquy << " TEBEG=" << TEBEG << endl;
-    cerr << soliloquy << " TEEND=" << TEEND << endl;
-    cerr << soliloquy << " SMASS=" << SMASS << endl;
-    cerr << soliloquy << " NPACO=" << NPACO << endl;
-    cerr << soliloquy << " APACO=" << APACO << endl;
-    cerr << soliloquy << " PSTRESS=" << PSTRESS << endl;
-    cerr << soliloquy << " pressure(PSTRESS)=" << pressure << endl;
-    cerr << soliloquy << " NBANDS=" << NBANDS << endl;
-    cerr << soliloquy << " NKPTS=" << NKPTS << endl;
-    cerr << soliloquy << " ISPIN=" << ISPIN << endl;
-    cerr << soliloquy << " total_energy_change=" << total_energy_change << endl;
+    cerr << __AFLOW_FUNC__ << " ENCUT=" << ENCUT << endl;
+    cerr << __AFLOW_FUNC__ << " EDIFF=" << EDIFF << endl;
+    cerr << __AFLOW_FUNC__ << " EDIFFG=" << EDIFFG << endl;
+    cerr << __AFLOW_FUNC__ << " NSW=" << NSW << endl;
+    cerr << __AFLOW_FUNC__ << " NBLOCK=" << NBLOCK << endl;
+    cerr << __AFLOW_FUNC__ << " KBLOCK=" << KBLOCK << endl;
+    cerr << __AFLOW_FUNC__ << " IBRION=" << IBRION << endl;
+    cerr << __AFLOW_FUNC__ << " NFREE=" << NFREE << endl;
+    cerr << __AFLOW_FUNC__ << " ISIF=" << ISIF << endl;
+    cerr << __AFLOW_FUNC__ << " IWAVPR=" << IWAVPR << endl;
+    cerr << __AFLOW_FUNC__ << " ISYM=" << ISYM << endl;
+    cerr << __AFLOW_FUNC__ << " POTIM=" << POTIM << endl;
+    cerr << __AFLOW_FUNC__ << " TEIN=" << TEIN << endl;
+    cerr << __AFLOW_FUNC__ << " TEBEG=" << TEBEG << endl;
+    cerr << __AFLOW_FUNC__ << " TEEND=" << TEEND << endl;
+    cerr << __AFLOW_FUNC__ << " SMASS=" << SMASS << endl;
+    cerr << __AFLOW_FUNC__ << " NPACO=" << NPACO << endl;
+    cerr << __AFLOW_FUNC__ << " APACO=" << APACO << endl;
+    cerr << __AFLOW_FUNC__ << " PSTRESS=" << PSTRESS << endl;
+    cerr << __AFLOW_FUNC__ << " pressure(PSTRESS)=" << pressure << endl;
+    cerr << __AFLOW_FUNC__ << " NBANDS=" << NBANDS << endl;
+    cerr << __AFLOW_FUNC__ << " NKPTS=" << NKPTS << endl;
+    cerr << __AFLOW_FUNC__ << " ISPIN=" << ISPIN << endl;
+    cerr << __AFLOW_FUNC__ << " total_energy_change=" << total_energy_change << endl;
   }
 
   // if pressure correct enthalpy
   // ----------------------------------------------------------------------
   // ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RMAX (there are many)
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD \"ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RMAX\" DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD \"ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RMAX\" DATA (" << time_delay(seconds) << ")" << endl;
   vline.clear();
   vENMAX.clear();vENMIN.clear();vPOMASS.clear();vZVAL.clear();vEATOM.clear();vRCORE.clear();vRWIGS.clear();vEAUG.clear();vRAUG.clear();vRMAX.clear();
   for(uint iline=0;iline<vcontentRED.size();iline++) {
@@ -1224,15 +1221,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     //AS20200528
     if(aurostd::substring2bool(vcontentRED.at(iline),"NELECT") && aurostd::substring2bool(vcontentRED.at(iline),"total number of electrons")) vline.push_back(vcontentRED.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << " (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << " (" << time_delay(seconds) << ")" << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \"ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RAUG RMAX\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \"ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RAUG RMAX\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of \"ENMAX ENMIN POMASS ZVAL EATOM RCORE RWIGS EAUG RAUG RMAX\" in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {
-    // if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     //    if(LDEBUG) cerr << vline.at(j) << endl;
@@ -1261,37 +1258,37 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
   ENMAX=aurostd::max(vENMAX);
   ENMIN=aurostd::min(vENMIN);
-  if(LDEBUG) {cerr << soliloquy << " ENMAX=" << ENMAX << " vENMAX.size()=" << vENMAX.size() << ": "; for(uint i=0;i<vENMAX.size();i++) { cerr << vENMAX.at(i) << " "; } cerr << " " << endl;}
-  if(LDEBUG) {cerr << soliloquy << " ENMIN=" << ENMIN << " vENMIN.size()=" << vENMIN.size() << ": "; for(uint i=0;i<vENMIN.size();i++) { cerr << vENMIN.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ENMAX=" << ENMAX << " vENMAX.size()=" << vENMAX.size() << ": "; for(uint i=0;i<vENMAX.size();i++) { cerr << vENMAX.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ENMIN=" << ENMIN << " vENMIN.size()=" << vENMIN.size() << ": "; for(uint i=0;i<vENMIN.size();i++) { cerr << vENMIN.at(i) << " "; } cerr << " " << endl;}
 
   POMASS_sum=aurostd::sum(vPOMASS);POMASS_min=aurostd::min(vPOMASS);POMASS_max=aurostd::max(vPOMASS);
-  if(LDEBUG) {cerr << soliloquy << " POMASS_sum=" << POMASS_sum << " POMASS_min=" << POMASS_min << " POMASS_max=" << POMASS_max << " vPOMASS.size()=" << vPOMASS.size() << ": "; for(uint i=0;i<vPOMASS.size();i++) { cerr << vPOMASS.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " POMASS_sum=" << POMASS_sum << " POMASS_min=" << POMASS_min << " POMASS_max=" << POMASS_max << " vPOMASS.size()=" << vPOMASS.size() << ": "; for(uint i=0;i<vPOMASS.size();i++) { cerr << vPOMASS.at(i) << " "; } cerr << " " << endl;}
 
   ZVAL_sum=aurostd::sum(vZVAL);ZVAL_min=aurostd::min(vZVAL);ZVAL_max=aurostd::max(vZVAL);
-  if(LDEBUG) {cerr << soliloquy << " ZVAL_sum=" << ZVAL_sum << " ZVAL_min=" << ZVAL_min << " ZVAL_max=" << ZVAL_max << " vZVAL.size()=" << vZVAL.size() << ": "; for(uint i=0;i<vZVAL.size();i++) { cerr << vZVAL.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ZVAL_sum=" << ZVAL_sum << " ZVAL_min=" << ZVAL_min << " ZVAL_max=" << ZVAL_max << " vZVAL.size()=" << vZVAL.size() << ": "; for(uint i=0;i<vZVAL.size();i++) { cerr << vZVAL.at(i) << " "; } cerr << " " << endl;}
 
   EATOM_min=aurostd::min(vEATOM);EATOM_max=aurostd::max(vEATOM);
-  if(LDEBUG) {cerr << soliloquy << " EATOM_min=" << EATOM_min << " EATOM_max=" << EATOM_max << " vEATOM.size()=" << vEATOM.size() << ": "; for(uint i=0;i<vEATOM.size();i++) { cerr << vEATOM.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EATOM_min=" << EATOM_min << " EATOM_max=" << EATOM_max << " vEATOM.size()=" << vEATOM.size() << ": "; for(uint i=0;i<vEATOM.size();i++) { cerr << vEATOM.at(i) << " "; } cerr << " " << endl;}
 
   RCORE_min=aurostd::min(vRCORE);RCORE_max=aurostd::max(vRCORE);
-  if(LDEBUG) {cerr << soliloquy << " RCORE_min=" << RCORE_min << " RCORE_max=" << RCORE_max << " vRCORE.size()=" << vRCORE.size() << ": "; for(uint i=0;i<vRCORE.size();i++) { cerr << vRCORE.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RCORE_min=" << RCORE_min << " RCORE_max=" << RCORE_max << " vRCORE.size()=" << vRCORE.size() << ": "; for(uint i=0;i<vRCORE.size();i++) { cerr << vRCORE.at(i) << " "; } cerr << " " << endl;}
 
   RWIGS_min=aurostd::min(vRWIGS);RWIGS_max=aurostd::max(vRWIGS);
-  if(LDEBUG) {cerr << soliloquy << " RWIGS_min=" << RWIGS_min << " RWIGS_max=" << RWIGS_max << " vRWIGS.size()=" << vRWIGS.size() << ": "; for(uint i=0;i<vRWIGS.size();i++) { cerr << vRWIGS.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RWIGS_min=" << RWIGS_min << " RWIGS_max=" << RWIGS_max << " vRWIGS.size()=" << vRWIGS.size() << ": "; for(uint i=0;i<vRWIGS.size();i++) { cerr << vRWIGS.at(i) << " "; } cerr << " " << endl;}
 
   EAUG_min=aurostd::min(vEAUG);EAUG_max=aurostd::max(vEAUG);
-  if(LDEBUG) {cerr << soliloquy << " EAUG_min=" << EAUG_min << " EAUG_max=" << EAUG_max << " vEAUG.size()=" << vEAUG.size() << ": "; for(uint i=0;i<vEAUG.size();i++) { cerr << vEAUG.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EAUG_min=" << EAUG_min << " EAUG_max=" << EAUG_max << " vEAUG.size()=" << vEAUG.size() << ": "; for(uint i=0;i<vEAUG.size();i++) { cerr << vEAUG.at(i) << " "; } cerr << " " << endl;}
 
   RAUG_min=aurostd::min(vRAUG);RAUG_max=aurostd::max(vRAUG);
-  if(LDEBUG) {cerr << soliloquy << " RAUG_min=" << RAUG_min << " RAUG_max=" << RAUG_max << " vRAUG.size()=" << vRAUG.size() << ": "; for(uint i=0;i<vRAUG.size();i++) { cerr << vRAUG.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RAUG_min=" << RAUG_min << " RAUG_max=" << RAUG_max << " vRAUG.size()=" << vRAUG.size() << ": "; for(uint i=0;i<vRAUG.size();i++) { cerr << vRAUG.at(i) << " "; } cerr << " " << endl;}
 
   RMAX_min=aurostd::min(vRMAX);RMAX_max=aurostd::max(vRMAX);
-  if(LDEBUG) {cerr << soliloquy << " RMAX_min=" << RMAX_min << " RMAX_max=" << RMAX_max << " vRMAX.size()=" << vRMAX.size() << ": "; for(uint i=0;i<vRMAX.size();i++) { cerr << vRMAX.at(i) << " "; } cerr  << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RMAX_min=" << RMAX_min << " RMAX_max=" << RMAX_max << " vRMAX.size()=" << vRMAX.size() << ": "; for(uint i=0;i<vRMAX.size();i++) { cerr << vRMAX.at(i) << " "; } cerr  << " " << endl;}
 
   // ----------------------------------------------------------------------
   // KINETIC AND METAGGA DATA
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD KINETIC AND METAGGA DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD KINETIC AND METAGGA DATA (" << time_delay(seconds) << ")" << endl;
   isKIN=FALSE;
   isMETAGGA=FALSE;
   METAGGA="";
@@ -1300,7 +1297,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontent.at(iline),"partial kinetic energy density read in")) { isKIN=TRUE; }
     if(aurostd::substring2bool(vcontent.at(iline),"METAGGA")) { vline.push_back(vcontent.at(iline)); }
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
 
   if(vline.size()>0) {
     aurostd::string2tokens(vline.at(0),tokens,"=");
@@ -1314,15 +1311,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " isKIN=" << isKIN << endl;
-  if(LDEBUG) cerr << soliloquy << " isMETAGGA=" << isMETAGGA << endl;
-  if(LDEBUG) cerr << soliloquy << " METAGGA=" << METAGGA << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " isKIN=" << isKIN << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " isMETAGGA=" << isMETAGGA << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " METAGGA=" << METAGGA << endl;
 
   // ----------------------------------------------------------------------
   // PSEUDOPOTENTIAL DATA
   // LDEBUG=1;
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD PSEUDOPOTENTIAL DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD PSEUDOPOTENTIAL DATA (" << time_delay(seconds) << ")" << endl;
 
   vline.clear();
   vTITEL.clear();
@@ -1332,67 +1329,67 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(aurostd::substring2bool(vcontentRED.at(iline),"TITEL")) {
         aurostd::string2tokens(vcontentRED.at(iline),tokens,"=");
         if(tokens.size()>1) vTITEL.push_back(tokens.at(1));
-        //	if(LDEBUG) cerr << soliloquy << " TITEL=" << tokens.at(1) << endl;
+        //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " TITEL=" << tokens.at(1) << endl;
       }
       if(aurostd::substring2bool(vcontentRED.at(iline),"LEXCH")) {
         if(!aurostd::substring2bool(vcontentRED.at(iline),"exchange")) {
           aurostd::string2tokens(vcontentRED.at(iline),tokens,"=");
           if(tokens.size()>1) vLEXCH.push_back(tokens.at(1));
-          //	if(LDEBUG) cerr << soliloquy << " LEXCH=" << tokens.at(1) << endl;
+          //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " LEXCH=" << tokens.at(1) << endl;
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vTITEL.size()=" << vTITEL.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vLEXCH.size()=" << vLEXCH.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vEATOM.size()=" << vEATOM.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vRMAX.size()=" << vRMAX.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vTITEL.size()=" << vTITEL.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vLEXCH.size()=" << vLEXCH.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vEATOM.size()=" << vEATOM.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vRMAX.size()=" << vRMAX.size() << endl;
   if(vTITEL.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (TITEL) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (TITEL) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (TITEL) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;  
   } //CO20200106 - patching for auto-indenting
   if(vLEXCH.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (LEXCH) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (LEXCH) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (LEXCH) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;  
   } //CO20200106 - patching for auto-indenting
   if(vEATOM.size()==0) {
     message << "Wrong number of pseudopotentials (EATOM) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vRMAX.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (RMAX) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (RMAX) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (RMAX) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }   //CO20200106 - patching for auto-indenting
   if(vTITEL.size()!=vLEXCH.size()) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (TITEL/LEXCH) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (TITEL/LEXCH) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (TITEL/LEXCH) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vLEXCH.size()!=vEATOM.size()) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (LEXCH/EATOM) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (LEXCH/EATOM) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (LEXCH/EATOM) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vEATOM.size()!=vRMAX.size()) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of pseudopotentials (EATOM/RMAX) in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of pseudopotentials (EATOM/RMAX) in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of pseudopotentials (EATOM/RMAX) in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }   //CO20200106 - patching for auto-indenting
 
   for(uint j=0;j<vTITEL.size();j++) {
-    if(LDEBUG) cerr << soliloquy << " SPECIES(" << j << ") " << endl;
-    if(LDEBUG) cerr << soliloquy << " vTITEL.at(j)=" << vTITEL.at(j) << endl;
-    if(LDEBUG) cerr << soliloquy << " vLEXCH.at(j)=" << vLEXCH.at(j) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " SPECIES(" << j << ") " << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vTITEL.at(j)=" << vTITEL.at(j) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vLEXCH.at(j)=" << vLEXCH.at(j) << endl;
     aurostd::string2tokens(vTITEL.at(j),tokens," ");
     pp_type=tokens.at(0);
     if(pp_type=="US" or pp_type=="NC") {
@@ -1405,10 +1402,10 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         }
       }
     }
-    if(pp_type=="PAW") pp_type="PAW_LDA"; // cerr << soliloquy << " PAW_LDA" << endl;
+    if(pp_type=="PAW") pp_type="PAW_LDA"; // cerr << __AFLOW_FUNC__ << " PAW_LDA" << endl;
     if(isKIN) pp_type+="_KIN";
     if(isMETAGGA) pp_type+=":"+METAGGA;
-    if(LDEBUG) cerr << soliloquy << " pp_type=" << pp_type << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " pp_type=" << pp_type << endl;
     species.push_back(KBIN::VASP_PseudoPotential_CleanName(tokens.at(1)));
     species_Z.push_back(xelement::symbol2Z(KBIN::VASP_PseudoPotential_CleanName(tokens.at(1))));
     species_pp.push_back(tokens.at(1));
@@ -1424,7 +1421,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     species_pp_groundstate_energy.push_back(xPOT.species_pp_groundstate_energy.at(0));
     species_pp_groundstate_structure.push_back(xPOT.species_pp_groundstate_structure.at(0));
 
-    if(LDEBUG) cerr << soliloquy << " SPECIES(" << j << ") [pp, type, version, AUID] = "
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " SPECIES(" << j << ") [pp, type, version, AUID] = "
       << species.at(species.size()-1) << " ["
         << species_Z.at(species_Z.size()-1) << ", "
         << species_pp.at(species_pp.size()-1) << ", "
@@ -1437,32 +1434,32 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   //CO20210213 - check types are all the same, if not issue warning/error (mixing is not advisable)
   for(uint i=0;i<species_pp_type.size();i++){
     if(species_pp_type[i]!=pp_type){
-      pflow::logger(_AFLOW_FILE_NAME_,soliloquy,"Mismatch in species_pp_types ("+species_pp_type[i]+" vs. "+pp_type+")",*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"Mismatch in species_pp_types ("+species_pp_type[i]+" vs. "+pp_type+")",*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_,QUIET);
     }
   }
 
 
-  if(LDEBUG) cerr << soliloquy << " PSEUDOPOTENTIAL type = " << pp_type << endl;
-  if(LDEBUG) cerr << soliloquy << " species.size()=" << species.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_Z.size()=" << species_Z.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp.size()=" << species_pp.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_type.size()=" << species_pp_type.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_version.size()=" << species_pp_version.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_AUID.size()=" << species_pp_AUID.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_groundstate_energy.size()=" << species_pp_groundstate_energy.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_groundstate_structure.size()=" << species_pp_groundstate_structure.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " PSEUDOPOTENTIAL type = " << pp_type << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species.size()=" << species.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_Z.size()=" << species_Z.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp.size()=" << species_pp.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_type.size()=" << species_pp_type.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_version.size()=" << species_pp_version.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_AUID.size()=" << species_pp_AUID.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_groundstate_energy.size()=" << species_pp_groundstate_energy.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_groundstate_structure.size()=" << species_pp_groundstate_structure.size() << endl;
   if(species_pp_AUID_collisions.size()) {
-    //[CO20200404 - OBSOLETE]cerr << soliloquy << " COLLISION species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
+    //[CO20200404 - OBSOLETE]cerr << __AFLOW_FUNC__ << " COLLISION species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
     message << "COLLISION species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size();
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
 
   // ----------------------------------------------------------------------
   // LDAU DATA
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD LDAU DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD LDAU DATA (" << time_delay(seconds) << ")" << endl;
   for(uint j=0;j<species.size();j++) 
     species_pp_vLDAU.push_back(deque<double>());  // make space for LDAU
 
@@ -1477,7 +1474,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   int LDAUT=0;
   stringstream sdata_ldau;
   if(vline.size()!=0) {
-    if(LDEBUG) cerr << soliloquy << " LDAU calculation in OUTCAR" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " LDAU calculation in OUTCAR" << endl;
     vector<int> vLDAUL;vector<double> vLDAUU,vLDAUJ;
     for(uint j=0;j<vline.size();j++) {
       aurostd::string2tokens(vline.at(j),tokens,"=");
@@ -1491,26 +1488,26 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(j==3) for(uint i=0;i<tokens.size();i++) vLDAUJ.push_back(((int) 100*aurostd::string2utype<double>(tokens.at(i)))/100.0);
     }
     if(species_pp_vLDAU.size()!=species.size()) {
-      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << soliloquy << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != species.size()[" << species.size() << "]" << "   filename=[" << filename << "]" << endl;
+      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != species.size()[" << species.size() << "]" << "   filename=[" << filename << "]" << endl;
       message << "species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != species.size()[" << species.size() << "]" << "   filename=[" << filename << "]";
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
       ERROR_flag=TRUE;
     }
     if(species_pp_vLDAU.size()!=vLDAUL.size()) {
-      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << soliloquy << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUL.size()[" << vLDAUL.size() << "]" << "   filename=[" << filename << "]" << endl;
+      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUL.size()[" << vLDAUL.size() << "]" << "   filename=[" << filename << "]" << endl;
       message << "species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUL.size()[" << vLDAUL.size() << "]" << "   filename=[" << filename << "]";
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
       ERROR_flag=TRUE;
     }
     if(species_pp_vLDAU.size()!=vLDAUU.size()) {
-      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << soliloquy << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUU.size()[" << vLDAUU.size() << "]" << "   filename=[" << filename << "]" << endl;
+      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUU.size()[" << vLDAUU.size() << "]" << "   filename=[" << filename << "]" << endl;
       message << "species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUU.size()[" << vLDAUU.size() << "]" << "   filename=[" << filename << "]";
       ERROR_flag=TRUE;
     }
     if(species_pp_vLDAU.size()!=vLDAUJ.size()) {
-      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << soliloquy << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUJ.size()[" << vLDAUJ.size() << "]" << "   filename=[" << filename << "]" << endl;
+      //[CO20200404 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " ERROR - species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUJ.size()[" << vLDAUJ.size() << "]" << "   filename=[" << filename << "]" << endl;
       message << "species_pp_vLDAU.size()[" << species_pp_vLDAU.size() << "] != vLDAUJ.size()[" << vLDAUJ.size() << "]" << "   filename=[" << filename << "]";
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
       ERROR_flag=TRUE;
     }
     for(uint j=0;j<species.size();j++) {
@@ -1522,17 +1519,17 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
     if(LDEBUG) { 
       //
-      cout << soliloquy << " LDA_type=" << LDAUT << endl;
+      cout << __AFLOW_FUNC__ << " LDA_type=" << LDAUT << endl;
       //
-      cout << soliloquy << " LDAU_L=";
+      cout << __AFLOW_FUNC__ << " LDAU_L=";
       for(uint i=0;i<vLDAUL.size();i++) cout << vLDAUL.at(i) << ((i<vLDAUL.size()-1)?",":""); 
       cout << endl;
       //
-      cout << soliloquy << " LDAU_U=";
+      cout << __AFLOW_FUNC__ << " LDAU_U=";
       for(uint i=0;i<vLDAUU.size();i++) cout << vLDAUU.at(i) << ((i<vLDAUU.size()-1)?",":""); 
       cout << endl;
       //
-      cout << soliloquy << " LDAU_J=";
+      cout << __AFLOW_FUNC__ << " LDAU_J=";
       for(uint i=0;i<vLDAUJ.size();i++) cout << vLDAUJ.at(i) << ((i<vLDAUJ.size()-1)?",":"");
       cout << endl;
     }
@@ -1546,22 +1543,22 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     string_LDAU=sdata_ldau.str();
   }else{
     //CO20210713 - push back 0 for no +U
-    if(LDEBUG) cerr << soliloquy << " LDAU calculation NOT FOUND in OUTCAR" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " LDAU calculation NOT FOUND in OUTCAR" << endl;
     for(uint j=0;j<species.size();j++) {
       species_pp_vLDAU.at(j).push_back(LDAUT);
     }
-    if(LDEBUG) { cout << soliloquy << " LDA_type=" << LDAUT << endl;}
+    if(LDEBUG) { cout << __AFLOW_FUNC__ << " LDA_type=" << LDAUT << endl;}
     //[CO+ME20210713 - keep legacy behavior, only print when non-zero]sdata_ldau << aurostd::utype2string(LDAUT);
     //[CO+ME20210713 - keep legacy behavior, only print when non-zero]string_LDAU=sdata_ldau.str();
   }
 
-  if(LDEBUG) cerr << soliloquy << " string_LDAU=" << string_LDAU << endl;
-  if(LDEBUG) cerr << soliloquy << " species_pp_vLDAU.size()=" << species_pp_vLDAU.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " string_LDAU=" << string_LDAU << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " species_pp_vLDAU.size()=" << species_pp_vLDAU.size() << endl;
 
   // ----------------------------------------------------------------------
   // DOS related values:
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD DOS related values DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD DOS related values DATA (" << time_delay(seconds) << ")" << endl;
   EMIN=0.0;EMAX=0.0;SIGMA=0.0;ISMEAR=0;  // for aflowlib_libraries.cpp 
   vline.clear();
   for(uint iline=vcontentRED.size()-1;iline<vcontentRED.size();iline--)  //CO20200404
@@ -1572,15 +1569,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontentRED.at(iline),"ISMEAR") && aurostd::substring2bool(vcontentRED.at(iline),"broadening in eV")) vline.push_back(vcontentRED.at(iline));
     if(aurostd::substring2bool(vcontentRED.at(iline),"SIGMA") && aurostd::substring2bool(vcontentRED.at(iline),"broadening in eV")) vline.push_back(vcontentRED.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \"DOS related values\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \"DOS related values\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of \"DOS related values\" in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {
-    //   if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    //   if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     //    if(LDEBUG) cerr << vline.at(j) << endl;
@@ -1592,15 +1589,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(tokens.at(k)=="SIGMA" && k+1<tokens.size()) SIGMA=aurostd::string2utype<double>(tokens.at(k+1));
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " EMIN=" << EMIN << endl;}
-  if(LDEBUG) {cerr << soliloquy << " EMAX=" << EMAX << endl;}
-  if(LDEBUG) {cerr << soliloquy << " ISMEAR=" << ISMEAR << endl;}
-  if(LDEBUG) {cerr << soliloquy << " SIGMA=" << SIGMA << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EMIN=" << EMIN << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EMAX=" << EMAX << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ISMEAR=" << ISMEAR << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " SIGMA=" << SIGMA << endl;}
 
   // ----------------------------------------------------------------------
   // Electronic relaxation
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD Electronic relaxation DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD Electronic relaxation DATA (" << time_delay(seconds) << ")" << endl;
   IALGO=0;                      // for aflowlib_libraries.cpp
   LDIAG="";                     // for aflowlib_libraries.cpp
   IMIX=0;INIMIX=0;MIXPRE=0;     // for aflowlib_libraries.cpp
@@ -1617,15 +1614,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontentRED.at(iline),"AMIN")) vline.push_back(vcontentRED.at(iline));
     if(aurostd::substring2bool(vcontentRED.at(iline),"WC") && aurostd::substring2bool(vcontentRED.at(iline),"INIMIX") && aurostd::substring2bool(vcontentRED.at(iline),"MIXPRE")) vline.push_back(vcontentRED.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \"Electronic relaxation\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \"Electronic relaxation\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of \"Electronic relaxation\" in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {
-    //  if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    //  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     //    if(LDEBUG) cerr << vline.at(j) << endl;
@@ -1644,22 +1641,22 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(tokens.at(k)=="MIXPRE" && k+1<tokens.size()) MIXPRE=aurostd::string2utype<int>(tokens.at(k+1));
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " IALGO=" << IALGO << endl;}
-  if(LDEBUG) {cerr << soliloquy << " LDIAG=" << LDIAG << endl;}
-  if(LDEBUG) {cerr << soliloquy << " IMIX=" << IMIX << endl;}
-  if(LDEBUG) {cerr << soliloquy << " AMIX=" << AMIX << endl;}
-  if(LDEBUG) {cerr << soliloquy << " BMIX=" << BMIX << endl;}
-  if(LDEBUG) {cerr << soliloquy << " AMIX_MAG=" << AMIX_MAG << endl;}
-  if(LDEBUG) {cerr << soliloquy << " BMIX_MAG=" << BMIX_MAG << endl;}
-  if(LDEBUG) {cerr << soliloquy << " AMIN=" << AMIN << endl;}
-  if(LDEBUG) {cerr << soliloquy << " WC=" << WC << endl;}
-  if(LDEBUG) {cerr << soliloquy << " INIMIX=" << INIMIX << endl;}
-  if(LDEBUG) {cerr << soliloquy << " MIXPRE=" << MIXPRE << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " IALGO=" << IALGO << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " LDIAG=" << LDIAG << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " IMIX=" << IMIX << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " AMIX=" << AMIX << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " BMIX=" << BMIX << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " AMIX_MAG=" << AMIX_MAG << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " BMIX_MAG=" << BMIX_MAG << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " AMIN=" << AMIN << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " WC=" << WC << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " INIMIX=" << INIMIX << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " MIXPRE=" << MIXPRE << endl;}
 
   // ----------------------------------------------------------------------
   // Intra band minimization
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD Intra band minimization DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD Intra band minimization DATA (" << time_delay(seconds) << ")" << endl;
   WEIMIN=0.0;EBREAK=0.0;DEPER=0.0;TIME=0.0;  // for aflowlib_libraries.cpp
   vline.clear();
   for(uint iline=vcontentRED.size()-1;iline<vcontentRED.size();iline--)  //CO20200404
@@ -1670,15 +1667,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontentRED.at(iline),"DEPER") && aurostd::substring2bool(vcontentRED.at(iline),"relativ break condition")) vline.push_back(vcontentRED.at(iline));
     if(aurostd::substring2bool(vcontentRED.at(iline),"TIME") && aurostd::substring2bool(vcontentRED.at(iline),"timestep for ELM")) vline.push_back(vcontentRED.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \"Intra band minimization\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \"Intra band minimization\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
     message << "Wrong number of \"Intra band minimization\" in OUTCAR" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {
-    //  if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    //  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     //    if(LDEBUG) cerr << vline.at(j) << endl;
@@ -1690,15 +1687,15 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(tokens.at(k)=="TIME" && k+1<tokens.size()) TIME=aurostd::string2utype<double>(tokens.at(k+1));
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " WEIMIN=" << WEIMIN << endl;}
-  if(LDEBUG) {cerr << soliloquy << " EBREAK=" << EBREAK << endl;}
-  if(LDEBUG) {cerr << soliloquy << " DEPER=" << DEPER << endl;}
-  if(LDEBUG) {cerr << soliloquy << " TIME=" << TIME; cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " WEIMIN=" << WEIMIN << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EBREAK=" << EBREAK << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DEPER=" << DEPER << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " TIME=" << TIME; cerr << endl;}
 
   // ----------------------------------------------------------------------
   // LOAD NWEIGHTS VKPOINT
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD NWEIGHTS KPOINTLIST DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD NWEIGHTS KPOINTLIST DATA (" << time_delay(seconds) << ")" << endl;
   uint nkpoints_line=0;
   nweights=0;
   nkpoints_irreducible=0;
@@ -1712,14 +1709,14 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   { //CO20200106 - patching for auto-indenting
     if(aurostd::substring2bool(vcontent.at(iline),"Found") && aurostd::substring2bool(vcontent.at(iline),"irreducible k-points")) {vline.push_back(vcontent.at(iline));nkpoints_line=iline+4;}
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
   //[CO20200404 - breaks for all OUTCAR.bands]if(vline.size()==0) {
-  //[CO20200404 - breaks for all OUTCAR.bands]  //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " wrong number of \" LOAD NWEIGHTS VKPOINT\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
+  //[CO20200404 - breaks for all OUTCAR.bands]  //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " wrong number of \" LOAD NWEIGHTS VKPOINT\" in OUTCAR" << "   filename=[" << filename << "]" << endl;
   //[CO20200404 - breaks for all OUTCAR.bands]  message << "Wrong number of \" LOAD NWEIGHTS VKPOINT\" in OUTCAR" << "   filename=[" << filename << "]";
-  //[CO20200404 - breaks for all OUTCAR.bands]  pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+  //[CO20200404 - breaks for all OUTCAR.bands]  pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
   //[CO20200404 - breaks for all OUTCAR.bands]  ERROR_flag=TRUE;
   for(uint j=0;j<vline.size();j++) {
-    if(LDEBUG) cerr << soliloquy << " vline.at(" << j << ")=" << vline.at(j) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.at(" << j << ")=" << vline.at(j) << endl;
     aurostd::StringSubst(vline.at(j),"="," ");
     aurostd::StringSubst(vline.at(j),";"," ");
     //    if(LDEBUG) cerr << vline.at(j) << endl;
@@ -1728,7 +1725,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(tokens.at(k)=="Found" && k+1<tokens.size()) nkpoints_irreducible=aurostd::string2utype<uint>(tokens.at(k+1));
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " nkpoints_irreducible=" << nkpoints_irreducible << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " nkpoints_irreducible=" << nkpoints_irreducible << endl;}
 
   if(nkpoints_irreducible) {
     for(uint iline=nkpoints_line;(iline<nkpoints_line+nkpoints_irreducible && iline<vcontent.size());iline++) {
@@ -1744,7 +1741,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         minweight=aurostd::min(minweight,aurostd::string2utype<uint>(tokens.at(3)));
         nweights+=aurostd::string2utype<uint>(tokens.at(3));
       } else {
-        //	if(!QUIET) cerr << soliloquy << " error in NWEIGHTS/VKPOINT calculation tokens.size()=" << tokens.size() << endl;
+        //	if(!QUIET) cerr << __AFLOW_FUNC__ << " error in NWEIGHTS/VKPOINT calculation tokens.size()=" << tokens.size() << endl;
       }
     }
     nkpoints_line+=3;
@@ -1758,21 +1755,21 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         kpoint[3]=aurostd::string2utype<double>(tokens.at(2));
         vkpoint_cartesian.push_back(kpoint); // cerr.precision(20);
       } else {
-        //	if(!QUIET) cerr << soliloquy << " error in NWEIGHTS/VKPOINT calculation tokens.size()=" << tokens.size() << endl;
+        //	if(!QUIET) cerr << __AFLOW_FUNC__ << " error in NWEIGHTS/VKPOINT calculation tokens.size()=" << tokens.size() << endl;
       }
     }
   }
   //  nweights=nweights/minweight; 
-  if(LDEBUG) cerr << soliloquy << " vkpoint_reciprocal.size()=" << vkpoint_reciprocal.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vkpoint_cartesian.size()=" << vkpoint_cartesian.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vweights.size()=" << vweights.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " nweights=" << nweights << endl;
-  if(LDEBUG) cerr << soliloquy << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vkpoint_reciprocal.size()=" << vkpoint_reciprocal.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vkpoint_cartesian.size()=" << vkpoint_cartesian.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vweights.size()=" << vweights.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nweights=" << nweights << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
 
   // ----------------------------------------------------------------------
   // LOAD CALCULATION STUFF
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
-  if(LDEBUG) cerr << soliloquy << " LOAD CALCULATION STUFF DATA (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD CALCULATION STUFF DATA (" << time_delay(seconds) << ")" << endl;
   // CALCULATION_CORES
   calculation_cores=1;
   for(uint iline=0;iline<vcontent.size();iline++) 
@@ -1786,7 +1783,7 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(tokens.size()>2) calculation_cores=aurostd::string2utype<uint>(tokens.at(2));
   }
   if(calculation_cores<1) calculation_cores=1; 
-  if(LDEBUG) cerr << soliloquy << " calculation_cores=" << calculation_cores << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " calculation_cores=" << calculation_cores << endl;
   // CALCULATION_TIME
   calculation_time=0.0;
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--){  // NEW FROM THE BACK
@@ -1798,14 +1795,14 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     }
   }
   if(line.empty()) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " in OUTCAR (no calculation_time)" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " in OUTCAR (no calculation_time)" << "   filename=[" << filename << "]" << endl;
     message << "In OUTCAR (no calculation_time)" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   aurostd::string2tokens(line,tokens);
   if(tokens.size()>1) calculation_time=aurostd::string2utype<double>(tokens.at(tokens.size()-1));
-  if(LDEBUG) cerr << soliloquy << " calculation_time=" << calculation_time << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " calculation_time=" << calculation_time << endl;
   // CALCULATION_MEMORY 
   calculation_memory=0.0;
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
@@ -1815,25 +1812,25 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         break;
       } 
   if(line.empty()) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< soliloquy << " in OUTCAR (no calculation_memory)" << "   filename=[" << filename << "]" << endl;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " in OUTCAR (no calculation_memory)" << "   filename=[" << filename << "]" << endl;
     message << "In OUTCAR (no calculation_memory)" << "   filename=[" << filename << "]";
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   aurostd::string2tokens(line,tokens); //   cerr << tokens.at(3) << endl;
   if(tokens.size()>3) calculation_memory=aurostd::string2utype<double>(tokens.at(3));
-  if(LDEBUG) cerr << soliloquy << " calculation_memory=" << calculation_memory << endl;
-  if(LDEBUG) cerr << soliloquy << " ---------------------------------" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " calculation_memory=" << calculation_memory << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ---------------------------------" << endl;
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
 
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - "<< soliloquy << " ERROR_flag set in xOUTCAR" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - "<< __AFLOW_FUNC__ << " ERROR_flag set in xOUTCAR" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xOUTCAR";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -1844,10 +1841,9 @@ bool xOUTCAR::GetXStructure() {
   //CO20211107 - this is good for OUTCAR.static or .bands which only has one structure inside
   //use GetIonicStepsData() otherwise
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xOUTCAR::GetXStructure():";
   xstr.clear(); //DX20191220 - uppercase to lowercase clear
 
-  if(LDEBUG) {cerr << soliloquy << " Trying to build the xstructure from the OUTCAR" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " Trying to build the xstructure from the OUTCAR" << endl;}
 
   //get lattice
   bool found_lattice,found_types,found_positions;
@@ -1866,12 +1862,12 @@ bool xOUTCAR::GetXStructure() {
       aurostd::string2tokens(vcontent[iline],tokens);
       if((tokens.size()>5) && (tokens[0] == "direct") && (tokens[1] == "lattice") && (tokens[2] == "vectors") &&
           (tokens[3] == "reciprocal") && (tokens[4] == "lattice") && (tokens[5] == "vectors")){
-        if(LDEBUG) {cerr << soliloquy << " lattice found!" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " lattice found!" << endl;}
         found_lattice=true;
         //
         tokens=GetCorrectPositions(vcontent[iline+1],6);
         if(!tokens.size()){
-          if(LDEBUG) {cerr << soliloquy << " line with lattice vector is ill-written, see: " << vcontent[iline+1] << endl;}
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " line with lattice vector is ill-written, see: " << vcontent[iline+1] << endl;}
           return false;
         }
         lattice(1,1)=aurostd::string2utype<double>(tokens[0]);
@@ -1883,7 +1879,7 @@ bool xOUTCAR::GetXStructure() {
         //
         tokens=GetCorrectPositions(vcontent[iline+2],6);
         if(!tokens.size()){
-          if(LDEBUG) {cerr << soliloquy << " line with lattice vector is ill-written, see: " << vcontent[iline+2] << endl;}
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " line with lattice vector is ill-written, see: " << vcontent[iline+2] << endl;}
           return false;
         }
         lattice(2,1)=aurostd::string2utype<double>(tokens[0]);
@@ -1895,7 +1891,7 @@ bool xOUTCAR::GetXStructure() {
         //
         tokens=GetCorrectPositions(vcontent[iline+3],6);
         if(!tokens.size()){
-          if(LDEBUG) {cerr << soliloquy << " line with lattice vector is ill-written, see: " << vcontent[iline+3] << endl;}
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " line with lattice vector is ill-written, see: " << vcontent[iline+3] << endl;}
           return false;
         }
         lattice(3,1)=aurostd::string2utype<double>(tokens[0]);
@@ -1912,7 +1908,7 @@ bool xOUTCAR::GetXStructure() {
       if((tokens.size()>2) && (tokens[0]=="ions") && (tokens[1]=="per") && (tokens[2]=="type")){
         aurostd::string2tokens(vcontent[iline],tokens,"=");
         if(tokens.size()!=2){continue;}
-        if(LDEBUG) {cerr << soliloquy << " types found!" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " types found!" << endl;}
         found_types=true;
         token=tokens[1];
         aurostd::string2tokens(token,tokens);
@@ -1926,11 +1922,11 @@ bool xOUTCAR::GetXStructure() {
     }
   }
   if(!found_lattice){
-    if(LDEBUG) {cerr << soliloquy << " lattice not found" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " lattice not found" << endl;}
     return false;
   }
   if(!found_types){
-    if(LDEBUG) {cerr << soliloquy << " types not found" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " types not found" << endl;}
     return false;
   }
 
@@ -1946,7 +1942,7 @@ bool xOUTCAR::GetXStructure() {
       if(!found_positions && (iline<(int)vcontent_size-natoms) && (tokens.size()>5) && (tokens[0] == "position") && (tokens[1] == "of") && (tokens[2] == "ions") &&
           (tokens[3] == "in") && (tokens[4] == "cartesian") && (tokens[5] == "coordinates")){
         found_positions=true;
-        if(LDEBUG) {cerr << soliloquy << " positions (cartesian) found!" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " positions (cartesian) found!" << endl;}
         atoms.clear();
         for(uint itype=0;itype<num_each_type.size();itype++){
           for(uint iatom=0;iatom<(uint)num_each_type[itype];iatom++){
@@ -1954,7 +1950,7 @@ bool xOUTCAR::GetXStructure() {
             atoms.back().type=itype;
             tokens=GetCorrectPositions(vcontent[iline+atoms.size()],3);
             if(!tokens.size()){
-              if(LDEBUG) {cerr << soliloquy << " line with atom positions is ill-written, see: " << vcontent[iline+atoms.size()] << endl;}
+              if(LDEBUG) {cerr << __AFLOW_FUNC__ << " line with atom positions is ill-written, see: " << vcontent[iline+atoms.size()] << endl;}
               return false;
             }
             cpos(1)=aurostd::string2utype<double>(tokens[0]);
@@ -1968,7 +1964,7 @@ bool xOUTCAR::GetXStructure() {
       if(!found_positions && (iline<(int)vcontent_size-natoms) && (tokens.size()>5) && (tokens[0] == "position") && (tokens[1] == "of") && (tokens[2] == "ions") &&
           (tokens[3] == "in") && (tokens[4] == "fractional") && (tokens[5] == "coordinates")){
         found_positions=true;
-        if(LDEBUG) {cerr << soliloquy << " positions (fractional) found!" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " positions (fractional) found!" << endl;}
         atoms.clear();
         for(uint itype=0;itype<num_each_type.size();itype++){
           for(uint iatom=0;iatom<(uint)num_each_type[itype];iatom++){
@@ -1976,7 +1972,7 @@ bool xOUTCAR::GetXStructure() {
             atoms.back().type=itype;
             tokens=GetCorrectPositions(vcontent[iline+atoms.size()],3);
             if(!tokens.size()){
-              if(LDEBUG) {cerr << soliloquy << " line with atom positions is ill-written, see: " << vcontent[iline+atoms.size()] << endl;}
+              if(LDEBUG) {cerr << __AFLOW_FUNC__ << " line with atom positions is ill-written, see: " << vcontent[iline+atoms.size()] << endl;}
               return false;
             }
             fpos(1)=aurostd::string2utype<double>(tokens[0]);
@@ -1991,7 +1987,7 @@ bool xOUTCAR::GetXStructure() {
   }
 
   if(!found_positions){
-    if(LDEBUG) {cerr << soliloquy << " atom positions not found" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " atom positions not found" << endl;}
     return false;
   }
 
@@ -2024,26 +2020,26 @@ bool xOUTCAR::GetXStructure() {
   xstr.FixLattices();
   //xstr.atoms=atoms;
   for(uint i=0;i<atoms.size();i++){
-    xstr.AddAtom(atoms[i]);
+    xstr.AddAtom(atoms[i],false); //CO20230319 - add by type
     xstr.partial_occupation_sublattice.push_back(_pocc_no_sublattice_); //default!
   }
   xstr.MakeBasis();
 
   if(LDEBUG) {
-    cerr << soliloquy << " lattice" << endl;
+    cerr << __AFLOW_FUNC__ << " lattice" << endl;
     cerr << lattice << endl;
-    cerr << soliloquy << " klattice" << endl;
+    cerr << __AFLOW_FUNC__ << " klattice" << endl;
     cerr << 2.0*pi*klattice << endl;
-    cerr << soliloquy << " reciprocal of lattice (check)" << endl;
+    cerr << __AFLOW_FUNC__ << " reciprocal of lattice (check)" << endl;
     cerr << ReciprocalLattice(lattice) << endl;
-    cerr << soliloquy << " natoms = " << natoms << endl;
+    cerr << __AFLOW_FUNC__ << " natoms = " << natoms << endl;
     for(uint i=0;i<num_each_type.size();i++){
-      cerr << soliloquy << " num_each_type[" << i << "] = " << num_each_type[i] << endl;
+      cerr << __AFLOW_FUNC__ << " num_each_type[" << i << "] = " << num_each_type[i] << endl;
     }
     for(uint i=0;i<atoms.size();i++){
-      cerr << soliloquy << " atom[" << i << "] type=" << atoms[i].type << " cpos=" << atoms[i].cpos << " fpos=" << atoms[i].fpos << endl;
+      cerr << __AFLOW_FUNC__ << " atom[" << i << "] type=" << atoms[i].type << " cpos=" << atoms[i].cpos << " fpos=" << atoms[i].fpos << endl;
     }
-    cerr << soliloquy << " full xstructure" << endl;
+    cerr << __AFLOW_FUNC__ << " full xstructure" << endl;
     cerr << xstr << endl;
   }
 
@@ -2209,23 +2205,22 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
   //OUTPUT: iedge - index of VBT
 
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xOUTCAR::GetBandEdge():";
 
   //////////////////////////////////////////////////////////////////////////////
   //tests of stupidity ROUND 1 - START
 
   if(b_energies.size() != b_occs.size()){
-    if(LDEBUG) {cerr << soliloquy << " size of energies != size of occupations" << endl;} 
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " size of energies != size of occupations" << endl;} 
     return false;
   }
   if(b_energies.size()==0){
-    if(LDEBUG) {cerr << soliloquy << " no input energies or occupations found" << endl;} 
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " no input energies or occupations found" << endl;} 
     return false;
   }
 
   if(!(ISPIN==1 || ISPIN==2) || NKPTS==0 || NBANDS==0){
     if(!GetProperties(content) || !(ISPIN==1 || ISPIN==2) || NKPTS==0 || NBANDS==0){
-      if(LDEBUG) {cerr << soliloquy << " GetProperties failed." << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " GetProperties failed." << endl;}
       return false;
     }
   }
@@ -2237,7 +2232,7 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
     efermi_tol=Efermi-EFERMI;                             //generlly, E-fermi BANDS > E-fermi STATIC
     if(std::signbit(efermi_tol)){efermi_tol=energy_tol;}  //just in case
   }
-  if(LDEBUG) {cerr << soliloquy << " tol(E-fermi)=" << efermi_tol << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " tol(E-fermi)=" << efermi_tol << endl;}
 
   double full_occ = (ISPIN==1 ? 2.0 : 1.0);
 
@@ -2247,7 +2242,7 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
   //two bands with the same energy should also be sorted by occs:  see ORC/Al1Pd1Sm1_ICSD_609058 k-point 21 (spin=1)
   //looks like VASP band indices are completely meaningless!
   if(!orderBands(b_energies,b_occs,energy_tol)){
-    if(LDEBUG) {cerr << soliloquy << " cannot sort band energies and occupations, this is VERY odd!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " cannot sort band energies and occupations, this is VERY odd!" << endl;}
     return false;
   }
 
@@ -2257,13 +2252,13 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
   for(int iband=(int)b_energies.size()-2;iband>=0;iband--){ //-2 because we compare iband and iband+1
     if(found_full_occ){
       if(!(abs(full_occ-b_occs[iband])<occ_tol)){
-        if(LDEBUG) {cerr << soliloquy << " drop from full_occ to non-full_occ (iband=" << iband+1 << "), this is VERY odd!" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " drop from full_occ to non-full_occ (iband=" << iband+1 << "), this is VERY odd!" << endl;}
         return false;
       }
     }
     if(abs(full_occ-b_occs[iband])<occ_tol){found_full_occ=true;}
     if(std::signbit(b_occs[iband]-b_occs[iband+1]) && aurostd::isdifferent(b_occs[iband],b_occs[iband+1],occ_tol)){
-      if(LDEBUG) {cerr << soliloquy << " occupation decreased at lower energy (iband=" << iband+1 << "), this is VERY odd!" << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " occupation decreased at lower energy (iband=" << iband+1 << "), this is VERY odd!" << endl;}
       return false;
     }
   }
@@ -2281,7 +2276,7 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
     if(abs(full_occ-b_occs[iband])<occ_tol && abs(b_occs[iband+1])<occ_tol){
       iedge=iband;
       if(LDEBUG) {
-        cerr << soliloquy << " sharp edge found between energies " << b_energies[iedge] << ",";
+        cerr << __AFLOW_FUNC__ << " sharp edge found between energies " << b_energies[iedge] << ",";
         cerr << b_energies[iedge+1] << " (ibands=" << iedge+1 << "," << iedge+2 << ")" << endl;
       }
       return true;
@@ -2295,22 +2290,22 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
 
   //band energy edges should not be near E-fermi
   if(b_energies[0]>-efermi_tol){
-    if(LDEBUG) {cerr << soliloquy << " first band energy is near/above E-fermi!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " first band energy is near/above E-fermi!" << endl;}
     return false;
   }
   if(b_energies[b_energies.size()-1]<efermi_tol){
-    if(LDEBUG) {cerr << soliloquy << " last band energy is near/below E-fermi!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " last band energy is near/below E-fermi!" << endl;}
     return false;
   }
 
   //first band should be fully occupied
   if(abs(full_occ-b_occs[0])>=occ_tol){
-    if(LDEBUG) {cerr << soliloquy << " first band is not fully occupied!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " first band is not fully occupied!" << endl;}
     return false;
   }
   //last band should be fully un-occupied
   if(abs(b_occs[b_occs.size()-1])>=occ_tol){
-    if(LDEBUG) {cerr << soliloquy << " last band is not fully un-occupied!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " last band is not fully un-occupied!" << endl;}
     //return false; //don't exit here, we might still have a legitimate soft edge, see FCC/C6Mn20W3_ICSD_618279
   }
 
@@ -2340,12 +2335,12 @@ bool xOUTCAR::GetBandEdge(vector<double>& b_energies,vector<double>& b_occs,doub
   }
 
   if(abs(occ_delta_max)<occ_tol){
-    if(LDEBUG) {cerr << soliloquy << " no edge found!" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " no edge found!" << endl;}
     return false;
   }
 
   if(LDEBUG) {
-    cerr << soliloquy << " soft edge found between energies " << b_energies[iedge] << ",";
+    cerr << __AFLOW_FUNC__ << " soft edge found between energies " << b_energies[iedge] << ",";
     cerr << b_energies[iedge+1] << " (ibands=" << iedge+1 << "," << iedge+2 << ")" << endl;
   }
   return true;
@@ -2577,12 +2572,11 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 
   //repetita iuvant!!!!!!!!
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xOUTCAR::GetBandGap():";
   stringstream message;
   bool force_exit=false; //[CO20210621 - we will now exit gracefully]XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   if((content == "") || (vcontent.size() == 0)) {
-    //[CO20200404 - OBSOLETE]ERROR = soliloquy + " xOUTCAR needs to be loaded before. \n"
+    //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " xOUTCAR needs to be loaded before. \n"
     //[CO20200404 - OBSOLETE]  "        GetProperties(const stringstream&); \n"
     //[CO20200404 - OBSOLETE]  "        GetProperties(const string&); \n"
     //[CO20200404 - OBSOLETE]  "        GetPropertiesFile(const string&); \n";
@@ -2591,20 +2585,20 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     message << "GetProperties(const stringstream&);" << endl;
     message << "GetProperties(const string&);" << endl;
     message << "GetPropertiesFile(const string&);" << endl;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _INPUT_MISSING_);
   }
-  if(LDEBUG) {cerr << soliloquy << " OUTCAR content found" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " OUTCAR content found" << endl;}
 
   //quick check if GetProperties() failed
   if(!(ISPIN==1 || ISPIN==2) || NKPTS==0 || NBANDS==0){
     if(!GetProperties(content) || !(ISPIN==1 || ISPIN==2) || NKPTS==0 || NBANDS==0){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " GetProperties failed. \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " GetProperties failed. \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "GetProperties() failed";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " OUTCAR properties retrieved" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " OUTCAR properties retrieved" << endl;}
 
   // GET FERMI LEVEL
   if(EFERMI==AUROSTD_NAN){
@@ -2614,7 +2608,7 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     //since it is not self-consistent, it does not fill in states correctly
     //static is the best way to go!
 
-    if(LDEBUG) {cerr << soliloquy << " Using Efermi from CURRENT OUTCAR (recommended to use Efermi from OUTCAR.static)" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " Using Efermi from CURRENT OUTCAR (recommended to use Efermi from OUTCAR.static)" << endl;}
     EFERMI=Efermi;
   }
 
@@ -2623,29 +2617,29 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
   // silly to load in POSCAR when all the information is in OUTCAR
   if(!xstr.atoms.size()){ //assume it's already loaded
     if(!GetXStructure()){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " GetXStructure failed. \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " GetXStructure failed. \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "GetXStructure() failed";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " xstructure built from OUTCAR" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " xstructure built from OUTCAR" << endl;}
 
   double kpt_tol;
   if(xstr.CalculateSymmetry()){kpt_tol=xstr.sym_eps;}
   else {kpt_tol=SYM::defaultTolerance(xstr);}
-  if(LDEBUG) {cerr << soliloquy << " kpt_tol=" << kpt_tol << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " kpt_tol=" << kpt_tol << endl;}
   // ----------------------------------------------------------------------
 
   vector<uint> starting_lines;
   if(!GetStartingKPointLines(starting_lines)){
-    //[CO20200404 - OBSOLETE]ERROR = soliloquy + " Unable to grab starting k-point lines. \n";
+    //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " Unable to grab starting k-point lines. \n";
     //[CO20200404 - OBSOLETE]return false;
     message << "Unable to grab starting k-point lines";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_CORRUPT_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_CORRUPT_);
   }
   if(LDEBUG) {
-    cerr << soliloquy << " reading k-points starting at line";
+    cerr << __AFLOW_FUNC__ << " reading k-points starting at line";
     cerr << (starting_lines.size()==2 ? "s: " : ": ");
     cerr << starting_lines[0];
     cerr << (starting_lines.size()==2 ? " and "+aurostd::utype2string(starting_lines[1]) : "");
@@ -2680,25 +2674,25 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       kpt_found=isKPointLine(iline,kpoint);
       if((int)ikpt!=kpt_found){
         if(kpt_found==-1 && ikpt<1000){  //ONLY exception, above 999, VASP starting writing ***, so ignore this check starting at 1000
-          //[CO20200404 - OBSOLETE]ERROR = soliloquy + " missing k-point "+aurostd::utype2string(ikpt)+
+          //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " missing k-point "+aurostd::utype2string(ikpt)+
           //[CO20200404 - OBSOLETE]  " (spin="+aurostd::utype2string(ispin+1)+") \n";
           //[CO20200404 - OBSOLETE]return false;
           message << "Missing k-point " << ikpt << " (spin=" << ispin+1 << ")";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_CORRUPT_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_CORRUPT_);
         }
       }
-      if(LDEBUG) {cerr << soliloquy << " looking at k-point[" << ikpt << "]=" << kpoint << " (spin=" << ispin+1 << ")" << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " looking at k-point[" << ikpt << "]=" << kpoint << " (spin=" << ispin+1 << ")" << endl;}
 
       /////////////////////////////////////////////
       //BANDS analysis - START
       vkpoints[ispin].push_back(kpoint);  //push back kpoints even if empty channel
 
       if(!ProcessKPoint(iline,EFERMI,b_energies,b_occs)){
-        //[CO20200404 - OBSOLETE]ERROR = soliloquy + " unable to process k-point "+aurostd::utype2string(ikpt)+
+        //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " unable to process k-point "+aurostd::utype2string(ikpt)+
         //[CO20200404 - OBSOLETE]  " (spin="+aurostd::utype2string(ispin+1)+") \n";
         //[CO20200404 - OBSOLETE]return false;
         message << "Unable to process k-point " << ikpt << " (spin=" << ispin+1 << +")";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
 
       //keep vedges, vVBT, vCBB same size as vkpoints
@@ -2716,7 +2710,7 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
           partially_empty_channel[ispin]=1;
           if(first_kpt_empty==-1){first_kpt_empty=1;}
           if(first_spin_empty==-1){first_spin_empty=ispin;}
-          //ERROR = soliloquy + " unable to detetc band edge for k-point "+aurostd::utype2string(1)+
+          //ERROR = __AFLOW_FUNC__ + " unable to detetc band edge for k-point "+aurostd::utype2string(1)+
           //  " (spin="+aurostd::utype2string(ispin+1)+") \n";
           //return false;
         }//[CO20210621 - always save good vedges, even if empty channel] else {
@@ -2725,13 +2719,13 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
         vCBB[ispin].back()=b_energies[iedge+1];
         //[CO20210621 - always save good vedges, even if empty channel]}
       }else{  //special case
-        if(LDEBUG) {cerr << soliloquy << " no band edge found for k-point[" << ikpt << "]=" << kpoint << " (spin=" << ispin+1 << ")" << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " no band edge found for k-point[" << ikpt << "]=" << kpoint << " (spin=" << ispin+1 << ")" << endl;}
         if(ikpt!=1){  
           //if we get here, kpt==1 presents an edge, but current k-point does not
           //therefore, current k-point is the outlier
           //inconsistency within channel
           partially_empty_channel[ispin]=1;
-          //ERROR = soliloquy + " unable to detect band edge for k-point "+aurostd::utype2string(ikpt)+
+          //ERROR = __AFLOW_FUNC__ + " unable to detect band edge for k-point "+aurostd::utype2string(ikpt)+
           //  " (spin="+aurostd::utype2string(ispin+1)+") \n";
           //return false;
         }
@@ -2745,11 +2739,11 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 
       //can we find the next kpoint?
       if(ikpt<(uint)NKPTS && !GetNextKPointLine(iline)){
-        //[CO20200404 - OBSOLETE]ERROR = soliloquy + " missing k-point "+aurostd::utype2string(ikpt+1)+
+        //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " missing k-point "+aurostd::utype2string(ikpt+1)+
         //[CO20200404 - OBSOLETE]  " (spin="+aurostd::utype2string(ispin+1)+") \n";
         //[CO20200404 - OBSOLETE]return false;
         message << "Missing k-point " << ikpt+1 << " (spin=" << ispin+1 << +")";
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_CORRUPT_);
       }
     }
   }
@@ -2759,12 +2753,12 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
   //these runs should be rerun - they are garbage!
   if(0){  //CO20210621 - moved below
     if(empty_channel[0]==1 || (ISPIN==2 && empty_channel[1]==1)){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " unable to detect band edge for k-point "+aurostd::utype2string(first_kpt_empty)+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " unable to detect band edge for k-point "+aurostd::utype2string(first_kpt_empty)+
       //[CO20200404 - OBSOLETE]  " (spin="+aurostd::utype2string(first_spin_empty+1)+"),"+
       //[CO20200404 - OBSOLETE]  " this system should be rerun with a wider energy range \n";
       message << "Unable to detect band edge for k-point " << first_kpt_empty << " (spin=" << first_spin_empty+1 << ")," << " this system should be rerun with a wider energy range";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
   }
 
@@ -2792,7 +2786,7 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     //[CO20210621 - check for metal first, even if empty]if(empty_channel[ispin]){broad_type[ispin]=empty;continue;}
     broad_type[ispin]=insulator;  //insulator unless proven otherwise
     for(uint ikpt=1;ikpt<vedges[ispin].size();ikpt++){
-      if(LDEBUG){cerr << soliloquy << " looking at vedges[ispin=" << ispin << "][ikpt-1=" << ikpt-1 << "]=" << vedges[ispin][ikpt-1] << " vs. " << vedges[ispin][ikpt] << "=vedges[ispin=" << ispin << "][ikpt=" << ikpt << "]" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking at vedges[ispin=" << ispin << "][ikpt-1=" << ikpt-1 << "]=" << vedges[ispin][ikpt-1] << " vs. " << vedges[ispin][ikpt] << "=vedges[ispin=" << ispin << "][ikpt=" << ikpt << "]" << endl;}
       if(vedges[ispin][ikpt-1]==AUROSTD_MAX_UINT||vedges[ispin][ikpt]==AUROSTD_MAX_UINT){continue;}
       if(vedges[ispin][ikpt-1]!=vedges[ispin][ikpt]){
         broad_type[ispin]=metal; //metal
@@ -2805,8 +2799,8 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
   for(uint ispin=0;ispin<(uint)ISPIN;ispin++){
     if(broad_type[ispin]==empty){
       message << "Unable to detect band edge for k-point " << first_kpt_empty << " (spin=" << first_spin_empty+1 << ")," << " this system should be rerun with a wider energy range";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
   }
 
@@ -2822,10 +2816,10 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       gap[ispin]=0.0;
       if(partially_empty_channel[ispin]==1){
         empty_type[ispin]=empty_partial;
-        if(LDEBUG) {cerr << soliloquy << " empty (partial) channel found spin=" << ispin+1 << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " empty (partial) channel found spin=" << ispin+1 << endl;}
       } else {
         empty_type[ispin]=empty_all;
-        if(LDEBUG) {cerr << soliloquy << " empty (all) channel found spin=" << ispin+1 << endl;}
+        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " empty (all) channel found spin=" << ispin+1 << endl;}
       }
       continue;
     }
@@ -2833,17 +2827,17 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     //modify starting here in the future for SEMI-metals (need DOS)
     else if(broad_type[ispin]==metal){
       gap[ispin]=0.0;
-      if(LDEBUG) {cerr << soliloquy << " metal found in spin=" << ispin+1 << endl;}
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " metal found in spin=" << ispin+1 << endl;}
       continue;
     }
     else if(broad_type[ispin]!=insulator){  //test of stupidity
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " unknown material type (!empty && !metal && !insulator) (spin="+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " unknown material type (!empty && !metal && !insulator) (spin="+
       //[CO20200404 - OBSOLETE]  aurostd::utype2string(ispin+1)+") \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Unknown material type (!empty && !metal && !insulator) (spin=" << ispin+1 << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
-    if(LDEBUG) {cerr << soliloquy << " insulator found in spin=" << ispin+1 << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " insulator found in spin=" << ispin+1 << endl;}
     max_VBT = (-1.0) * AUROSTD_MAX_DOUBLE;
     min_CBB =          AUROSTD_MAX_DOUBLE;
     //determine if direct/indirect insulator
@@ -2859,31 +2853,31 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       }
     }
     if(LDEBUG) {
-      cerr << soliloquy << " absolute VBT=" << max_VBT << " at k-point " << vkpoints[ispin][imax_VBT] << " (kpt=" << imax_VBT << ",spin=" << ispin+1 << ")" << endl;
-      cerr << soliloquy << " absolute CBB=" << min_CBB << " at k-point " << vkpoints[ispin][imin_CBB] << " (kpt=" << imin_CBB << ",spin=" << ispin+1 << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " absolute VBT=" << max_VBT << " at k-point " << vkpoints[ispin][imax_VBT] << " (kpt=" << imax_VBT << ",spin=" << ispin+1 << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " absolute CBB=" << min_CBB << " at k-point " << vkpoints[ispin][imin_CBB] << " (kpt=" << imin_CBB << ",spin=" << ispin+1 << ")" << endl;
     }
     vimax_VBTs_equiv.clear(); vimin_CBBs_equiv.clear();
     //grab any equivalently high/low extrema
     for(uint ikpt=0;ikpt<vkpoints[ispin].size();ikpt++){
       if(abs(max_VBT-vVBT[ispin][ikpt])<energy_tol){
         vimax_VBTs_equiv.push_back(ikpt);
-        if(LDEBUG && ikpt!=imax_VBT){cerr << soliloquy << " found equivalent VBT at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin+1 << ")" << endl;}
+        if(LDEBUG && ikpt!=imax_VBT){cerr << __AFLOW_FUNC__ << " found equivalent VBT at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin+1 << ")" << endl;}
       }
       if(abs(min_CBB-vCBB[ispin][ikpt])<energy_tol){
         vimin_CBBs_equiv.push_back(ikpt);
-        if(LDEBUG && ikpt!=imin_CBB){cerr << soliloquy << " found equivalent CBB at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin+1 << ")" << endl;}
+        if(LDEBUG && ikpt!=imin_CBB){cerr << __AFLOW_FUNC__ << " found equivalent CBB at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin+1 << ")" << endl;}
       }
     }
-    if(LDEBUG) {cerr << soliloquy << " removing duplicate k-points from VBT search (spin=" << ispin+1 << ")" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " removing duplicate k-points from VBT search (spin=" << ispin+1 << ")" << endl;}
     vbt_duplicate_remove=removeDuplicateKPoints(vkpoints[ispin],vimax_VBTs_equiv);
-    if(LDEBUG) {cerr << soliloquy << " removing duplicate k-points from CBB search (spin=" << ispin+1 << ")" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " removing duplicate k-points from CBB search (spin=" << ispin+1 << ")" << endl;}
     cbb_duplicate_remove=removeDuplicateKPoints(vkpoints[ispin],vimin_CBBs_equiv);
     if(!vbt_duplicate_remove || !cbb_duplicate_remove){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " cannot find equivalent band extrema (spin="+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " cannot find equivalent band extrema (spin="+
       //[CO20200404 - OBSOLETE]  aurostd::utype2string(ispin+1)+") \n";
       message << "Cannot find equivalent band extrema (spin=" << ispin+1 << ")";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
     //if we found more than one possible extrema, minimize kpoint distance between max/min
     //this simulates the electron trying to reduce momentum needed to conduct
@@ -2904,33 +2898,33 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       }
     }
     if(dist_min==AUROSTD_MAX_DOUBLE){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " cannot calculate k-point distance between band extrema (spin="+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " cannot calculate k-point distance between band extrema (spin="+
       //[CO20200404 - OBSOLETE]  aurostd::utype2string(ispin+1)+") \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Cannot calculate k-point distance between band extrema (spin=" << ispin+1 << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
-    if(LDEBUG){cerr << soliloquy << " dist_min=" << dist_min << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " dist_min=" << dist_min << endl;}
     if(LDEBUG){
-      cerr << soliloquy << " vCBB[ispin=" << ispin << "][imin_CBB=" << imin_CBB << "]=" << vCBB[ispin][imin_CBB] << endl;
-      cerr << soliloquy << " vVBT[ispin=" << ispin << "][imax_VBT=" << imax_VBT << "]=" << vVBT[ispin][imax_VBT] << endl;
+      cerr << __AFLOW_FUNC__ << " vCBB[ispin=" << ispin << "][imin_CBB=" << imin_CBB << "]=" << vCBB[ispin][imin_CBB] << endl;
+      cerr << __AFLOW_FUNC__ << " vVBT[ispin=" << ispin << "][imax_VBT=" << imax_VBT << "]=" << vVBT[ispin][imax_VBT] << endl;
     }
     gap[ispin]=vCBB[ispin][imin_CBB]-vVBT[ispin][imax_VBT];
     vimin_CBBs[ispin]=imin_CBB; //save for later spin loops
     vimax_VBTs[ispin]=imax_VBT; //save for later spin loops
-    if(LDEBUG){cerr << soliloquy << " gap[ispin=" << ispin << "]=" << gap[ispin] << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " gap[ispin=" << ispin << "]=" << gap[ispin] << endl;}
     if(gap[ispin]<0){ //test of stupidity, this should NEVER happen
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " negative band gap found, something broke (spin="+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " negative band gap found, something broke (spin="+
       //[CO20200404 - OBSOLETE]  aurostd::utype2string(ispin+1)+") \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Negative band gap found, something broke (spin=" << ispin+1 << ")";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
     gap_type[ispin]=(gap[ispin] < energy_tol ? zero_gap : non_zero_gap);
     insulator_type[ispin]=(abs(dist_min)<kpt_tol ? insulator_direct : insulator_indirect);
     if(LDEBUG) {
-      cerr << soliloquy << " ";
+      cerr << __AFLOW_FUNC__ << " ";
       cerr << (insulator_type[ispin]==insulator_indirect ? "IN" : "" ) << "DIRECT insulator ";
       cerr << "gap=" << gap[ispin] << " ";
       cerr << (gap_type[ispin]==zero_gap ? "(zero-gap) " : "");
@@ -2958,11 +2952,11 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       Egap[ispin]=_METALGAP_;
       Egap_type[ispin]="metal";
     } else if(broad_type[ispin]!=insulator){ //test of stupidity
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " unknown material type (!empty && !metal && !insulator) (spin="+
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " unknown material type (!empty && !metal && !insulator) (spin="+
       //[CO20200404 - OBSOLETE]  aurostd::utype2string(ispin+1)+") \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Unknown material type (!empty && !metal && !insulator) (spin=" << ispin+1 << ")";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     } else {
       valence_band_max[ispin]=vVBT[ispin][vimax_VBTs[ispin]];
       conduction_band_min[ispin]=vCBB[ispin][vimin_CBBs[ispin]];
@@ -3021,13 +3015,13 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     Egap_net=_METALGAP_;
     Egap_type_net="half-metal";
   } else if(!(broad_type[0]==insulator && broad_type[1]==insulator)){  //test of stupidity
-    //[CO20200404 - OBSOLETE]ERROR = soliloquy + " unknown material type (!insulator_spin-polarized) (spin-averaged) \n";
+    //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " unknown material type (!insulator_spin-polarized) (spin-averaged) \n";
     //[CO20200404 - OBSOLETE]return false;
     message << "Unknown material type (!insulator_spin-polarized) (spin-averaged)";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
   } else {  //do more work for 2 spin channels that are both insulating
     //get spin-averaged properties
-    if(LDEBUG) {cerr << soliloquy << " we have a spin-polarized insulator, need to find spin-averaged gap" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " we have a spin-polarized insulator, need to find spin-averaged gap" << endl;}
     double max_VBT_net,min_CBB_net;
     max_VBT_net = (-1.0) * AUROSTD_MAX_DOUBLE;
     min_CBB_net =          AUROSTD_MAX_DOUBLE;
@@ -3049,8 +3043,8 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       }
     }
     if(LDEBUG) {
-      cerr << soliloquy << " absolute VBT_net=" << max_VBT_net << " at k-point " << vkpoints[ispin_VBT_net][imax_VBT_net] << " (kpt=" << imax_VBT_net << ",spin=" << ispin_VBT_net << ")" << endl;
-      cerr << soliloquy << " absolute CBB_net=" << min_CBB_net << " at k-point " << vkpoints[ispin_VBT_net][imin_CBB_net] << " (kpt=" << imin_CBB_net << ",spin=" << ispin_CBB_net << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " absolute VBT_net=" << max_VBT_net << " at k-point " << vkpoints[ispin_VBT_net][imax_VBT_net] << " (kpt=" << imax_VBT_net << ",spin=" << ispin_VBT_net << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " absolute CBB_net=" << min_CBB_net << " at k-point " << vkpoints[ispin_VBT_net][imin_CBB_net] << " (kpt=" << imin_CBB_net << ",spin=" << ispin_CBB_net << ")" << endl;
     }
     vimax_VBTs_equiv_net.clear(); vispin_VBTs_net.clear(); vimin_CBBs_equiv_net.clear(); vispin_CBBs_net.clear();
     //grab any equivalently high/low extrema
@@ -3059,25 +3053,25 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
         if(abs(max_VBT_net-vVBT[ispin][ikpt])<energy_tol){
           vimax_VBTs_equiv_net.push_back(ikpt);
           vispin_VBTs_net.push_back(ispin);
-          if(LDEBUG && ikpt!=imax_VBT_net){cerr << soliloquy << " found equivalent VBT_net at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin << ")" << endl;}
+          if(LDEBUG && ikpt!=imax_VBT_net){cerr << __AFLOW_FUNC__ << " found equivalent VBT_net at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin << ")" << endl;}
         }
         if(abs(min_CBB_net-vCBB[ispin][ikpt])<energy_tol){
           vimin_CBBs_equiv_net.push_back(ikpt);
           vispin_CBBs_net.push_back(ispin);
-          if(LDEBUG && ikpt!=imin_CBB_net){cerr << soliloquy << " found equivalent CBB_net at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin << ")" << endl;}
+          if(LDEBUG && ikpt!=imin_CBB_net){cerr << __AFLOW_FUNC__ << " found equivalent CBB_net at " << vkpoints[ispin][ikpt] << " (kpt=" << ikpt << ",spin=" << ispin << ")" << endl;}
         }
       }
     }
-    if(LDEBUG) {cerr << soliloquy << " removing duplicate k-points from VBT search (spin-averaged)" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " removing duplicate k-points from VBT search (spin-averaged)" << endl;}
     vbt_duplicate_remove=removeDuplicateKPoints(vkpoints,vimax_VBTs_equiv_net,vispin_VBTs_net);
-    if(LDEBUG) {cerr << soliloquy << " removing duplicate k-points from CBB search (spin-averaged)" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " removing duplicate k-points from CBB search (spin-averaged)" << endl;}
     cbb_duplicate_remove=removeDuplicateKPoints(vkpoints,vimin_CBBs_equiv_net,vispin_CBBs_net);
     if(!vbt_duplicate_remove || !cbb_duplicate_remove){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " cannot find equivalent band extrema (spin-averaged) \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " cannot find equivalent band extrema (spin-averaged) \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Cannot find equivalent band extrema (spin-averaged)";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
     //if we found more than one possible extrema, minimize kpoint distance between max/min
     //this simulates the electron trying to reduce momentum needed to conduct
@@ -3098,26 +3092,26 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       }
     }
     if(dist_min==AUROSTD_MAX_DOUBLE){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " cannot calculate k-point distance between band extrema (spin-averaged) \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " cannot calculate k-point distance between band extrema (spin-averaged) \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Cannot calculate k-point distance between band extrema (spin-averaged)";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
     }
     valence_band_max_net=vVBT[ispin_VBT_net][imax_VBT_net];
     conduction_band_min_net=vCBB[ispin_CBB_net][imin_CBB_net];
     if(LDEBUG){
-      cerr << soliloquy << " vCBB[ispin_CBB_net=" << ispin_CBB_net << "][imin_CBB_net=" << imin_CBB_net << "]=" << vCBB[ispin_CBB_net][imin_CBB_net] << endl;
-      cerr << soliloquy << " vVBT[ispin_VBT_net=" << ispin_VBT_net << "][imax_VBT_net=" << imax_VBT_net << "]" << vVBT[ispin_VBT_net][imax_VBT_net] << endl;
+      cerr << __AFLOW_FUNC__ << " vCBB[ispin_CBB_net=" << ispin_CBB_net << "][imin_CBB_net=" << imin_CBB_net << "]=" << vCBB[ispin_CBB_net][imin_CBB_net] << endl;
+      cerr << __AFLOW_FUNC__ << " vVBT[ispin_VBT_net=" << ispin_VBT_net << "][imax_VBT_net=" << imax_VBT_net << "]" << vVBT[ispin_VBT_net][imax_VBT_net] << endl;
     }
     bool direct_insulator_net=abs(dist_min)<kpt_tol;
     double gap_net=(conduction_band_min_net-valence_band_max_net);
-    if(LDEBUG){cerr << soliloquy << " gap_net=" << gap_net << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " gap_net=" << gap_net << endl;}
     if(gap_net<0){ //test of stupidity, this should NEVER happen
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " negative band gap found, something broke (spin-averaged) \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " negative band gap found, something broke (spin-averaged) \n";
       //[CO20200404 - OBSOLETE]return false;
       message << "Negative band gap found, something broke (spin-averaged)";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
     bool zero_gap_net=gap_net < energy_tol;
     bool spin_polarized_net=ispin_VBT_net!=ispin_CBB_net;
@@ -3127,7 +3121,7 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       string(zero_gap_net ? "_zero-gap" : "")+
       string(spin_polarized_net ? "_spin-polarized" : "");
     if(LDEBUG) {
-      cerr << soliloquy << " ";
+      cerr << __AFLOW_FUNC__ << " ";
       cerr << (direct_insulator_net ? "" : "IN" ) << "DIRECT insulator ";
       cerr << "gap=" << gap_net << " ";
       cerr << (zero_gap_net ? "(zero-gap) " : "");
@@ -3166,7 +3160,7 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 //[CO20200404 - OBSOLETE]    message << "GetProperties(const stringstream&);" << endl;
 //[CO20200404 - OBSOLETE]    message << "GetProperties(const string&);" << endl;
 //[CO20200404 - OBSOLETE]    message << "GetPropertiesFile(const string&);" << endl;
-//[CO20200404 - OBSOLETE]    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _INPUT_MISSING_);
+//[CO20200404 - OBSOLETE]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _INPUT_MISSING_);
 //[CO20200404 - OBSOLETE]  }
 //[CO20200404 - OBSOLETE]
 //[CO20200404 - OBSOLETE]  uint tagcount = 0;
@@ -4111,9 +4105,12 @@ bool xOUTCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 //[CO20200404 - OBSOLETE]  return TRUE;
 //[CO20200404 - OBSOLETE]}
 
-bool xOUTCAR::GetIonicStepsData(){  //CO20211106
+/// @brief gets the ionic step data
+/// @authors
+/// @mod{CO,20211106,created function}
+/// @mod{SD,20221208,patched for VASP5 and VASP6}
+bool xOUTCAR::GetIonicStepsData(){
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xOUTCAR::GetIonicStepsData():";
   vxstr_ionic.clear();
   venergy_ionic.clear();
   vstresses_ionic.clear();
@@ -4138,7 +4135,7 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
       //vtokens[1] is the species_pp
       if(!aurostd::WithinList(species_pp,vtokens[1])){species_pp.push_back(vtokens[1]);}
       if(LDEBUG){
-        cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
+        cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
       }
     }
     if(aurostd::substring2bool(vcontent[iline],"ions") && //THIS MUST COME AFTER species_pp IS FILLED
@@ -4151,7 +4148,7 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
         if(vtokens.size()>0 && vtokens.size()==species_pp.size()){
           num_each_type=aurostd::vector2deque(aurostd::vectorstring2vectorutype<int>(vtokens));
           if(LDEBUG){
-            cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
+            cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
           }
           break;
         }
@@ -4160,9 +4157,9 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
   }
   uint natoms=aurostd::sum(num_each_type);
   if(LDEBUG){
-    cerr << soliloquy << " species_pp=" << aurostd::joinWDelimiter(species_pp,",") << endl;
-    cerr << soliloquy << " num_each_type=" << aurostd::joinWDelimiter(num_each_type,",") << endl;
-    cerr << soliloquy << " natoms=" << natoms << endl;
+    cerr << __AFLOW_FUNC__ << " species_pp=" << aurostd::joinWDelimiter(species_pp,",") << endl;
+    cerr << __AFLOW_FUNC__ << " num_each_type=" << aurostd::joinWDelimiter(num_each_type,",") << endl;
+    cerr << __AFLOW_FUNC__ << " natoms=" << natoms << endl;
   }
 
   uint ilattice=0,iatom=0,itype=0;
@@ -4172,7 +4169,12 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
   vector<_atom> vatoms; //must keep like this until we settle types...
   for(iline=0;iline<vcontent_size;iline++){
     if(reading_ionic==false){
-      if(aurostd::substring2bool(vcontent[iline],"ENERGIE")){
+      if(aurostd::substring2bool(vcontent[iline],"aborting") &&
+           aurostd::substring2bool(vcontent[iline],"loop") &&
+           aurostd::substring2bool(vcontent[iline],"because") &&
+           aurostd::substring2bool(vcontent[iline],"EDIFF") &&
+           aurostd::substring2bool(vcontent[iline],"is") &&
+           aurostd::substring2bool(vcontent[iline],"reached")){
         reading_ionic=true;
         reading_stresses=false;reading_lattice=false;reading_atoms=false;convert_kBar2eV=false;
         //clear everything, set stresses to 3 as an indicator that it's not set
@@ -4187,7 +4189,7 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
         reading_ionic=false;
         reading_stresses=false;
         if(xstr.atoms.size()==natoms && ilattice==3 && iatom==natoms && energy!=AUROSTD_MAX_DOUBLE && stresses[stresses.lrows]!=AUROSTD_MAX_DOUBLE){  //add additional checks as needed //stresses.rows==6
-          if(LDEBUG){cerr << soliloquy << " adding a new ionic step" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " adding a new ionic step" << endl;}
           vxstr_ionic.push_back(xstr);
           venergy_ionic.push_back(energy);
           vstresses_ionic.push_back(stresses);
@@ -4203,8 +4205,8 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
           aurostd::string2tokens(tmp_str,vtokens,"e");
           if(vtokens.size()>0){energy=aurostd::string2utype<double>(vtokens[0]);}
           if(LDEBUG){
-            cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
-            cerr << soliloquy << " energy=" << energy << endl;
+            cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
+            cerr << __AFLOW_FUNC__ << " energy=" << energy << endl;
           }
         }
       }
@@ -4216,8 +4218,8 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
             //stresses.resize(6);
             for(i=1;i<7;i++){stresses[stresses.lrows+i-1]=aurostd::string2utype<double>(vtokens[i]);}
             if(LDEBUG){
-              cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
-              cerr << soliloquy << " stresses(eV)=" << stresses << endl; //X Y Z XY YZ ZX //this is eV*volume of cell
+              cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
+              cerr << __AFLOW_FUNC__ << " stresses(eV)=" << stresses << endl; //X Y Z XY YZ ZX //this is eV*volume of cell
             }
           }
         }
@@ -4229,8 +4231,8 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
             for(i=2;i<8;i++){stresses[stresses.lrows+i-2]=aurostd::string2utype<double>(vtokens[i]);}
             convert_kBar2eV=true;
             if(LDEBUG){
-              cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
-              cerr << soliloquy << " stresses(kBar)=" << stresses << endl; //X Y Z XY YZ ZX
+              cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;
+              cerr << __AFLOW_FUNC__ << " stresses(kBar)=" << stresses << endl; //X Y Z XY YZ ZX
             }
           }
         }
@@ -4240,7 +4242,7 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
           aurostd::substring2bool(vcontent[iline],"vectors") &&
           aurostd::substring2bool(vcontent[iline],"reciprocal")){reading_lattice=true;reading_stresses=false;reading_atoms=false;ilattice=0;xstr.clear();continue;}
       if(reading_lattice && ilattice<3){
-        if(LDEBUG){cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;}
         vtokens=GetCorrectPositions(vcontent[iline],6); //aurostd::string2tokens(vcontent[iline],vtokens," ");
         if(vtokens.size()!=6){ilattice=0;reading_lattice=false;}  //also contains reciprocal lattice components //ilattice==0 is an indicator that lattice was not read (correctly)
         xstr.lattice[xstr.lattice.lrows+ilattice][xstr.lattice.lcols+0]=aurostd::string2utype<double>(vtokens[0]);
@@ -4248,18 +4250,18 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
         xstr.lattice[xstr.lattice.lrows+ilattice][xstr.lattice.lcols+2]=aurostd::string2utype<double>(vtokens[2]);
         ilattice++;
         if(ilattice==3){
-          if(LDEBUG){cerr << soliloquy << " xstr.lattice=" << endl << xstr.lattice << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " xstr.lattice=" << endl << xstr.lattice << endl;}
           xstr.scale=1.0;
           xstr.FixLattices();
           if(convert_kBar2eV){
             if(LDEBUG){
-              cerr << soliloquy << " xstr.GetVolume()=" << xstr.GetVolume() << endl;
-              cerr << soliloquy << " stresses(kBar)=" << stresses << endl; //X Y Z XY YZ ZX
-              cerr << soliloquy << " kBar2eV=" << kBar2eV << endl;
+              cerr << __AFLOW_FUNC__ << " xstr.GetVolume()=" << xstr.GetVolume() << endl;
+              cerr << __AFLOW_FUNC__ << " stresses(kBar)=" << stresses << endl; //X Y Z XY YZ ZX
+              cerr << __AFLOW_FUNC__ << " kBar2eV=" << kBar2eV << endl;
             }
             stresses*=(kBar2eV*xstr.GetVolume());
             if(LDEBUG){
-              cerr << soliloquy << " stresses(eV)=" << stresses << endl; //X Y Z XY YZ ZX //this is eV*volume of cell
+              cerr << __AFLOW_FUNC__ << " stresses(eV)=" << stresses << endl; //X Y Z XY YZ ZX //this is eV*volume of cell
             }
           }
           reading_lattice=false;
@@ -4267,7 +4269,7 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
       }
       if(aurostd::substring2bool(vcontent[iline],"POSITION") && aurostd::substring2bool(vcontent[iline],"TOTAL-FORCE")){reading_atoms=true;reading_stresses=false;reading_lattice=false;convert_kBar2eV=false;iatom=0;vatoms.clear();continue;}
       if(reading_atoms && iatom<natoms){
-        if(LDEBUG){cerr << soliloquy << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " vcontent[iline=" << iline << "]=\"" << vcontent[iline] << "\"" << endl;}
         if(aurostd::substring2bool(vcontent[iline],"---------")){continue;}
         vtokens=GetCorrectPositions(vcontent[iline],6); //aurostd::string2tokens(vcontent[iline],vtokens," ");
         if(vtokens.size()!=6){iatom=0;reading_atoms=false;}  //also contains force components //iatom==0 is an indicator that atoms were not read (correctly)
@@ -4283,14 +4285,14 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
               vatoms[iatom].name=species_pp[itype];
               vatoms[iatom].name_is_given=(!vatoms[iatom].name.empty());
               vatoms[iatom].fpos=xstr.c2f*vatoms[iatom].cpos;
-              xstr.AddAtom(vatoms[iatom]);
+              xstr.AddAtom(vatoms[iatom],false);  //CO20230319 - add by type
               xstr.partial_occupation_sublattice.push_back(_pocc_no_sublattice_);
               iatom++;
             }
           }
           xstr.title=SYSTEM;
           xstr.MakeBasis();
-          if(LDEBUG){cerr << soliloquy << " xstr=" << endl << xstr << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " xstr=" << endl << xstr << endl;}
           reading_atoms=false;
         }
       }
@@ -4300,135 +4302,44 @@ bool xOUTCAR::GetIonicStepsData(){  //CO20211106
   return true;
 }
 
-void xOUTCAR::populateAFLOWLIBEntry(aflowlib::_aflowlib_entry& data,const string& outcar_path){ //CO20220124
-  bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xOUTCAR::populateAFLOWLIBEntry():";
-
-  if(LDEBUG){cerr << soliloquy << " outcar_path=" << outcar_path << endl;}
-  data.clear();
-  data.vspecies.clear(); for(uint i=0;i<species.size();i++) { data.vspecies.push_back(species.at(i)); } // for aflowlib_libraries.cpp
-  data.nspecies=data.vspecies.size();
-  data.vspecies_pp_AUID.clear(); for(uint i=0;i<species_pp_AUID.size();i++) { data.vspecies_pp_AUID.push_back(species_pp_AUID.at(i)); } // for aflowlib_libraries.cpp
-  data.dft_type=pp_type;
-  data.METAGGA=METAGGA;
-
-  data.catalog="LIB"+aurostd::utype2string(data.vspecies.size()); //default
-  if(!outcar_path.empty()){
-    aflowlib::setAURL(data,aurostd::dirname(outcar_path));  //outcar_path is a path to a file, not a directory like directory_LIB
-  }
-
-  if(LDEBUG){
-    cerr << soliloquy << " vspecies=" << aurostd::joinWDelimiter(data.vspecies,",") << endl;
-    cerr << soliloquy << " vspecies_pp_AUID=" << aurostd::joinWDelimiter(data.vspecies_pp_AUID,",") << endl;
-    cerr << soliloquy << " dft_type=" << data.dft_type << endl;
-    cerr << soliloquy << " METAGGA=" << data.METAGGA << endl;
-    cerr << soliloquy << " aurl=" << data.aurl << endl;
-    cerr << soliloquy << " catalog=" << data.catalog << endl;
-  }
-}
-
-void xOUTCAR::WriteMTPCFG(stringstream& output_ss,const string& outcar_path){  //CO20211106
-  vector<string> velements;
-  return WriteMTPCFG(output_ss,outcar_path,velements);
-}
-void xOUTCAR::WriteMTPCFG(stringstream& output_ss,const string& outcar_path,const vector<string>& _velements){  //CO20211106
-  string soliloquy=XPID+"xOUTCAR::WriteMTPCFG():";
-
-  if(vxstr_ionic.size()!=venergy_ionic.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vxstr_ionic.size()!=venergy_ionic",_FILE_CORRUPT_);}
-  if(vxstr_ionic.size()!=vstresses_ionic.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vxstr_ionic.size()!=vstresses_ionic",_FILE_CORRUPT_);}
-
-  aflowlib::_aflowlib_entry data;
-  populateAFLOWLIBEntry(data,outcar_path);
-  vector<string> velements=_velements;
-  if(velements.empty()){velements=data.vspecies;}
-  bool FORMATION_CALC=false;
-
-  output_ss.setf(std::ios::fixed,std::ios::floatfield);
-  uint _precision_=_DOUBLE_WRITE_PRECISION_MAX_; //14; //was 16 SC 10 DM //CO20180515
-  output_ss.precision(_precision_);
-
-  string tab=" ";
-  uint istr,iatom,itype=0;
-  uint i=0,j=0;
-  int icoord=0;
-  bool found_itype=false;
-
-  for(istr=0;istr<vxstr_ionic.size();istr++){
-    const xstructure& a=vxstr_ionic[istr];
-    output_ss << "BEGIN_CFG" << endl;
-    output_ss << tab << "Size" << endl;
-    output_ss << tab << tab << a.atoms.size() << endl;
-    output_ss << tab << "Supercell" << endl;
-    for(i=1;i<=3;i++) {
-      for(j=1;j<=3;j++) {
-        output_ss << tab << tab << " ";
-        if(abs(a.lattice(i,j))<10.0) output_ss << " ";
-        if(!std::signbit(a.lattice(i,j))) output_ss << " ";
-        output_ss << a.lattice(i,j) << "";
-      }
-      output_ss << endl;
+/// @brief write ionic step data to JSON
+/// @param jo JSON object
+/// @param entry aflowlib entry
+/// @authors
+/// @mod{CO,20211106,created function}
+/// @mod{SD+HE,20221208,rewritten using JSON objects}
+void xOUTCAR::AddStepsIAPCFG(aurostd::JSON::object& jo, aflowlib::_aflowlib_entry& entry) {
+  if (vxstr_ionic.size() != venergy_ionic.size()) {throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "vxstr_ionic.size()!=venergy_ionic", _FILE_CORRUPT_);}
+  if (vxstr_ionic.size() != vstresses_ionic.size()) {throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "vxstr_ionic.size()!=vstresses_ionic", _FILE_CORRUPT_);}
+  //bool FORMATION_CALC = false;
+  vector<string> type;
+  vector<xvector<double>> fpos, force;
+  for(size_t istr = 0; istr < vxstr_ionic.size(); istr++) {
+    aurostd::JSON::object step(aurostd::JSON::object_types::DICTIONARY);
+    step["auid"] = entry.auid;
+    step["energy"] = venergy_ionic[istr];
+    step["lattice"] = vxstr_ionic[istr].lattice;
+    step["stress"] = vstresses_ionic[istr];
+    type.clear();
+    fpos.clear();
+    force.clear();
+    for(size_t iatom = 0; iatom < vxstr_ionic[istr].atoms.size(); iatom++) {
+      type.push_back(vxstr_ionic[istr].atoms[iatom].cleanname);
+      fpos.push_back(vxstr_ionic[istr].atoms[iatom].fpos);
+      force.push_back(vxstr_ionic[istr].atoms[iatom].force);
     }
-    output_ss << tab << "AtomData: id type direct_x direct_y direct_z  fx fy fz" << endl;
-    for(iatom=0;iatom<a.atoms.size();iatom++){
-      output_ss << tab << tab;
-      if(iatom<10) output_ss << "  ";
-      else if(iatom<100) output_ss << " ";
-      output_ss << iatom << " ";
-      if(0){
-        //this assumes all of the OUTCARs have the species in the right order
-        //if we're looking at the CrMn alloy, some systems in LIB2 have Mn only
-        //itype==1, base it on input velements (if available)
-        if(abs(a.atoms[iatom].type)<10) output_ss << "  ";
-        else if(abs(a.atoms[iatom].type)<100) output_ss << " ";
-        output_ss << a.atoms[iatom].type << " ";
-      }else{
-        found_itype=false;
-        for(itype=0;itype<velements.size()&&!found_itype;itype++){
-          if(a.atoms[iatom].cleanname==velements[itype]){
-            if(itype<10) output_ss << "  ";
-            else if(itype<100) output_ss << " ";
-            output_ss << itype << " ";
-            found_itype=true;
-          }
-        }
-        if(!found_itype){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"itype not found",_FILE_CORRUPT_);}
-      }
-      for(icoord=a.atoms[iatom].fpos.lrows;icoord<=a.atoms[iatom].fpos.urows;icoord++){
-        if(!std::signbit(a.atoms[iatom].fpos[icoord])) output_ss << " ";
-        output_ss << a.atoms[iatom].fpos[icoord] << (icoord<a.atoms[iatom].fpos.urows?" ":"");
-      }
-      output_ss << " ";
-      for(icoord=a.atoms[iatom].force.lrows;icoord<=a.atoms[iatom].force.urows;icoord++){
-        if(abs(a.atoms[iatom].force[icoord])<10) output_ss << "  ";
-        else if(abs(a.atoms[iatom].force[icoord])<100) output_ss << " ";
-        if(!std::signbit(a.atoms[iatom].force[icoord])) output_ss << " ";
-        output_ss << a.atoms[iatom].force[icoord] << (icoord<a.atoms[iatom].force.urows?" ":"");
-      }
-      output_ss << endl;
-    }
-    output_ss << tab << "Energy" << endl;
-    output_ss << tab << tab << venergy_ionic[istr] << endl;
-    output_ss << tab << "PlusStress: xx yy zz xy yz xz" << endl; //order as vasp
-    output_ss << tab << tab;
-    for(icoord=vstresses_ionic[istr].lrows;icoord<=vstresses_ionic[istr].urows;icoord++){
-      if(abs(vstresses_ionic[istr][icoord])<10) output_ss << "  ";
-      else if(abs(vstresses_ionic[istr][icoord])<100) output_ss << " ";
-      if(!std::signbit(vstresses_ionic[istr][icoord])) output_ss << " ";
-      output_ss << vstresses_ionic[istr][icoord] << (icoord<vstresses_ionic[istr].urows?" ":"");
-    }
-    output_ss << endl;
-    data.enthalpy_cell=data.enthalpy_atom=venergy_ionic[istr];
-    data.enthalpy_atom/=a.atoms.size();
-    FORMATION_CALC=aflowlib::LIB2RAW_Calculate_FormationEnthalpy(data,a,soliloquy);
-    if(FORMATION_CALC){
-      output_ss << tab << "Feature enthalpy_formation_atom " << data.enthalpy_formation_atom << endl;
-    }
-    output_ss << tab << "Feature EFS_by vasp" << endl;
-    output_ss << tab << "Feature from aflow.org:" << outcar_path << ":ionic_step=" << istr+1 << endl;
-    output_ss << tab << "Feature elements ";
-    for(itype=0;itype<a.species.size();itype++){output_ss << KBIN::VASP_PseudoPotential_CleanName(a.species[itype]);}
-    output_ss << endl;
-    output_ss << "END_CFG" << endl;
+    aurostd::JSON::object atoms(aurostd::JSON::object_types::DICTIONARY);
+    atoms["type"] = type;
+    atoms["position"] = fpos;
+    atoms["force"] = force;
+    step["atoms"] = atoms;
+  //  entry.enthalpy_cell = entry.enthalpy_atom = venergy_ionic[istr];
+  //  entry.enthalpy_atom /= vxstr_ionic[istr].atoms.size();
+  //  FORMATION_CALC = aflowlib::LIB2RAW_Calculate_FormationEnthalpy(entry, vxstr_ionic[istr], __AFLOW_FUNC__);
+  //  if (FORMATION_CALC) {
+  //    step["enthalpy_formation_atom"] = entry.enthalpy_formation_atom;
+  //  }
+    jo["data"].push_back(step);
   }
 
 }
@@ -4596,13 +4507,12 @@ bool xDOSCAR::GetPropertiesUrlFile(const string& url,const string& file,bool QUI
 
 bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy="xDOSCAR::GetProperties():";
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
   stringstream message;
 
   bool ERROR_flag=FALSE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -4615,7 +4525,7 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   if (vcontent.size() < 7) {
     //[CO20200404 - OBSOLETE]string function = "xDOSCAR::GetProperties()";
     message << "Broken DOSCAR: no content";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_ERROR_);
   }
   for(uint iline = 0; iline < 7;iline++) { //ME20190614 - Read header
     aurostd::string2tokens(vcontent.at(iline),tokens);
@@ -4662,7 +4572,7 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   if (partial) number_lines += number_atoms * (number_energies + 1);
   if (vcontent.size() < number_lines) {
     message << "Broken DOSCAR - not enough lines.";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_, soliloquy, message, _FILE_CORRUPT_);
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_CORRUPT_);
   }
   uint norbitals = 0;
   int d = 0, e = 0;
@@ -4735,7 +4645,7 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
             " DOSCAR is lm-resolved. If this is not the case, please put an"
             " INCAR" + ext + ", a vasprun.xml " + ext + ", or an"
             " OUTCAR" +  ext + " file into the working directory and try again.";
-          pflow::logger(_AFLOW_FILE_NAME_, "xDOSCAR::GetProperties()", message, std::cerr, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, "xDOSCAR::GetProperties()", message, std::cerr, _LOGGER_WARNING_,QUIET);
           isLSCOUPLING = true;
         }
         lmResolved = !(isLSCOUPLING);  // With 16 columns, it cannot be both
@@ -4766,7 +4676,7 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if (d == (int) ndos) {
         message << "DOSCAR contains more lines than the header suggests." << endl;
         message << "xDOSCAR object may not be properly populated.";
-        pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_oss, _LOGGER_WARNING_,QUIET);
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_oss, _LOGGER_WARNING_,QUIET);
         break;
       }
       e = 0;
@@ -4842,7 +4752,7 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   if ((d + 1 < (int) ndos) || (e < (int) number_energies)) {  //ME20191010: needs to be d + 1
     //[CO20200404 - OBSOLETE]string function = "xDOSCAR::GetProperties()";
     message << "Broken DOSCAR: not enough lines";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _FILE_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _FILE_ERROR_);
   }
   // fix denergy
   denergy=venergy.at(1)-venergy.at(0);
@@ -4887,39 +4797,39 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   if(0) cout << " spinF = " << ((spinF!=AUROSTD_NAN)?aurostd::utype2string(spinF,5):"unavailable") << endl;
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " title=" << title << endl;
-  if(LDEBUG) cerr << soliloquy << " spin=" << spin << endl;
-  if(LDEBUG) cerr << soliloquy << " Vol=" << Vol << endl;
-  if(LDEBUG) cerr << soliloquy << " lattice=" << lattice << endl;
-  if(LDEBUG) cerr << soliloquy << " POTIM=" << POTIM << endl;
-  if(LDEBUG) cerr << soliloquy << " temperature=" << temperature << endl;
-  if(LDEBUG) cerr << soliloquy << " RWIGS=" << RWIGS << endl;
-  if(LDEBUG) cerr << soliloquy << " Efermi=" << Efermi << endl;
-  if(LDEBUG) cerr << soliloquy << " spinF=" << spinF << endl;
-  if(LDEBUG) cerr << soliloquy << " number_energies=" << number_energies << endl;
-  if(LDEBUG) cerr << soliloquy << " energy_max=" << energy_max << " energy_min=" << energy_min << endl;
-  if(LDEBUG) cerr << soliloquy << " denergy=" << denergy << endl;
-  if(LDEBUG) cerr << soliloquy << " venergy.size()=" << venergy.size() << " venergyEf.size()=" << venergyEf.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vDOS.size()=" << vDOS.size() << ", " << vDOS[0].size() << ", " << vDOS[0][0].size() << ", " << vDOS[0][0][0].size() << std::endl;  //ME20190614 - new vDOS format
-  if(LDEBUG) cerr << soliloquy << " viDOS.size()=" << viDOS.size() << ", " << viDOS[0].size() << ", " << std::endl;  //ME20190614 - new viDOS format
-  //if(LDEBUG) cerr << soliloquy << " vDOS.size()=" << vDOS.size() << " vDOS.at(max).size()=" << vDOS.at(vDOS.size()-1).size() << endl;  OBSOLETE ME20190614
-  //if(LDEBUG) cerr << soliloquy << " viDOS.size()=" << viDOS.size() << " viDOS.at(max).size()=" << viDOS.at(viDOS.size()-1).size() << endl;  OBSOLETE ME20190614
-  //if(LDEBUG) cerr << soliloquy << " vDOSs.size()=" << vDOSs.size() << endl;  OBSOLETE ME20190614
-  // if(LDEBUG) cerr << soliloquy << " vDOSs.at(max).size()=" << vDOSs.at(vDOSs.size()-1).size() << endl;
-  //if(LDEBUG) cerr << soliloquy << " vDOSp.size()=" << vDOSp.size() << endl;  OBSOLETE ME20190614
-  // if(LDEBUG) cerr << soliloquy << " vDOSp.at(max).size()=" << vDOSp.at(vDOSp.size()-1).size() << endl;
-  //if(LDEBUG) cerr << soliloquy << " vDOSd.size()=" << vDOSd.size() << endl;  OBSOLETE ME20190614
-  // if(LDEBUG) cerr << soliloquy << " vDOSd.at(max).size()=" << vDOSd.at(vDOSd.size()-1).size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " title=" << title << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " spin=" << spin << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " Vol=" << Vol << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " lattice=" << lattice << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTIM=" << POTIM << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " temperature=" << temperature << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " RWIGS=" << RWIGS << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " Efermi=" << Efermi << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " spinF=" << spinF << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " number_energies=" << number_energies << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " energy_max=" << energy_max << " energy_min=" << energy_min << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " denergy=" << denergy << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " venergy.size()=" << venergy.size() << " venergyEf.size()=" << venergyEf.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOS.size()=" << vDOS.size() << ", " << vDOS[0].size() << ", " << vDOS[0][0].size() << ", " << vDOS[0][0][0].size() << std::endl;  //ME20190614 - new vDOS format
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " viDOS.size()=" << viDOS.size() << ", " << viDOS[0].size() << ", " << std::endl;  //ME20190614 - new viDOS format
+  //if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOS.size()=" << vDOS.size() << " vDOS.at(max).size()=" << vDOS.at(vDOS.size()-1).size() << endl;  OBSOLETE ME20190614
+  //if(LDEBUG) cerr << __AFLOW_FUNC__ << " viDOS.size()=" << viDOS.size() << " viDOS.at(max).size()=" << viDOS.at(viDOS.size()-1).size() << endl;  OBSOLETE ME20190614
+  //if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSs.size()=" << vDOSs.size() << endl;  OBSOLETE ME20190614
+  // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSs.at(max).size()=" << vDOSs.at(vDOSs.size()-1).size() << endl;
+  //if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSp.size()=" << vDOSp.size() << endl;  OBSOLETE ME20190614
+  // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSp.at(max).size()=" << vDOSp.at(vDOSp.size()-1).size() << endl;
+  //if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSd.size()=" << vDOSd.size() << endl;  OBSOLETE ME20190614
+  // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vDOSd.at(max).size()=" << vDOSd.at(vDOSd.size()-1).size() << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;  
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;  
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
   //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - xDOSCAR::GetProperties: ERROR_flag set in xDOSCAR" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xDOSCAR";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -4928,24 +4838,23 @@ bool xDOSCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 //CO20191217 - copies everything from spin channel 1 to spin channel 2
 void xDOSCAR::convertSpinOFF2ON() { //CO20191217
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xDOSCAR::convertSpinOFF2ON():";
-  if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
   uint iatom=0,iorbital=0;
 
   //check that it is truly SPIN-OFF
-  if(viDOS.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"viDOS.size()!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(viDOS.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"viDOS.size()!=1",_INPUT_ERROR_);}; //no conversion needed
   for(iatom=0;iatom<vDOS.size();iatom++){
     for(iorbital=0;iorbital<vDOS[iatom].size();iorbital++){
-      if(vDOS[iatom][iorbital].size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vDOS[iatom][iorbital].size()!=1",_INPUT_ERROR_);}; //no conversion needed
+      if(vDOS[iatom][iorbital].size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vDOS[iatom][iorbital].size()!=1",_INPUT_ERROR_);}; //no conversion needed
     }
   }
-  if(conduction_band_min.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"conduction_band_min.size()!=1",_INPUT_ERROR_);}; //no conversion needed
-  if(valence_band_max.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"valence_band_max.size()!=1",_INPUT_ERROR_);}; //no conversion needed
-  if(Egap.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Egap!=1",_INPUT_ERROR_);}; //no conversion needed
-  if(Egap_fit.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Egap_fit!=1",_INPUT_ERROR_);}; //no conversion needed
-  if(Egap_type.size()!=1){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Egap_type!=1",_INPUT_ERROR_);}; //no conversion needed
-  if(spin!=0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"spin!=0",_INPUT_ERROR_);}; //no conversion needed
+  if(conduction_band_min.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"conduction_band_min.size()!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(valence_band_max.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"valence_band_max.size()!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(Egap.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Egap!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(Egap_fit.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Egap_fit!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(Egap_type.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Egap_type!=1",_INPUT_ERROR_);}; //no conversion needed
+  if(spin!=0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"spin!=0",_INPUT_ERROR_);}; //no conversion needed
 
   //copy everything over
   viDOS.push_back(viDOS.back());
@@ -4964,13 +4873,12 @@ void xDOSCAR::convertSpinOFF2ON() { //CO20191217
 
 void xDOSCAR::addAtomChannel(){  //CO20211124
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xDOSCAR::addOrbitalChannel():";
-  if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
   string ERROR_out="";
-  if(!checkDOS(ERROR_out)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,ERROR_out,_INDEX_BOUNDS_);} //no conversion needed
+  if(!checkDOS(ERROR_out)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,ERROR_out,_INDEX_BOUNDS_);} //no conversion needed
 
-  uint atoms_size=vDOS.size();if(atoms_size==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vDOS.size()==0",_INDEX_BOUNDS_);} //no conversion needed
+  uint atoms_size=vDOS.size();if(atoms_size==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vDOS.size()==0",_INDEX_BOUNDS_);} //no conversion needed
   uint orbital_size=vDOS.front().size();
   uint spin_size=0;if(orbital_size>0){spin_size=vDOS.front().front().size();}
   uint energy_size=0;if(orbital_size>0 && spin_size>0){energy_size=vDOS.front().front().front().size();}
@@ -4990,13 +4898,12 @@ void xDOSCAR::addAtomChannel(){  //CO20211124
 
 void xDOSCAR::addOrbitalChannel(){  //CO20211124
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xDOSCAR::addOrbitalChannel():";
-  if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
   string ERROR_out="";
-  if(!checkDOS(ERROR_out)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,ERROR_out,_INDEX_BOUNDS_);} //no conversion needed
+  if(!checkDOS(ERROR_out)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,ERROR_out,_INDEX_BOUNDS_);} //no conversion needed
 
-  uint atoms_size=vDOS.size();if(atoms_size==0){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vDOS.size()==0",_INDEX_BOUNDS_);} //no conversion needed
+  uint atoms_size=vDOS.size();if(atoms_size==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vDOS.size()==0",_INDEX_BOUNDS_);} //no conversion needed
   uint orbital_size=vDOS.front().size();
   uint spin_size=0;if(orbital_size>0){spin_size=vDOS.front().front().size();}
   uint energy_size=0;if(orbital_size>0 && spin_size>0){energy_size=vDOS.front().front().front().size();}
@@ -5023,7 +4930,6 @@ void xDOSCAR::resetVDOS(){  //CO20211124
 
 bool xDOSCAR::checkDOS(string& ERROR_out) const { //CO20191110
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xDOSCAR::checkVDOS():";
   stringstream message;
 
   uint IENERGY=venergy.size();
@@ -5064,18 +4970,17 @@ bool xDOSCAR::checkDOS(string& ERROR_out) const { //CO20191110
       }
     }
   }
-  if(LDEBUG) {cerr << soliloquy << " DOSCAR properties retrieved" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DOSCAR properties retrieved" << endl;}
   return true;
 }
 
 bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,double occ_tol) { //CO20191004
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy="xDOSCAR::GetBandGap():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   if((content == "") || (vcontent.size() == 0)) {
-    //[CO20200404 - OBSOLETE]ERROR = soliloquy + " xDOSCAR needs to be loaded before. \n"
+    //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " xDOSCAR needs to be loaded before. \n"
     //[CO20200404 - OBSOLETE]  "        GetProperties(const stringstream&); \n"
     //[CO20200404 - OBSOLETE]  "        GetProperties(const string&); \n"
     //[CO20200404 - OBSOLETE]  "        GetPropertiesFile(const string&); \n";
@@ -5084,12 +4989,12 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     message << "GetProperties(const stringstream&);" << endl;
     message << "GetProperties(const string&);" << endl;
     message << "GetPropertiesFile(const string&);" << endl;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _INPUT_MISSING_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _INPUT_MISSING_);
   }
-  if(LDEBUG) {cerr << soliloquy << " DOSCAR content found" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DOSCAR content found" << endl;}
 
   string error_string="";
-  if(!checkDOS(error_string)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,error_string,_INPUT_ERROR_);};  //quick check if GetProperties() failed
+  if(!checkDOS(error_string)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,error_string,_INPUT_ERROR_);};  //quick check if GetProperties() failed
 
   //this should all work now that we checkDOS()
   uint IENERGY=venergy.size();
@@ -5098,10 +5003,10 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
   uint ISPIN=vDOS.front().front().size();
 
   if(LDEBUG){
-    cerr << soliloquy << " IENERGY=" << IENERGY << endl;
-    cerr << soliloquy << " IATOM=" << IATOM << endl;
-    cerr << soliloquy << " IORBITAL=" << IORBITAL << endl;
-    cerr << soliloquy << " ISPIN=" << ISPIN << endl;
+    cerr << __AFLOW_FUNC__ << " IENERGY=" << IENERGY << endl;
+    cerr << __AFLOW_FUNC__ << " IATOM=" << IATOM << endl;
+    cerr << __AFLOW_FUNC__ << " IORBITAL=" << IORBITAL << endl;
+    cerr << __AFLOW_FUNC__ << " ISPIN=" << ISPIN << endl;
   }
 
   // GET FERMI LEVEL
@@ -5112,7 +5017,7 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     //since it is not self-consistent, it does not fill in states correctly
     //static is the best way to go!
 
-    if(LDEBUG) {cerr << soliloquy << " Using Efermi from CURRENT DOSCAR (recommended to use Efermi from DOSCAR.static)" << endl;}
+    if(LDEBUG) {cerr << __AFLOW_FUNC__ << " Using Efermi from CURRENT DOSCAR (recommended to use Efermi from DOSCAR.static)" << endl;}
     EFERMI=Efermi;
   }
 
@@ -5123,8 +5028,8 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     efermi_tol=Efermi-EFERMI;                             //generlly, E-fermi BANDS > E-fermi STATIC
     if(std::signbit(efermi_tol)){efermi_tol=energy_tol;}  //just in case
   }
-  if(LDEBUG) {cerr << soliloquy << " tol(E-fermi)=" << efermi_tol << endl;}
-  if(LDEBUG) {cerr << soliloquy << " tol(occ)=" << occ_tol << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " tol(E-fermi)=" << efermi_tol << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " tol(occ)=" << occ_tol << endl;}
 
   valence_band_max.resize(ISPIN);
   conduction_band_min.resize(ISPIN);
@@ -5140,19 +5045,19 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
     for(uint ienergy=0;ienergy<vDOS.front().front()[ispin].size();ienergy++){
       if(venergy[ienergy]>=EFERMI){
         if(valence_band_max[ispin]==AUROSTD_MAX_DOUBLE){
-          if(LDEBUG){cerr << soliloquy << " DOS[energy=" << venergy[ienergy] << "]=" << vDOS.front().front()[ispin][ienergy] << " ?< " << occ_tol << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " DOS[energy=" << venergy[ienergy] << "]=" << vDOS.front().front()[ispin][ienergy] << " ?< " << occ_tol << endl;}
           if(found_EFERMI && (venergy[ienergy]-EFERMI)>efermi_tol){  //found metal for this spin
-            if(LDEBUG){cerr << soliloquy << " FOUND metal: ispin=" << ispin << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " FOUND metal: ispin=" << ispin << endl;}
             metal_found=true;
             break;
           }
           if(vDOS.front().front()[ispin][ienergy]<occ_tol){
-            if(LDEBUG){cerr << soliloquy << " FOUND valence_band_max[ispin=" << ispin << "]=" << venergy[ienergy] << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " FOUND valence_band_max[ispin=" << ispin << "]=" << venergy[ienergy] << endl;}
             valence_band_max[ispin]=venergy[ienergy];
           }
         }else{
           if(vDOS.front().front()[ispin][ienergy]>=occ_tol){
-            if(LDEBUG){cerr << soliloquy << " FOUND conduction_band_min[ispin=" << ispin << "]=" << venergy[ienergy] << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " FOUND conduction_band_min[ispin=" << ispin << "]=" << venergy[ienergy] << endl;}
             conduction_band_min[ispin]=venergy[ienergy];
             break;
           }
@@ -5161,26 +5066,26 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       }
     }
     if(valence_band_max[ispin]!=AUROSTD_MAX_DOUBLE && conduction_band_min[ispin]==AUROSTD_MAX_DOUBLE){
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " conduction band maximum not found [ispin="+aurostd::utype2string(ispin)+"] \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " conduction band maximum not found [ispin="+aurostd::utype2string(ispin)+"] \n";
       message << "Conduction band maximum not found [ispin=" << ispin << "]";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
   }
 
   if(!found_EFERMI){
-    //[CO20200404 - OBSOLETE]ERROR = soliloquy + " E-fermi not found \n";
+    //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " E-fermi not found \n";
     //[CO20200404 - OBSOLETE]return false;
     message << " E-fermi not found";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);
   }
 
   if(LDEBUG){
     for(uint ispin=0;ispin<ISPIN;ispin++){
-      cerr << soliloquy << " valence_band_max[ispin=" << ispin << "]=" << valence_band_max[ispin] << endl;
-      cerr << soliloquy << " conduction_band_min[ispin=" << ispin << "]=" << conduction_band_min[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " valence_band_max[ispin=" << ispin << "]=" << valence_band_max[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " conduction_band_min[ispin=" << ispin << "]=" << conduction_band_min[ispin] << endl;
     }
-    cerr << soliloquy << " metal_found=" << metal_found << endl;
+    cerr << __AFLOW_FUNC__ << " metal_found=" << metal_found << endl;
   }
 
   //[CO20191004]double _METALGAP = -AUROSTD_NAN, _METALEDGE = -1.0;
@@ -5190,10 +5095,10 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
   for(uint ispin=0;ispin<ISPIN;ispin++){
     if(valence_band_max[ispin]!=AUROSTD_MAX_DOUBLE && conduction_band_min[ispin]!=AUROSTD_MAX_DOUBLE){
       if(valence_band_max[ispin]>conduction_band_min[ispin]){
-        //[CO20200404 - OBSOLETE]ERROR = soliloquy + " Negative band gap found in ispin="+aurostd::utype2string(ispin)+", not expected \n";
+        //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " Negative band gap found in ispin="+aurostd::utype2string(ispin)+", not expected \n";
         message << "Negative band gap found in ispin=" << ispin << ", not expected";
-        if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-        else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+        if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+        else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
       }
       Egap[ispin]=conduction_band_min[ispin]-valence_band_max[ispin];
       Egap_fit[ispin]=1.348 * Egap[ispin] + 0.913;
@@ -5206,10 +5111,10 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       Egap_fit[ispin]=_METALGAP_;
       Egap_type[ispin]="metal";
     }else{
-      //[CO20200404 - OBSOLETE]ERROR = soliloquy + " valence_band_max/conduction_band_min not found [ispin="+aurostd::utype2string(ispin)+"] \n";
+      //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " valence_band_max/conduction_band_min not found [ispin="+aurostd::utype2string(ispin)+"] \n";
       message << "Valence_band_max/conduction_band_min not found [ispin=" << ispin << "]";
-      if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-      else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+      if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+      else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
     }
   }
   if(ISPIN==1){
@@ -5226,10 +5131,10 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
       double cbm=aurostd::min(conduction_band_min[0],conduction_band_min[1]);
       double vbm=aurostd::max(valence_band_max[0],valence_band_max[1]);
       if(vbm>cbm){
-        //[CO20200404 - OBSOLETE]ERROR = soliloquy + " Negative band gap found in net, not expected \n";
+        //[CO20200404 - OBSOLETE]ERROR = __AFLOW_FUNC__ + " Negative band gap found in net, not expected \n";
         message << "Negative band gap found in net, not expected";
-        if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-        else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
+        if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+        else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);return false;}
       }
       Egap_net=cbm-vbm;
       Egap_fit_net=1.348 * Egap_net + 0.913;
@@ -5240,15 +5145,15 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 
   if(LDEBUG){
     for(uint ispin=0;ispin<ISPIN;ispin++){
-      cerr << soliloquy << " valence_band_max[ispin=" << ispin << "]=" << valence_band_max[ispin] << endl;
-      cerr << soliloquy << " conduction_band_min[ispin=" << ispin << "]=" << conduction_band_min[ispin] << endl;
-      cerr << soliloquy << " Egap[ispin=" << ispin << "]=" << Egap[ispin] << endl;
-      cerr << soliloquy << " Egap_fit[ispin=" << ispin << "]=" << Egap_fit[ispin] << endl;
-      cerr << soliloquy << " Egap_type[ispin=" << ispin << "]=" << Egap_type[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " valence_band_max[ispin=" << ispin << "]=" << valence_band_max[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " conduction_band_min[ispin=" << ispin << "]=" << conduction_band_min[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " Egap[ispin=" << ispin << "]=" << Egap[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " Egap_fit[ispin=" << ispin << "]=" << Egap_fit[ispin] << endl;
+      cerr << __AFLOW_FUNC__ << " Egap_type[ispin=" << ispin << "]=" << Egap_type[ispin] << endl;
     }
-    cerr << soliloquy << " Egap_net=" << Egap_net << endl;
-    cerr << soliloquy << " Egap_fit_net=" << Egap_fit_net << endl;
-    cerr << soliloquy << " Egap_type_net=" << Egap_type_net << endl;
+    cerr << __AFLOW_FUNC__ << " Egap_net=" << Egap_net << endl;
+    cerr << __AFLOW_FUNC__ << " Egap_fit_net=" << Egap_fit_net << endl;
+    cerr << __AFLOW_FUNC__ << " Egap_type_net=" << Egap_type_net << endl;
   }
 
   return true;
@@ -5257,7 +5162,6 @@ bool xDOSCAR::GetBandGap(double EFERMI,double efermi_tol,double energy_tol,doubl
 deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(const xstructure& xstr) const {return GetVDOSSpecies(xstr.num_each_type);} //CO20191004
 deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_each_type) const { //CO20191004
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy = XPID + "xDOSCAR::GetVDOSSpecies():";
   stringstream message;
 
   if((content == "") || (vcontent.size() == 0)) {
@@ -5265,12 +5169,12 @@ deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_eac
     message << "       GetProperties(const stringstream&);" << endl;
     message << "       GetProperties(const string&);" << endl;
     message << "       GetPropertiesFile(const string&);";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ERROR_);
   }
-  if(LDEBUG) {cerr << soliloquy << " DOSCAR content found" << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " DOSCAR content found" << endl;}
 
   string error_string=""; //keep this function const for plotter
-  if(!checkDOS(error_string)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,error_string,_INPUT_ERROR_);};  //quick check if GetProperties() failed
+  if(!checkDOS(error_string)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,error_string,_INPUT_ERROR_);};  //quick check if GetProperties() failed
 
   //this should all work now that we checkDOS()
   uint IENERGY=venergy.size();
@@ -5279,24 +5183,24 @@ deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_eac
   uint ISPIN=vDOS.front().front().size();
 
   if(LDEBUG){
-    cerr << soliloquy << " IENERGY=" << IENERGY << endl;
-    cerr << soliloquy << " IATOM=" << IATOM << endl;
-    cerr << soliloquy << " IORBITAL=" << IORBITAL << endl;
-    cerr << soliloquy << " ISPIN=" << ISPIN << endl;
+    cerr << __AFLOW_FUNC__ << " IENERGY=" << IENERGY << endl;
+    cerr << __AFLOW_FUNC__ << " IATOM=" << IATOM << endl;
+    cerr << __AFLOW_FUNC__ << " IORBITAL=" << IORBITAL << endl;
+    cerr << __AFLOW_FUNC__ << " ISPIN=" << ISPIN << endl;
   }
 
   //check that num_each_type corresponds to vDOS
   uint atoms_total=0;
   for(uint iatom=0;iatom<num_each_type.size();iatom++){atoms_total+=num_each_type[iatom];}
   if(LDEBUG){
-    cerr << soliloquy << " atoms_total=" << atoms_total << endl;
-    cerr << soliloquy << " vDOS.size()=" << vDOS.size() << endl;
+    cerr << __AFLOW_FUNC__ << " atoms_total=" << atoms_total << endl;
+    cerr << __AFLOW_FUNC__ << " vDOS.size()=" << vDOS.size() << endl;
   }
 
   if(atoms_total+1!=IATOM){ //total column
     message << "Input xstructure and DOS mismatch: atoms_total+1!=vDOS.size()" << endl;
     message << "For POCC runs, check that all ARUN.POCC's have the same num_each_type" << endl;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INDEX_MISMATCH_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INDEX_MISMATCH_);
   }
 
   //create vDOS_species with appropriate dimensions
@@ -5314,12 +5218,12 @@ deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_eac
 
   uint iatom=0;
   double dos=0; //ME trick
-  if(LDEBUG){cerr << soliloquy << " summing vDOS_species[ispecies] (individuals)" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " summing vDOS_species[ispecies] (individuals)" << endl;}
   for(uint ispecies=0;ispecies<num_each_type.size();ispecies++){
     for(uint i=0;i<(uint)num_each_type[ispecies];i++){
       for(uint iorbital=1;iorbital<IORBITAL;iorbital++){  //iorbital==0 is total (VASP), skip that for now
         for(uint ispin=0;ispin<ISPIN;ispin++){
-          if(LDEBUG){cerr << soliloquy << " ispecies=" << ispecies << ", iorbital=" << iorbital << ", ispin=" << ispin << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " ispecies=" << ispecies << ", iorbital=" << iorbital << ", ispin=" << ispin << endl;}
           for(uint ienergy=0;ienergy<IENERGY;ienergy++){
             dos=vDOS[iatom+1][iorbital][ispin][ienergy];  //iatom==0 is total (VASP), skip that for now
             vDOS_species[ispecies+1][iorbital][ispin][ienergy]+=dos;  //ispecies==0 is total (VASP), skip for now
@@ -5330,19 +5234,19 @@ deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_eac
       iatom++;
     }
   }
-  if(LDEBUG){cerr << soliloquy << " getting vDOS_species[iorbital] (VASP totals)" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " getting vDOS_species[iorbital] (VASP totals)" << endl;}
   for(uint iorbital=1;iorbital<IORBITAL;iorbital++){  //iorbital==0 is total (VASP), skip for now
     for(uint ispin=0;ispin<ISPIN;ispin++){
-      if(LDEBUG){cerr << soliloquy << " iorbital=" << iorbital << ", ispin=" << ispin << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " iorbital=" << iorbital << ", ispin=" << ispin << endl;}
       for(uint ienergy=0;ienergy<IENERGY;ienergy++){
         dos=vDOS[0][iorbital][ispin][ienergy];
         vDOS_species[0][iorbital][ispin][ienergy]+=dos;
       }
     }
   }
-  if(LDEBUG){cerr << soliloquy << " getting vDOS_species[0] (VASP totals)" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " getting vDOS_species[0] (VASP totals)" << endl;}
   for(uint ispin=0;ispin<ISPIN;ispin++){
-    if(LDEBUG){cerr << soliloquy << " ispin=" << ispin << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " ispin=" << ispin << endl;}
     for(uint ienergy=0;ienergy<IENERGY;ienergy++){
       dos=vDOS[0][0][ispin][ienergy];
       vDOS_species[0][0][ispin][ienergy]+=dos;
@@ -5353,7 +5257,7 @@ deque<deque<deque<deque<double> > > > xDOSCAR::GetVDOSSpecies(deque<int> num_eac
   //    for(uint i=0;i<(uint)num_each_type[ispecies];i++){
   //      for(uint iorbital=1;iorbital<vDOS[iatom+1].size();iorbital++){  //iatom/iorbital total is 0
   //        for(uint ispin=0;ispin<vDOS[iatom+1][iorbital].size();ispin++){
-  //          if(LDEBUG){cerr << soliloquy << " ispecies=" << ispecies << ", iorbital=" << iorbital << ", ispin=" << ispin << endl;}
+  //          if(LDEBUG){cerr << __AFLOW_FUNC__ << " ispecies=" << ispecies << ", iorbital=" << iorbital << ", ispin=" << ispin << endl;}
   //          for(uint ienergy=0;ienergy<vDOS[iatom+1][iorbital][ispin].size();ienergy++){
   //            dos=vDOS[iatom+1][iorbital][ispin][ienergy];
   //            vDOS_species[ispecies+1][ispin][ienergy]+=dos;
@@ -5553,7 +5457,6 @@ bool xEIGENVAL::GetPropertiesUrlFile(const string& url,const string& file,bool Q
 
 bool xEIGENVAL::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xEIGENVAL::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
@@ -5672,8 +5575,8 @@ bool xEIGENVAL::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - xEIGENVAL::GetProperties: ERROR_flag set in xEIGENVAL" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xEIGENVAL";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -5734,7 +5637,6 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
   // xOUTCAR.mass_elec_dos, xOUTCAR.mass_hole_dos, xOUTCAR.mass_elec_conduction, and xOUTCAR.mass_hole_conduction
   // algorithm depends on the energy in doscar.venergy being sorted in ascending order  
   ///////////////////////////////////////////////////////////////////////
-  string soliloquy="GetEffectiveMass():";
   stringstream message;
 
   xmatrix<double> reciprocal_lattice(1,1,3,3);
@@ -5780,14 +5682,14 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
   else {
     //[CO20200404 - OBSOLETE]xoutcar.ERROR = "EIGENVAL spin value is neither 0 nor 1."; // probably unnecessary
     message << "EIGENVAL spin value is neither 0 nor 1"; //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
     return FALSE;
   }
   if(ispin == 1) {
     if(!SPIN_UP) {
       //[CO20200404 - OBSOLETE]xoutcar.ERROR = "Metallic system encountered";
       message << "Metallic system encountered"; //CO20200404
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
       return FALSE;
     }
   }
@@ -5795,7 +5697,7 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
     if(!SPIN_UP and !SPIN_DN) {
       //[CO20200404 - OBSOLETE]xoutcar.ERROR = "Metallic system encountered";
       message << "Metallic system encountered"; //CO20200404
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_ERROR_); //CO20200404
       return FALSE;
     }
   }
@@ -6022,7 +5924,7 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
           if(SINGULAR) {
             //[CO20200404 - OBSOLETE]xoutcar.ERROR = "Singular system: ill-defined matrix problem encountered.";
             message << "Singular system: ill-defined matrix problem encountered."; //CO20200404
-            pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, FileMESSAGE, oss, _LOGGER_WARNING_); //CO20200404
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_WARNING_); //CO20200404
             return FALSE;
           }
         }
@@ -6238,7 +6140,6 @@ bool near_to(const xvector<double> & k1, const xvector<double> & k2, const vecto
 // 2017: Corey Oses
 bool PrintBandGap(string& directory, ostream &oss) {
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"PrintBandGap():";
   stringstream message;  //CO20200404
   stringstream ss_outcar_static(""),ss_outcar_bands("");
   string path_outcar_static="",path_outcar_bands="",path_POSCAR="";
@@ -6247,15 +6148,15 @@ bool PrintBandGap(string& directory, ostream &oss) {
   if(LastChar == '/') directory.erase(directory.size()-1);
 
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG){cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;}
 
   // OUTCAR_bands
   //[CO20200404 - OBSOLETE]if(!ss_outcar_bands.str().length() && aurostd::FileExist(directory+"/OUTCAR.bands",path_outcar_bands)) aurostd::file2stringstream(path_outcar_bands, ss_outcar_bands); //CO20200404
   if(!ss_outcar_bands.str().length() && aurostd::EFileExist(directory+"/OUTCAR.bands",path_outcar_bands)) aurostd::efile2stringstream(path_outcar_bands, ss_outcar_bands); //CO20200404
   if(!ss_outcar_bands.str().length()) {
     message << "OUTCAR.bands not found"; //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_WARNING_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " OUTCAR.bands not found here: " << directory << endl;
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_WARNING_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " OUTCAR.bands not found here: " << directory << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     //[CO20200404 - OBSOLETE]return FALSE;
   }  //CO20200404
@@ -6263,7 +6164,7 @@ bool PrintBandGap(string& directory, ostream &oss) {
   if(!ss_outcar_bands.str().length() && aurostd::EFileExist(directory+"/OUTCAR",path_outcar_bands)) aurostd::efile2stringstream(path_outcar_bands, ss_outcar_bands); //CO20200404
   if(!ss_outcar_bands.str().length()) {  //CO20200404
     message << "OUTCAR not found"; //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_ERROR_); //CO20200404
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_ERROR_); //CO20200404
     return FALSE;
   }
 
@@ -6275,16 +6176,16 @@ bool PrintBandGap(string& directory, ostream &oss) {
   //CO20171002 - using tolerance from symmetry calc - STOP
 
   if(!xoutcar_bands.GetProperties(ss_outcar_bands)){
-    //[CO20200404 - OBSOLETE]pflow::logger(_AFLOW_FILE_NAME_, soliloquy, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
+    //[CO20200404 - OBSOLETE]pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     return FALSE;
   }
   //try to grab xstr from OUTCAR
   if(!xoutcar_bands.GetXStructure()){
     if(!aurostd::FileExist(directory+"/POSCAR.bands",path_POSCAR) && !aurostd::EFileExist(directory+"/POSCAR.bands",path_POSCAR)) {
-      //[CO20200404 - OBSOLETE]pflow::logger(_AFLOW_FILE_NAME_, soliloquy, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
-      //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
+      //[CO20200404 - OBSOLETE]pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
+      //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
       //[CO20200404 - OBSOLETE]oss << endl;
       return FALSE;
     }
@@ -6298,9 +6199,9 @@ bool PrintBandGap(string& directory, ostream &oss) {
   //[CO20200404 - OBSOLETE]if(!aurostd::FileExist(directory+"/OUTCAR.static",path_outcar_static) && !aurostd::EFileExist(directory+"/OUTCAR.static",path_outcar_static))
   if(!aurostd::EFileExist(directory+"/OUTCAR.static",path_outcar_static)){
     message << "OUTCAR.static not found, defaulting E-Fermi to that found in OUTCAR.bands";  //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_WARNING_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " OUTCAR.static not found here: " << directory << endl;
-    //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " Defaulting E-Fermi to that found in OUTCAR.bands" << endl;
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_WARNING_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " OUTCAR.static not found here: " << directory << endl;
+    //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " Defaulting E-Fermi to that found in OUTCAR.bands" << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     //return FALSE;
   } else {
@@ -6309,9 +6210,9 @@ bool PrintBandGap(string& directory, ostream &oss) {
     if(!xoutcar_static.GetProperties(ss_outcar_static)){
       //[CO20200404 - OBSOLETE]message << xoutcar_bands.ERROR << endl;  //CO20200404
       message << "Defaulting E-Fermi to that found in OUTCAR.bands"; //CO20200404
-      pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_WARNING_); //CO20200404
-      //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " " << xoutcar_static.ERROR << endl << "   filename=[" << path_outcar_static << "]" << endl;
-      //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " Defaulting E-Fermi to that found in OUTCAR.bands" << endl;
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_WARNING_); //CO20200404
+      //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " " << xoutcar_static.ERROR << endl << "   filename=[" << path_outcar_static << "]" << endl;
+      //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " Defaulting E-Fermi to that found in OUTCAR.bands" << endl;
       //[CO20200404 - OBSOLETE]oss << endl;
       //return FALSE;
     } else {
@@ -6321,8 +6222,8 @@ bool PrintBandGap(string& directory, ostream &oss) {
   }
 
   if(!xoutcar_bands.GetBandGap(EFERMI)){
-    //[CO20200404 - OBSOLETE]pflow::logger(_AFLOW_FILE_NAME_, soliloquy, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "WARNING " << soliloquy << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
+    //[CO20200404 - OBSOLETE]pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, xoutcar_bands.ERROR, oss, _LOGGER_ERROR_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "WARNING " << __AFLOW_FUNC__ << " " << xoutcar_bands.ERROR << endl << "   filename=[" << path_outcar_bands << "]" << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     return FALSE;
   }
@@ -6384,7 +6285,7 @@ bool PrintBandGap(string& directory, ostream &oss) {
   }
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  if(LDEBUG){cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;}
   return TRUE;
 }
 //-------------------------------------------------------------------------------------------------
@@ -6392,13 +6293,12 @@ bool PrintBandGap(string& directory, ostream &oss) {
 // 2019: Corey Oses
 bool PrintBandGap_DOS(string& directory, ostream &oss) { //CO20191110
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"PrintBandGap_DOS():";
   stringstream message;  //CO20200404
   char LastChar = *directory.rbegin();
   if(LastChar == '/') directory.erase(directory.size()-1);
 
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG){cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;}
 
   string path_doscar_static="";
   stringstream ss_doscar_static;
@@ -6406,8 +6306,8 @@ bool PrintBandGap_DOS(string& directory, ostream &oss) { //CO20191110
   if(!ss_doscar_static.str().length() && aurostd::EFileExist(directory+"/DOSCAR.static",path_doscar_static)) aurostd::efile2stringstream(path_doscar_static, ss_doscar_static); //CO20200404
   if(!ss_doscar_static.str().length()) {
     message << "DOSCAR.static not found";  //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_WARNING_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "ERROR " << soliloquy << " DOSCAR.static not found here: " << directory << endl;
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_WARNING_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "ERROR " << __AFLOW_FUNC__ << " DOSCAR.static not found here: " << directory << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     //[CO20200404 - OBSOLETE]return FALSE;
   }  //CO20200404
@@ -6415,20 +6315,20 @@ bool PrintBandGap_DOS(string& directory, ostream &oss) { //CO20191110
   if(!ss_doscar_static.str().length() && aurostd::EFileExist(directory+"/DOSCAR",path_doscar_static)) aurostd::efile2stringstream(path_doscar_static, ss_doscar_static);  //CO20200404
   if(!ss_doscar_static.str().length()) { //CO20200404
     message << "DOSCAR not found"; //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_ERROR_); //CO20200404
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_ERROR_); //CO20200404
     return FALSE;
   }
 
   xDOSCAR xdoscar;
   if(!xdoscar.GetProperties(ss_doscar_static)){
-    //[CO20200404 - OBSOLETE]pflow::logger(_AFLOW_FILE_NAME_, soliloquy, xdoscar.ERROR, oss, _LOGGER_ERROR_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "ERROR " << soliloquy << " " << xdoscar.ERROR << endl << "   filename=[" << path_doscar_static << "]" << endl;
+    //[CO20200404 - OBSOLETE]pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, xdoscar.ERROR, oss, _LOGGER_ERROR_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "ERROR " << __AFLOW_FUNC__ << " " << xdoscar.ERROR << endl << "   filename=[" << path_doscar_static << "]" << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     return FALSE;
   }
   if(!xdoscar.GetBandGap()){ //use EFERMI of doscar.static (most accurate)
-    //[CO20200404 - OBSOLETE]pflow::logger(_AFLOW_FILE_NAME_, soliloquy, xdoscar.ERROR, oss, _LOGGER_ERROR_); //CO20200404
-    //[CO20200404 - OBSOLETE]oss << "ERROR " << soliloquy << " " << xdoscar.ERROR << endl << "   filename=[" << path_doscar_static << "]" << endl;
+    //[CO20200404 - OBSOLETE]pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, xdoscar.ERROR, oss, _LOGGER_ERROR_); //CO20200404
+    //[CO20200404 - OBSOLETE]oss << "ERROR " << __AFLOW_FUNC__ << " " << xdoscar.ERROR << endl << "   filename=[" << path_doscar_static << "]" << endl;
     //[CO20200404 - OBSOLETE]oss << endl;
     return FALSE;
   }
@@ -6491,7 +6391,7 @@ bool PrintBandGap_DOS(string& directory, ostream &oss) { //CO20191110
   }
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  if(LDEBUG){cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;}
   return TRUE;
 }
 //---------------------------------------------------------------------------------
@@ -6646,7 +6546,6 @@ bool PrintEffectiveMass(string& directory, ostream &oss) {
 // This is then used to approximate the location of the e.m. ellipsoids in the IBZ
 // 2015: Camilo E. Calderon
 bool PrintEigCurv(string& directory, ostream &oss) {
-  string soliloquy="PrintEigCurv():";
   stringstream message;
 
   vector<vector<vector<vector<vector<double> > > > > branches_bnds ;
@@ -6753,7 +6652,7 @@ bool PrintEigCurv(string& directory, ostream &oss) {
     oss << endl ;
     //[CO20200404 - OBSOLETE]xoutcar.ERROR = "Material is metallic." ;
     message << "Material is metallic";  //CO20200404
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, oss, _LOGGER_WARNING_); //CO20200404
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, oss, _LOGGER_WARNING_); //CO20200404
     return FALSE ;
   }
   return TRUE ;
@@ -7537,7 +7436,7 @@ bool IBZextrema(xEIGENVAL& xeigenval,
             }
             //ME20200724 - there used to be an exit here without comment or explanation
             string message = "branches.at(itr0).at(itr1)[1] > branches.at(itr0).at(itr1)[2])";
-            throw aurostd::xerror(_AFLOW_FILE_NAME_, __AFLOW_FUNC__, message);
+            throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message);
           } else if(branches.at(itr0).at(itr1)[1] < branches.at(itr0).at(itr1)[2]) {
             for(int itr2=branches.at(itr0).at(itr1)[1]+2; itr2<=branches.at(itr0).at(itr1)[2]-2; itr2++) {
               ndxvec[1] = itr2-2 ;
@@ -8094,16 +7993,16 @@ bool xPOTCAR::GetPropertiesUrlFile(const string& url,const string& file,bool QUI
 
 bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy="xPOTCAR::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   bool ERROR_flag=FALSE;
   // XHOST.PSEUDOPOTENTIAL_GENERATOR=TRUE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
+  if(1&&LDEBUG){cerr << __AFLOW_FUNC__ << endl;cerr << content;}
   vcontent.clear();
   vector<string> vline,tokens;
   aurostd::string2vectorstring(content,vcontent);
@@ -8128,7 +8027,7 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
   // ----------------------------------------------------------------------
   // EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX
-  if(LDEBUG) cerr << soliloquy << " LOAD \"EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX\" DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD \"EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX\" DATA" << endl;
   vline.clear();
   vENMAX.clear();vENMIN.clear();vPOMASS.clear();vZVAL.clear();vEATOM.clear();vRCORE.clear();vRWIGS.clear();vEAUG.clear();vRAUG.clear();vRMAX.clear();
   for(uint iline=0;iline<vcontent.size();iline++) {
@@ -8142,11 +8041,11 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontent.at(iline),"RAUG") && aurostd::substring2bool(vcontent.at(iline),"sphere")) vline.push_back(vcontent.at(iline));
     if(aurostd::substring2bool(vcontent.at(iline),"RMAX") && aurostd::substring2bool(vcontent.at(iline),"radius")) vline.push_back(vcontent.at(iline));
   }
-  if(LDEBUG) cerr << soliloquy << " vline.size()=" << vline.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vline.size()=" << vline.size() << endl;
   if(vline.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of \"EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX\" in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of \"EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX\" in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of \"EATOM RCORE RWIGS EAUG RAUG ENMAX ENMIN POMASS ZVAL RMAX\" in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }
   for(uint j=0;j<vline.size();j++) {
@@ -8177,37 +8076,37 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
   ENMAX=aurostd::max(vENMAX);
   ENMIN=aurostd::min(vENMIN);
-  if(LDEBUG) {cerr << soliloquy << " ENMAX=" << ENMAX << " vENMAX.size()=" << vENMAX.size() << ": "; for(uint i=0;i<vENMAX.size();i++) { cerr << vENMAX.at(i) << " "; } cerr << " " << endl;}
-  if(LDEBUG) {cerr << soliloquy << " ENMIN=" << ENMIN << " vENMIN.size()=" << vENMIN.size() << ": "; for(uint i=0;i<vENMIN.size();i++) { cerr << vENMIN.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ENMAX=" << ENMAX << " vENMAX.size()=" << vENMAX.size() << ": "; for(uint i=0;i<vENMAX.size();i++) { cerr << vENMAX.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ENMIN=" << ENMIN << " vENMIN.size()=" << vENMIN.size() << ": "; for(uint i=0;i<vENMIN.size();i++) { cerr << vENMIN.at(i) << " "; } cerr << " " << endl;}
 
   POMASS_sum=aurostd::sum(vPOMASS);POMASS_min=aurostd::min(vPOMASS);POMASS_max=aurostd::max(vPOMASS);
-  if(LDEBUG) {cerr << soliloquy << " POMASS_sum=" << POMASS_sum << " POMASS_min=" << POMASS_min << " POMASS_max=" << POMASS_max << " vPOMASS.size()=" << vPOMASS.size() << ": "; for(uint i=0;i<vPOMASS.size();i++) { cerr << vPOMASS.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " POMASS_sum=" << POMASS_sum << " POMASS_min=" << POMASS_min << " POMASS_max=" << POMASS_max << " vPOMASS.size()=" << vPOMASS.size() << ": "; for(uint i=0;i<vPOMASS.size();i++) { cerr << vPOMASS.at(i) << " "; } cerr << " " << endl;}
 
   ZVAL_sum=aurostd::sum(vZVAL);ZVAL_min=aurostd::min(vZVAL);ZVAL_max=aurostd::max(vZVAL);
-  if(LDEBUG) {cerr << soliloquy << " ZVAL_sum=" << ZVAL_sum << " ZVAL_min=" << ZVAL_min << " ZVAL_max=" << ZVAL_max << " vZVAL.size()=" << vZVAL.size() << ": "; for(uint i=0;i<vZVAL.size();i++) { cerr << vZVAL.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ZVAL_sum=" << ZVAL_sum << " ZVAL_min=" << ZVAL_min << " ZVAL_max=" << ZVAL_max << " vZVAL.size()=" << vZVAL.size() << ": "; for(uint i=0;i<vZVAL.size();i++) { cerr << vZVAL.at(i) << " "; } cerr << " " << endl;}
 
   EATOM_min=aurostd::min(vEATOM);EATOM_max=aurostd::max(vEATOM);
-  if(LDEBUG) {cerr << soliloquy << " EATOM_min=" << EATOM_min << " EATOM_max=" << EATOM_max << " vEATOM.size()=" << vEATOM.size() << ": "; for(uint i=0;i<vEATOM.size();i++) { cerr << vEATOM.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EATOM_min=" << EATOM_min << " EATOM_max=" << EATOM_max << " vEATOM.size()=" << vEATOM.size() << ": "; for(uint i=0;i<vEATOM.size();i++) { cerr << vEATOM.at(i) << " "; } cerr << " " << endl;}
 
   RCORE_min=aurostd::min(vRCORE);RCORE_max=aurostd::max(vRCORE);
-  if(LDEBUG) {cerr << soliloquy << " RCORE_min=" << RCORE_min << " RCORE_max=" << RCORE_max << " vRCORE.size()=" << vRCORE.size() << ": "; for(uint i=0;i<vRCORE.size();i++) { cerr << vRCORE.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RCORE_min=" << RCORE_min << " RCORE_max=" << RCORE_max << " vRCORE.size()=" << vRCORE.size() << ": "; for(uint i=0;i<vRCORE.size();i++) { cerr << vRCORE.at(i) << " "; } cerr << " " << endl;}
 
   RWIGS_min=aurostd::min(vRWIGS);RWIGS_max=aurostd::max(vRWIGS);
-  if(LDEBUG) {cerr << soliloquy << " RWIGS_min=" << RWIGS_min << " RWIGS_max=" << RWIGS_max << " vRWIGS.size()=" << vRWIGS.size() << ": "; for(uint i=0;i<vRWIGS.size();i++) { cerr << vRWIGS.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RWIGS_min=" << RWIGS_min << " RWIGS_max=" << RWIGS_max << " vRWIGS.size()=" << vRWIGS.size() << ": "; for(uint i=0;i<vRWIGS.size();i++) { cerr << vRWIGS.at(i) << " "; } cerr << " " << endl;}
 
   EAUG_min=aurostd::min(vEAUG);EAUG_max=aurostd::max(vEAUG);
-  if(LDEBUG) {cerr << soliloquy << " EAUG_min=" << EAUG_min << " EAUG_max=" << EAUG_max << " vEAUG.size()=" << vEAUG.size() << ": "; for(uint i=0;i<vEAUG.size();i++) { cerr << vEAUG.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " EAUG_min=" << EAUG_min << " EAUG_max=" << EAUG_max << " vEAUG.size()=" << vEAUG.size() << ": "; for(uint i=0;i<vEAUG.size();i++) { cerr << vEAUG.at(i) << " "; } cerr << " " << endl;}
 
   RAUG_min=aurostd::min(vRAUG);RAUG_max=aurostd::max(vRAUG);
-  if(LDEBUG) {cerr << soliloquy << " RAUG_min=" << RAUG_min << " RAUG_max=" << RAUG_max << " vRAUG.size()=" << vRAUG.size() << ": "; for(uint i=0;i<vRAUG.size();i++) { cerr << vRAUG.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RAUG_min=" << RAUG_min << " RAUG_max=" << RAUG_max << " vRAUG.size()=" << vRAUG.size() << ": "; for(uint i=0;i<vRAUG.size();i++) { cerr << vRAUG.at(i) << " "; } cerr << " " << endl;}
 
   RMAX_min=aurostd::min(vRMAX);RMAX_max=aurostd::max(vRMAX);
-  if(LDEBUG) {cerr << soliloquy << " RMAX_min=" << RMAX_min << " RMAX_max=" << RMAX_max << " vRMAX.size()=" << vRMAX.size() << ": "; for(uint i=0;i<vRMAX.size();i++) { cerr << vRMAX.at(i) << " "; } cerr << " " << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " RMAX_min=" << RMAX_min << " RMAX_max=" << RMAX_max << " vRMAX.size()=" << vRMAX.size() << ": "; for(uint i=0;i<vRMAX.size();i++) { cerr << vRMAX.at(i) << " "; } cerr << " " << endl;}
 
 
   // ----------------------------------------------------------------------
   // PSEUDOPOTENTIAL DATA
-  if(LDEBUG) cerr << soliloquy << " LOAD PSEUDOPOTENTIAL DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD PSEUDOPOTENTIAL DATA" << endl;
 
   vline.clear();
   vTITEL.clear();
@@ -8217,69 +8116,69 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(aurostd::substring2bool(vcontent.at(iline),"TITEL")) {
         aurostd::string2tokens(vcontent.at(iline),tokens,"=");
         if(tokens.size()>1) vTITEL.push_back(tokens.at(1));
-        //	if(LDEBUG) cerr << soliloquy << " TITEL=" << tokens.at(1) << endl;
+        //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " TITEL=" << tokens.at(1) << endl;
       }
       if(aurostd::substring2bool(vcontent.at(iline),"LEXCH")) {
         if(!aurostd::substring2bool(vcontent.at(iline),"exchange")) {
           aurostd::string2tokens(vcontent.at(iline),tokens,"=");
           if(tokens.size()>1) vLEXCH.push_back(tokens.at(1));
-          //	if(LDEBUG) cerr << soliloquy << " LEXCH=" << tokens.at(1) << endl;
+          //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " LEXCH=" << tokens.at(1) << endl;
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vTITEL.size()=" << vTITEL.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vLEXCH.size()=" << vLEXCH.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vRMAX.size()=" << vRMAX.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vTITEL.size()=" << vTITEL.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vLEXCH.size()=" << vLEXCH.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vRMAX.size()=" << vRMAX.size() << endl;
 
   //ME20200604 - Only exit if force_exit is true
   if(vTITEL.size()==0) {
-    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (TITEL) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200404 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (TITEL) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (TITEL) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vLEXCH.size()==0) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vEATOM.size()==0) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vRMAX.size()==0) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }   //CO20200106 - patching for auto-indenting
   if(vTITEL.size()!=vLEXCH.size()) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (TITEL/LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (TITEL/LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (TITEL/LEXCH) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vLEXCH.size()!=vEATOM.size()) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (LEXCH/EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (LEXCH/EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (LEXCH/EATOM) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   } //CO20200106 - patching for auto-indenting
   if(vEATOM.size()!=vRMAX.size()) {
-    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << soliloquy << " wrong number of pseudopotentials (EATOM/RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
+    //[CO20200604 - OBSOLETE]if(!QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " wrong number of pseudopotentials (EATOM/RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;ERROR_flag=TRUE;
     message << "Wrong number of pseudopotentials (EATOM/RMAX) in POTCAR" << "   filename=[" << filename << "]" << endl;
-    pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
     ERROR_flag=TRUE;
   }   //CO20200106 - patching for auto-indenting
 
   for(uint j=0;j<vTITEL.size();j++) {
-    if(LDEBUG) cerr << soliloquy << " SPECIES(" << j << ") " << endl;
-    if(LDEBUG) cerr << soliloquy << " vTITEL.at(j)=" << vTITEL.at(j) << endl;
-    if(LDEBUG) cerr << soliloquy << " vLEXCH.at(j)=" << vLEXCH.at(j) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " SPECIES(" << j << ") " << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vTITEL.at(j)=" << vTITEL.at(j) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vLEXCH.at(j)=" << vLEXCH.at(j) << endl;
     aurostd::string2tokens(vTITEL.at(j),tokens," ");
     pp_type=tokens.at(0);
     if(pp_type=="US" or pp_type=="NC") {
@@ -8290,8 +8189,8 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
             pp_type="LDA";
     }
     if(tokens.size()>1) {
-      if(pp_type=="PAW") pp_type="PAW_LDA"; // cerr << soliloquy << " PAW_LDA" << endl;
-      if(LDEBUG) cerr << soliloquy << " pp_type=" << pp_type << " " << "tokens.size()=" << tokens.size() << endl;
+      if(pp_type=="PAW") pp_type="PAW_LDA"; // cerr << __AFLOW_FUNC__ << " PAW_LDA" << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " pp_type=" << pp_type << " " << "tokens.size()=" << tokens.size() << endl;
       species.push_back(KBIN::VASP_PseudoPotential_CleanName(tokens.at(1)));
       species_Z.push_back(xelement::symbol2Z(KBIN::VASP_PseudoPotential_CleanName(tokens.at(1))));
       species_pp.push_back(tokens.at(1));
@@ -8310,11 +8209,17 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
     vTITEL.at(j)=aurostd::RemoveWhiteSpaces(vTITEL.at(j));
     vLEXCH.at(j)=aurostd::RemoveWhiteSpaces(vLEXCH.at(j));   
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " vTITEL.at(j)=" << vTITEL.at(j) << endl;
+      cerr << __AFLOW_FUNC__ << " vLEXCH.at(j)=" << vLEXCH.at(j) << endl;
+      cerr << __AFLOW_FUNC__ << " vEATOM.at(j)=" << vEATOM.at(j) << endl;
+      cerr << __AFLOW_FUNC__ << " vRMAX.at(j)=" << vRMAX.at(j) << endl;
+    }
     xPOTCAR xPOT(xPOTCAR_Finder(species_pp_AUID,species_pp_AUID_collisions,vTITEL.at(j),vLEXCH.at(j),vEATOM.at(j),vRMAX.at(j),LDEBUG)); // FIXES species_pp_AUID,species_pp_AUID_collisions
     species_pp_groundstate_energy.push_back(xPOT.species_pp_groundstate_energy.at(0));
     species_pp_groundstate_structure.push_back(xPOT.species_pp_groundstate_structure.at(0));
 
-    if(LDEBUG) cerr << soliloquy << " SPECIES(" << j << ") [pp, type, version, AUID] = "
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " SPECIES(" << j << ") [pp, type, version, AUID] = "
       << species.at(species.size()-1) << " ["
         << species_Z.at(species_Z.size()-1) << ", "
         << species_pp.at(species_pp.size()-1) << ", "
@@ -8325,29 +8230,29 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         << species_pp_groundstate_structure.at(species_pp_groundstate_structure.size()-1) << "]" << endl;
   }
 
-  if(LDEBUG) {cerr << soliloquy << " PSEUDOPOTENTIAL type = " << pp_type << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species.size()=" << species.size() << ": "; for(uint i=0;i<species.size();i++) { cerr << species.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_Z.size()=" << species_Z.size() << ": "; for(uint i=0;i<species_Z.size();i++) { cerr << species_Z.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp.size()=" << species_pp.size() << ": "; for(uint i=0;i<species_pp.size();i++) { cerr << species_pp.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_type.size()=" << species_pp_type.size() << ": "; for(uint i=0;i<species_pp_type.size();i++) { cerr << species_pp_type.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_version.size()=" << species_pp_version.size() << ": "; for(uint i=0;i<species_pp_version.size();i++) { cerr << species_pp_version.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_AUID.size()=" << species_pp_AUID.size() << ": "; for(uint i=0;i<species_pp_AUID.size();i++) { cerr << species_pp_AUID.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << ": "; for(uint i=0;i<species_pp_AUID_collisions.size();i++) { cerr << species_pp_AUID_collisions.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_groundstate_energy.size()=" << species_pp_groundstate_energy.size() << ": "; for(uint i=0;i<species_pp_groundstate_energy.size();i++) { cerr << species_pp_groundstate_energy.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " species_pp_groundstate_structure.size()=" << species_pp_groundstate_structure.size() << ": "; for(uint i=0;i<species_pp_groundstate_structure.size();i++) { cerr << species_pp_groundstate_structure.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " vTITEL.size()=" << vTITEL.size() << ": "; for(uint i=0;i<vTITEL.size();i++) { cerr << vTITEL.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " vLEXCH.size()=" << vLEXCH.size() << ": "; for(uint i=0;i<vLEXCH.size();i++) { cerr << vLEXCH.at(i) << " "; } cerr << endl;}
-  if(LDEBUG) {cerr << soliloquy << " filename=" << filename << endl;}
-  if(LDEBUG) {cerr << soliloquy << " AUID=" << AUID << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " PSEUDOPOTENTIAL type = " << pp_type << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species.size()=" << species.size() << ": "; for(uint i=0;i<species.size();i++) { cerr << species.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_Z.size()=" << species_Z.size() << ": "; for(uint i=0;i<species_Z.size();i++) { cerr << species_Z.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp.size()=" << species_pp.size() << ": "; for(uint i=0;i<species_pp.size();i++) { cerr << species_pp.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_type.size()=" << species_pp_type.size() << ": "; for(uint i=0;i<species_pp_type.size();i++) { cerr << species_pp_type.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_version.size()=" << species_pp_version.size() << ": "; for(uint i=0;i<species_pp_version.size();i++) { cerr << species_pp_version.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_AUID.size()=" << species_pp_AUID.size() << ": "; for(uint i=0;i<species_pp_AUID.size();i++) { cerr << species_pp_AUID.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << ": "; for(uint i=0;i<species_pp_AUID_collisions.size();i++) { cerr << species_pp_AUID_collisions.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_groundstate_energy.size()=" << species_pp_groundstate_energy.size() << ": "; for(uint i=0;i<species_pp_groundstate_energy.size();i++) { cerr << species_pp_groundstate_energy.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " species_pp_groundstate_structure.size()=" << species_pp_groundstate_structure.size() << ": "; for(uint i=0;i<species_pp_groundstate_structure.size();i++) { cerr << species_pp_groundstate_structure.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " vTITEL.size()=" << vTITEL.size() << ": "; for(uint i=0;i<vTITEL.size();i++) { cerr << vTITEL.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " vLEXCH.size()=" << vLEXCH.size() << ": "; for(uint i=0;i<vLEXCH.size();i++) { cerr << vLEXCH.at(i) << " "; } cerr << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " filename=" << filename << endl;}
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " AUID=" << AUID << endl;}
   if(species_pp_AUID_collisions.size()) {
-    cerr << soliloquy << " COLLISION species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
+    cerr << __AFLOW_FUNC__ << " COLLISION species_pp_AUID_collisions.size()=" << species_pp_AUID_collisions.size() << endl;
     ERROR_flag=TRUE;
   }
   if(LDEBUG) cerr.flush();
 
   // ----------------------------------------------------------------------
   // POTCAR_PAW POTCAR_TYPE POTCAR_KINETIC
-  if(LDEBUG) cerr << soliloquy << " LOAD POTCAR_PAW POTCAR_TYPE" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD POTCAR_PAW POTCAR_TYPE" << endl;
   POTCAR_PAW=FALSE;
   POTCAR_KINETIC=FALSE;
   POTCAR_GW=FALSE;
@@ -8377,31 +8282,31 @@ bool xPOTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       if(tokens.at(0)=="PAW" && POTCAR_KINETIC) POTCAR_TYPE="PAW_LDA_KIN";
     }
   }    
-  if(LDEBUG) cerr << soliloquy << " POTCAR_PAW = " << POTCAR_PAW << endl;
-  if(LDEBUG) cerr << soliloquy << " POTCAR_TYPE = " << POTCAR_TYPE << endl;
-  if(LDEBUG) cerr << soliloquy << " POTCAR_KINETIC = " << POTCAR_KINETIC << endl;
-  if(LDEBUG) cerr << soliloquy << " POTCAR_GW = " << POTCAR_GW << endl;
-  if(LDEBUG) cerr << soliloquy << " POTCAR_AE = " << POTCAR_AE << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTCAR_PAW = " << POTCAR_PAW << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTCAR_TYPE = " << POTCAR_TYPE << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTCAR_KINETIC = " << POTCAR_KINETIC << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTCAR_GW = " << POTCAR_GW << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " POTCAR_AE = " << POTCAR_AE << endl;
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " WRITE vxpseudopotentials" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " WRITE vxpseudopotentials" << endl;
 
   if(XHOST.PSEUDOPOTENTIAL_GENERATOR && species.size()==1) xPOTCAR_PURE_Printer((*this),cout);
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " (BULLSHIT DONT USE) title=" << title << endl;
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " (BULLSHIT DONT USE) title=" << title << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
 
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << soliloquy << " ERROR_flag set in xPOTCAR" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xPOTCAR" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xPOTCAR";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -8489,12 +8394,11 @@ bool xVASPRUNXML::GetPropertiesUrlFile(const string& url,const string& file,bool
 
 bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xVASPRUNXML::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
   bool ERROR_flag=FALSE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -8505,18 +8409,18 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // crunching to eat the info
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
 
   // ----------------------------------------------------------------------
   // LOAD natoms
 
-  if(LDEBUG) cerr << soliloquy << " LOAD natoms DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD natoms DATA" << endl;
   line="";
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"<atoms>"))
       if(aurostd::substring2bool(vcontent.at(iline),"</atoms>"))
       {line=vcontent.at(iline);break;} 
-  if(LDEBUG) cerr << soliloquy << " line=" << line << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " line=" << line << endl;
   aurostd::StringSubst(line,"<atoms>","");
   aurostd::StringSubst(line,"</atoms>","");
 
@@ -8524,20 +8428,20 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // LOAD NATOMS
   natoms=0.0;
   aurostd::string2tokens(line,tokens,">");
-  if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl; 
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl; 
   natoms=aurostd::string2utype<double>(line);
-  if(LDEBUG) cerr << soliloquy << " natoms=" << natoms << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " natoms=" << natoms << endl;
 
   // ----------------------------------------------------------------------
   // LOAD FORCES
-  if(LDEBUG) cerr << soliloquy << " LOAD FORCES DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD FORCES DATA" << endl;
   vforces.clear();                    // QM FORCES calculation
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--) {
     if(aurostd::substring2bool(vcontent.at(iline),"<varray name=\"forces\" >")) {
       for(uint iat=0;iat<(uint)natoms && iat<vcontent.size();iat++) {
         aurostd::StringSubst(vcontent.at(iline+iat+1),"<v>","");
         aurostd::StringSubst(vcontent.at(iline+iat+1),"</v>","");
-        // if(LDEBUG) cerr << soliloquy << " vcontent.at(iline+iat+1)=" << vcontent.at(iline+iat+1) << endl;
+        // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat+1)=" << vcontent.at(iline+iat+1) << endl;
         aurostd::string2tokens(vcontent.at(iline+iat+1),tokens," ");
         if(tokens.size()==3) {
           xvector<double> force(3);
@@ -8545,23 +8449,23 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           force[2]=aurostd::string2utype<double>(tokens.at(1));
           force[3]=aurostd::string2utype<double>(tokens.at(2));
           vforces.push_back(force); // cerr.precision(20);
-          if(LDEBUG) cerr << soliloquy << " force=" << force << endl;
-          // if(LDEBUG) cerr << soliloquy << " force=" << force[1]  << " " << force[2] << " " << force[3] << endl;
+          if(LDEBUG) cerr << __AFLOW_FUNC__ << " force=" << force << endl;
+          // if(LDEBUG) cerr << __AFLOW_FUNC__ << " force=" << force[1]  << " " << force[2] << " " << force[3] << endl;
         } else {
-          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << soliloquy << " error in QM FORCES calculation" << endl;
+          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM FORCES calculation" << endl;
           message << "Error in QM FORCES calculation" << endl;
-          pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
           ERROR_flag=TRUE;
         }
       }
       iline=-1;
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vforces.size()=" << vforces.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vforces.size()=" << vforces.size() << endl;
 
   // ----------------------------------------------------------------------
   // LOAD KPOINTLIST
-  if(LDEBUG) cerr << soliloquy << " LOAD KPOINTLIST DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD KPOINTLIST DATA" << endl;
   vkpoint.clear();                    // QM KPOINTLIST calculation
   for(int iline=0;iline<(int)vcontent.size();iline++) {
     if(aurostd::substring2bool(vcontent.at(iline),"<varray name=\"kpointlist\" >")) {
@@ -8570,7 +8474,7 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         if(aurostd::substring2bool(vcontent.at(iline+iat),"</varray>")) {
           iline=(int)vcontent.size();
         } else {
-          // cerr << soliloquy << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
+          // cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
           aurostd::StringSubst(vcontent.at(iline+iat),"<v>","");
           aurostd::StringSubst(vcontent.at(iline+iat),"</v>","");
           aurostd::string2tokens(vcontent.at(iline+iat),tokens," ");
@@ -8580,22 +8484,22 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
             kpoint[2]=aurostd::string2utype<double>(tokens.at(1));
             kpoint[3]=aurostd::string2utype<double>(tokens.at(2));
             vkpoint.push_back(kpoint); // cerr.precision(20);
-            //	    if(LDEBUG) cerr << soliloquy << " kpoint=" << kpoint << endl;
+            //	    if(LDEBUG) cerr << __AFLOW_FUNC__ << " kpoint=" << kpoint << endl;
           } else {
-            //[CO20200604 - OBSOLETE]if(!QUIET) cerr << soliloquy << " error in QM KPOINTLIST calculation" << endl;
+            //[CO20200604 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM KPOINTLIST calculation" << endl;
             message << "Error in QM KPOINTLIST calculation" << endl;
-            pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
             ERROR_flag=TRUE;
           }
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vkpoint.size()=" << vkpoint.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vkpoint.size()=" << vkpoint.size() << endl;
 
   // ----------------------------------------------------------------------
   // LOAD WEIGHTS
-  if(LDEBUG) cerr << soliloquy << " LOAD WEIGHTS DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD WEIGHTS DATA" << endl;
   vweights.clear();                    // QM WEIGHTS calculation
   for(int iline=0;iline<(int)vcontent.size();iline++) {
     if(aurostd::substring2bool(vcontent.at(iline),"<varray name=\"weights\" >")) {
@@ -8604,62 +8508,62 @@ bool xVASPRUNXML::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         if(aurostd::substring2bool(vcontent.at(iline+iat),"</varray>")) {
           iline=(int)vcontent.size();
         } else {
-          // cerr << soliloquy << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
+          // cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
           aurostd::StringSubst(vcontent.at(iline+iat),"<v>","");
           aurostd::StringSubst(vcontent.at(iline+iat),"</v>","");
           aurostd::string2tokens(vcontent.at(iline+iat),tokens," ");
           if(tokens.size()==1) {
             vweights.push_back(aurostd::string2utype<double>(tokens.at(0))); // cerr.precision(20);
-            //	    if(LDEBUG) cerr << soliloquy << " weight=" << weight << endl;
+            //	    if(LDEBUG) cerr << __AFLOW_FUNC__ << " weight=" << weight << endl;
           } else {
-            //[CO20200604 - OBSOLETE]if(!QUIET) cerr << soliloquy << " error in QM WEIGHTS calculation" << endl;
+            //[CO20200604 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM WEIGHTS calculation" << endl;
             message << "Error in QM WEIGHTS calculation" << endl;
-            pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
             ERROR_flag=TRUE;
           }
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vweights.size()=" << vweights.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vweights.size()=" << vweights.size() << endl;
 
   // ----------------------------------------------------------------------
   // LOAD STRESS
-  if(LDEBUG) cerr << soliloquy << " LOAD STRESS DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD STRESS DATA" << endl;
   stress.clear();                    // QM STRESS calculation
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--) {
     if(aurostd::substring2bool(vcontent.at(iline),"<varray name=\"stress\" >")) {
       for(uint iat=0;iat<(uint)3 && iat<vcontent.size();iat++) { // only three lines
         aurostd::StringSubst(vcontent.at(iline+iat+1),"<v>","");
         aurostd::StringSubst(vcontent.at(iline+iat+1),"</v>","");
-        // if(LDEBUG) cerr << soliloquy << " vcontent.at(iline+iat+1)=" << vcontent.at(iline+iat+1) << endl;
+        // if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat+1)=" << vcontent.at(iline+iat+1) << endl;
         aurostd::string2tokens(vcontent.at(iline+iat+1),tokens," ");
         if(tokens.size()==3) {
           stress(iat+1,1)=aurostd::string2utype<double>(tokens.at(0));
           stress(iat+1,2)=aurostd::string2utype<double>(tokens.at(1));
           stress(iat+1,3)=aurostd::string2utype<double>(tokens.at(2));
         } else {
-          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << soliloquy << " error in QM STRESS calculation" << endl;
+          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM STRESS calculation" << endl;
           message << "Error in QM STRESS calculation" << endl;
-          pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
           ERROR_flag=TRUE;
         }
       }
       iline=-1;
     }
   }
-  if(LDEBUG) cerr << soliloquy << " stress=" << endl << stress << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " stress=" << endl << stress << endl;
 
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200604 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << soliloquy << " ERROR_flag set in xVASPRUNXML" << endl;
+  //[CO20200604 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xVASPRUNXML" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xVASPRUNXML";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -8685,12 +8589,11 @@ bool xVASPRUNXML::GetForcesFile(const string& fileIN, bool QUIET) {
 // Cannot use const stringstream& because of std::getline
 bool xVASPRUNXML::GetForces(stringstream& stringstreamIN, bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy="xVASPRUNXML::GetForces():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
   bool ERROR_flag=FALSE;
 
-  if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
   vforces.clear();
   string line;
@@ -8711,7 +8614,7 @@ bool xVASPRUNXML::GetForces(stringstream& stringstreamIN, bool QUIET) {
           //[CO20200404 - OBSOLETE]if (!QUIET) cerr << XPID << "xVASPRUNXML::GetForces: error in QM FORCES calculation" << endl;
           //[CO20200404 - OBSOLETE]return false;
           message << "Error in QM FORCES calculation" << endl;
-          pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
           ERROR_flag=TRUE;
         }
       }
@@ -8723,8 +8626,8 @@ bool xVASPRUNXML::GetForces(stringstream& stringstreamIN, bool QUIET) {
   //[CO20200404 - OBSOLETE]return false;
   if(ERROR_flag){
     message << "ERROR_flag set: forces not found";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return false; //catch all false
@@ -8820,13 +8723,12 @@ bool xIBZKPT::GetPropertiesUrlFile(const string& url,const string& file,bool QUI
 
 bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xIBZKPT::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
   bool ERROR_flag=FALSE;
 
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -8837,11 +8739,11 @@ bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // crunching to eat the info
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
 
   // ----------------------------------------------------------------------
   // LOAD NWEIGHTS VKPOINT
-  if(LDEBUG) cerr << soliloquy << " LOAD VKPOINT DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD VKPOINT DATA" << endl;
   nweights=0;
   nkpoints_irreducible=0;
   vkpoint.clear();                    // QM VKPOINT calculation
@@ -8850,11 +8752,11 @@ bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
     if(aurostd::substring2bool(vcontent.at(iline),"Automatically generated mesh")) {
       iline++;
       nkpoints_irreducible=aurostd::string2utype<double>(vcontent.at(iline));
-      if(LDEBUG) cerr << soliloquy << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
       iline+=2; // skip text
-      //  cerr << soliloquy << " vcontent.at(iline)=" << vcontent.at(iline) << endl;
+      //  cerr << __AFLOW_FUNC__ << " vcontent.at(iline)=" << vcontent.at(iline) << endl;
       for(uint iat=0;iat<nkpoints_irreducible;iat++) {
-        // 	cerr << soliloquy << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
+        // 	cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
         aurostd::string2tokens(vcontent.at(iline+iat),tokens," ");
         if(tokens.size()==4) {
           xvector<double> kpoint(3);
@@ -8864,24 +8766,24 @@ bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           vkpoint.push_back(kpoint); // cerr.precision(20);
           vweights.push_back(aurostd::string2utype<uint>(tokens.at(3)));
           nweights+=aurostd::string2utype<uint>(tokens.at(3));
-          //	  if(LDEBUG) cerr << soliloquy << " kpoint=" << kpoint << " " << "weight=" << aurostd::string2utype<double>(tokens.at(3))<< endl;
+          //	  if(LDEBUG) cerr << __AFLOW_FUNC__ << " kpoint=" << kpoint << " " << "weight=" << aurostd::string2utype<double>(tokens.at(3))<< endl;
         } else {
-          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << soliloquy << " error in QM NWEIGHTS/VKPOINT calculation" << endl;
+          //[CO20200604 - OBSOLETE]if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM NWEIGHTS/VKPOINT calculation" << endl;
           message << "Error in QM NWEIGHTS/VKPOINT calculation" << endl;
-          pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_,QUIET);
           ERROR_flag=TRUE;
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vkpoint.size()=" << vkpoint.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vweights.size()=" << vweights.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " nweights=" << nweights << endl;
-  if(LDEBUG) cerr << soliloquy << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vkpoint.size()=" << vkpoint.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vweights.size()=" << vweights.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nweights=" << nweights << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nkpoints_irreducible=" << nkpoints_irreducible << endl;
 
   // ---------------------------------------------------------------------
   // LOAD NTETRAHEDRA WTETRAHEDRA TETRAHEDRA
-  if(LDEBUG) cerr << soliloquy << " LOAD TETRAHEDRA DATA" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD TETRAHEDRA DATA" << endl;
   ntetrahedra=0;
   wtetrahedra=0.0;
   vtetrahedra.clear();                    // QM TETRAHEDRA calculation
@@ -8891,11 +8793,11 @@ bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
       aurostd::string2tokens(vcontent.at(iline),tokens," ");
       ntetrahedra=aurostd::string2utype<uint>(tokens.at(0));
       wtetrahedra=aurostd::string2utype<double>(tokens.at(1));
-      if(LDEBUG) cerr << soliloquy << " ntetrahedra=" << ntetrahedra << endl;
-      if(LDEBUG) cerr << soliloquy << " wtetrahedra=" << wtetrahedra << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " ntetrahedra=" << ntetrahedra << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " wtetrahedra=" << wtetrahedra << endl;
       iline+=1; // skip text
       for(uint iat=0;iat<ntetrahedra;iat++) {
-        // 	cerr << soliloquy << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
+        // 	cerr << __AFLOW_FUNC__ << " vcontent.at(iline+iat)=" << vcontent.at(iline+iat) << endl;
         aurostd::string2tokens(vcontent.at(iline+iat),tokens," ");
         if(tokens.size()==5) {
           xvector<int> tetrahedra(5);
@@ -8905,29 +8807,29 @@ bool xIBZKPT::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
           tetrahedra[4]=aurostd::string2utype<double>(tokens.at(3));
           tetrahedra[5]=aurostd::string2utype<double>(tokens.at(4));
           vtetrahedra.push_back(tetrahedra); // cerr.precision(20);
-          //	  if(LDEBUG) cerr << soliloquy << " tetrahedra=" << tetrahedra << " " << endl;
+          //	  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tetrahedra=" << tetrahedra << " " << endl;
         } else {
-          if(!QUIET) cerr << soliloquy << " error in QM NTETRAHEDRA/WTETRAHEDRA/TETRAHEDRA calculation" << endl;
+          if(!QUIET) cerr << __AFLOW_FUNC__ << " error in QM NTETRAHEDRA/WTETRAHEDRA/TETRAHEDRA calculation" << endl;
           ERROR_flag=TRUE;
         }
       }
     }
   }
-  if(LDEBUG) cerr << soliloquy << " ntetrahedra=" << ntetrahedra << endl;
-  if(LDEBUG) cerr << soliloquy << " wtetrahedra=" << wtetrahedra << endl;
-  if(LDEBUG) cerr << soliloquy << " vtetrahedra.size()=" << vtetrahedra.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ntetrahedra=" << ntetrahedra << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " wtetrahedra=" << wtetrahedra << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vtetrahedra.size()=" << vtetrahedra.size() << endl;
 
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200604 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << soliloquy << " ERROR_flag set in xIBZKPT" << endl;
+  //[CO20200604 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xIBZKPT" << endl;
   //[CO20200604 - OBSOLETE]if(ERROR_flag) return FALSE;
   if(ERROR_flag){
     message << "ERROR_flag set in xIBZKPT";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -9032,7 +8934,6 @@ bool xKPOINTS::GetPropertiesUrlFile(const string& url,const string& file,bool QU
 
 bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xKPOINTS::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
@@ -9040,7 +8941,7 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   clear(); // so it does not mess up vector/deque
 
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
 
   content=stringstreamIN.str();
   vcontent.clear();
@@ -9062,18 +8963,18 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   path_grid=0;
   vpath.clear();
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
 
   // ----------------------------------------------------------------------
   // CHECK IF WITH KPOINTS NUMBERS
-  if(LDEBUG) cerr << soliloquy << " CHECK IF WITH KPOINTS NUMBERS" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " CHECK IF WITH KPOINTS NUMBERS" << endl;
   if(!is_KPOINTS_NNN && !is_KPOINTS_PATH && vcontent.size()>=5) {
     if(vcontent.at(2).at(0)=='M'||vcontent.at(2).at(0)=='m' || vcontent.at(2).at(0)=='G'||vcontent.at(2).at(0)=='g') {
       aurostd::string2tokens(vcontent.at(3),tokens);
-      //    if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+      //    if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
       if(tokens.size()==3) {
         aurostd::string2tokens(vcontent.at(4),tokens);
-        //     if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+        //     if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
         if(tokens.size()==3) {
           is_KPOINTS_NNN=TRUE;
           is_KPOINTS_PATH=FALSE;
@@ -9096,7 +8997,7 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 
   // ----------------------------------------------------------------------
   // CHECK IF WITH PATH
-  if(LDEBUG) cerr << soliloquy << " CHECK IF WITH PATH" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " CHECK IF WITH PATH" << endl;
   if(!is_KPOINTS_NNN && !is_KPOINTS_PATH && vcontent.size()>=5) {
     if(vcontent.at(2).at(0)=='L'||vcontent.at(2).at(0)=='l') {
       is_KPOINTS_NNN=FALSE;
@@ -9113,7 +9014,7 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         if(aurostd::substring2bool(vcontent.at(iline),"@")) { // avoid removing ! as comment
           aurostd::string2tokens(vcontent.at(iline),tokens," ");
           if(tokens.size()>=5) {
-            //	    if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+            //	    if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
             for(uint k=0;k<tokens.size();k++) {
               if(tokens.at(k)=="@" && k+1<tokens.size()) {
                 vpath.push_back(tokens.at(k+1));
@@ -9126,7 +9027,7 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         }
       }
       // ----------------------------------------------------------------------
-      //     if(LDEBUG) cerr << soliloquy << " vpath.size()=" << vpath.size() << endl;
+      //     if(LDEBUG) cerr << __AFLOW_FUNC__ << " vpath.size()=" << vpath.size() << endl;
       if(0) { // old
         path=vpath.at(0);
         for(uint i=1;i<vpath.size();i++) {
@@ -9145,10 +9046,10 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         // \Gamma-X,X-W,W-K,K-\Gamma,\Gamma-L,L-U,U-W,W-L,L-K,U-X
         // \Gamma-X-W-K-\Gamma-L-U-W-L-K,U-X
         // \Gamma-X-W-K-\Gamma-L-U-W-L-K,U-X
-        //	if(LDEBUG) cerr << soliloquy << " path=[" << path << "]" << endl;
+        //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " path=[" << path << "]" << endl;
       }
       // ----------------------------------------------------------------------
-      if(LDEBUG) cerr << soliloquy << " vpath.size()=" << vpath.size() << endl;
+      if(LDEBUG) cerr << __AFLOW_FUNC__ << " vpath.size()=" << vpath.size() << endl;
       if(1) { // new
         path="";
         for(uint i=0;i<vpath.size();i+=2) 
@@ -9156,37 +9057,37 @@ bool xKPOINTS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
         // \Gamma-X,X-W,W-K,K-\Gamma,\Gamma-L,L-U,U-W,W-L,L-K,U-X
         // \Gamma-X-W-K-\Gamma-L-U-W-L-K,U-X
         // \Gamma-X-W-K-\Gamma-L-U-W-L-K,U-X
-        //	if(LDEBUG) cerr << soliloquy << " path=[" << path << "]" << endl;
+        //	if(LDEBUG) cerr << __AFLOW_FUNC__ << " path=[" << path << "]" << endl;
       }
     }
   }
   // ----------------------------------------------------------------------
 
-  if(LDEBUG) cerr << soliloquy << " title=[" << title << "]" << endl;
-  if(LDEBUG) cerr << soliloquy << " mode=" << mode << endl;
-  if(LDEBUG) cerr << soliloquy << " grid_type=[" << grid_type << "]" << endl;
-  if(LDEBUG) cerr << soliloquy << " nkpoints=" << nkpoints << endl;
-  if(LDEBUG) cerr << soliloquy << " nnn_kpoints=" << nnn_kpoints << endl;
-  if(LDEBUG) cerr << soliloquy << " ooo_kpoints=" << ooo_kpoints << endl;
-  if(LDEBUG) cerr << soliloquy << " is_KPOINTS_NNN=" << is_KPOINTS_NNN << endl;
-  if(LDEBUG) cerr << soliloquy << " is_KPOINTS_PATH=" << is_KPOINTS_PATH << endl;
-  if(LDEBUG) cerr << soliloquy << " path_mode=[" << path_mode << "]" << endl;
-  if(LDEBUG) cerr << soliloquy << " path=[" << path << "]" << endl;
-  if(LDEBUG) cerr << soliloquy << " vpath.size()=" << vpath.size() << endl;
-  if(LDEBUG) {cerr << soliloquy << " vpath="; for(uint i=0;i<vpath.size();i++) cerr << vpath.at(i) << " "; cerr << endl;}
-  if(LDEBUG) cerr << soliloquy << " path_grid=" << path_grid << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " title=[" << title << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " mode=" << mode << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " grid_type=[" << grid_type << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nkpoints=" << nkpoints << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " nnn_kpoints=" << nnn_kpoints << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " ooo_kpoints=" << ooo_kpoints << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " is_KPOINTS_NNN=" << is_KPOINTS_NNN << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " is_KPOINTS_PATH=" << is_KPOINTS_PATH << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " path_mode=[" << path_mode << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " path=[" << path << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vpath.size()=" << vpath.size() << endl;
+  if(LDEBUG) {cerr << __AFLOW_FUNC__ << " vpath="; for(uint i=0;i<vpath.size();i++) cerr << vpath.at(i) << " "; cerr << endl;}
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " path_grid=" << path_grid << endl;
 
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << soliloquy << " ERROR_flag set in xKPOINTS" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xKPOINTS" << endl;
   //[CO20200404 - OBSOLETE]if(ERROR_flag) return FALSE;
   if(ERROR_flag){
     message << "ERROR_flag set in xKPOINTS";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -9347,13 +9248,12 @@ bool xCHGCAR::GetPropertiesUrlFile(const string& url,const string& file,bool QUI
 
 bool xCHGCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xCHGCAR::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   bool ERROR_flag=FALSE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -9370,48 +9270,48 @@ bool xCHGCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   tvalues.clear();
   uint index=5;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " LOAD GRID " << endl;
-  if(LDEBUG) cerr << soliloquy << " vcontent.at(" << index << ")=" << vcontent.at(index) << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD GRID " << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.at(" << index << ")=" << vcontent.at(index) << endl;
   aurostd::string2tokens(vcontent.at(index),tokens);
-  if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
   for(uint i=0;i<tokens.size();i++) {
     natoms+=aurostd::string2utype<uint>(tokens.at(i));
   }
-  if(LDEBUG) cerr << soliloquy << " natoms=" << natoms << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " natoms=" << natoms << endl;
   index+=natoms+1+2; // skip direct and atoms space and get grid
-  if(LDEBUG) cerr << soliloquy << " vcontent.at(" << index << ")=" << vcontent.at(index) << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.at(" << index << ")=" << vcontent.at(index) << endl;
   aurostd::string2tokens(vcontent.at(index),tokens);
-  if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
   for(uint i=0;i<tokens.size();i++) {
     grid(i+1)=aurostd::string2utype<uint>(tokens.at(i));
   }
   index++;
   uint size_grid=grid(1)*grid(2)*grid(3);
-  if(LDEBUG) cerr << soliloquy << " grid=[" << grid(1) << "," << grid(2) << "," << grid(3) << "]" << endl;
-  if(LDEBUG) cerr << soliloquy << " size_grid=" << size_grid << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " grid=[" << grid(1) << "," << grid(2) << "," << grid(3) << "]" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " size_grid=" << size_grid << "]" << endl;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " LOAD VSTRING " << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD VSTRING " << endl;
   for(uint i=index;i<vcontent.size();i++) {
     aurostd::string2tokens(vcontent.at(i),tokens);
-    //    if(LDEBUG) cerr << soliloquy << " tokens.size()=" << tokens.size() << endl;
+    //    if(LDEBUG) cerr << __AFLOW_FUNC__ << " tokens.size()=" << tokens.size() << endl;
     for(uint j=0;j<tokens.size();j++) {
       if(vstring.size()<size_grid) vstring.push_back(tokens.at(j));
     }
   }
-  if(LDEBUG) cerr << soliloquy << " vstring.size()=" << vstring.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vstring.size()=" << vstring.size() << endl;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " LOAD VVALUES " << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD VVALUES " << endl;
   xvector<double> vvalues_aus(vstring.size());
   for(uint i=0;i<vstring.size();i++) {
     vvalues_aus(i+1)=aurostd::string2utype<double>(vstring.at(i));
   }
   // now copy on the real vvalues which has undefined size
   vvalues=vvalues_aus;
-  if(LDEBUG) cerr << soliloquy << " vvalues.rows=" << vvalues.rows << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vvalues.rows=" << vvalues.rows << endl;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " LOAD TVALUES " << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " LOAD TVALUES " << endl;
   //[OBSOLETE ME20180705]xtensor3<double> tvalues_aus(grid(1),grid(2),grid(3));
   xtensor<double> tvalues_aus(grid); //ME20180705
   int iii=0;
@@ -9424,24 +9324,24 @@ bool xCHGCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   }
 
   tvalues=tvalues_aus;
-  if(LDEBUG) cerr << soliloquy << " tvalues.shape[1]=" << tvalues.shape[1] << endl; //ME20180705
-  if(LDEBUG) cerr << soliloquy << " tvalues.shape[2]=" << tvalues.shape[2] << endl; //ME20180705
-  if(LDEBUG) cerr << soliloquy << " tvalues.shape[3]=" << tvalues.shape[3] << endl; //ME20180705
-  //[OBSOLETE ME20180705]if(LDEBUG) cerr << soliloquy << " tvalues.index[1]=" << tvalues.index[1] << endl;
-  //[OBSOLETE ME20180705]if(LDEBUG) cerr << soliloquy << " tvalues.index[2]=" << tvalues.index[2] << endl;
-  //[OBSOLETE ME20180705]if(LDEBUG) cerr << soliloquy << " tvalues.index[3]=" << tvalues.index[3] << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.shape[1]=" << tvalues.shape[1] << endl; //ME20180705
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.shape[2]=" << tvalues.shape[2] << endl; //ME20180705
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.shape[3]=" << tvalues.shape[3] << endl; //ME20180705
+  //[OBSOLETE ME20180705]if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.index[1]=" << tvalues.index[1] << endl;
+  //[OBSOLETE ME20180705]if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.index[2]=" << tvalues.index[2] << endl;
+  //[OBSOLETE ME20180705]if(LDEBUG) cerr << __AFLOW_FUNC__ << " tvalues.index[3]=" << tvalues.index[3] << endl;
   // ----------------------------------------------------------------------   
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << soliloquy << " ERROR_flag set in xCHGCAR" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << XPID << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xCHGCAR" << endl;
   //[CO20200404 - OBSOLETE]if(ERROR_flag) return FALSE;
   if(ERROR_flag){
     message << "ERROR_flag set in xCHGCAR";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -9533,13 +9433,12 @@ bool xQMVASP::GetPropertiesUrlFile(const string& url,const string& file,bool QUI
 
 bool xQMVASP::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //CO20191110
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xQMVASP::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   bool ERROR_flag=FALSE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -9552,10 +9451,10 @@ bool xQMVASP::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //C
   H_atom_static=AUROSTD_NAN;
   bool inside_relax=false,inside_static=false;
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
   // ----------------------------------------------------------------------
   for(uint iline=0;iline<vcontent.size();iline++){
-    if(LDEBUG) cerr << soliloquy << " vcontent.at(" << iline << ")=" << vcontent.at(iline) << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.at(" << iline << ")=" << vcontent.at(iline) << endl;
     if(aurostd::substring2bool(vcontent[iline],"STOP_relax")){inside_relax=false;}
     else if(aurostd::substring2bool(vcontent[iline],"START_relax")){inside_relax=true;}
     else if(aurostd::substring2bool(vcontent[iline],"STOP_static")){inside_static=false;}
@@ -9567,7 +9466,7 @@ bool xQMVASP::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //C
         aurostd::string2tokens(vcontent[iline],tokens,"=");
         if(tokens.size()){aurostd::string2tokens(tokens[1],tokens2," ");}
         if(tokens2.size()){
-          if(!aurostd::isfloat(tokens2[0])){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"H_atom input cannot be parsed (!isfloat)",_INPUT_ERROR_);}
+          if(!aurostd::isfloat(tokens2[0])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"H_atom input cannot be parsed (!isfloat)",_INPUT_ERROR_);}
           if(inside_relax){H_atom_relax=aurostd::string2utype<double>(tokens2[0]);}
           else if(inside_static){H_atom_static=aurostd::string2utype<double>(tokens2[0]);}
         }
@@ -9588,11 +9487,11 @@ bool xQMVASP::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //C
               if(aurostd::isfloat(tokens[i+2])){
                 vforces.back()[i]=aurostd::string2utype<double>(tokens[i+2]);
               } else {
-                throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Expected force input to be a number",_FILE_CORRUPT_);
+                throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Expected force input to be a number",_FILE_CORRUPT_);
               }
             }
           } else {
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unexpected count of force components",_FILE_CORRUPT_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unexpected count of force components",_FILE_CORRUPT_);
           }
         }
       }
@@ -9602,14 +9501,14 @@ bool xQMVASP::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //C
   // ----------------------------------------------------------------------   
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << soliloquy << " ERROR_flag set in xQMVASP" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xQMVASP" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xQMVASP";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -9679,8 +9578,7 @@ void xPLASMONICS::clear() {  // clear PRIVATE  //CO20191110
 
 void xPLASMONICS::getEPS() {  //CO20211120
   bool LDEBUG=(FALSE || XHOST.DEBUG);
-  string soliloquy=XPID+"xPLASMONICS::getEPS():";
-  if(LDEBUG){cerr << soliloquy << " filename=" << filename << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " filename=" << filename << endl;}
   if(filename.find(DEFAULT_AFLOW_PLASMONICS_FILE)!=string::npos){
     //get eps and store it
     string _eps=filename;
@@ -9692,7 +9590,7 @@ void xPLASMONICS::getEPS() {  //CO20211120
     _eps=_eps.substr(0,_eps.find(POCC_OUT_FILE)); //remove everything before 'out'
     if(aurostd::isfloat(_eps)){eps=_eps;}
   }
-  if(LDEBUG){cerr << soliloquy << " eps=" << eps << endl;}
+  if(LDEBUG){cerr << __AFLOW_FUNC__ << " eps=" << eps << endl;}
 }
 
 bool xPLASMONICS::GetProperties(const string& stringIN,bool QUIET) { //CO20191110
@@ -9721,13 +9619,12 @@ bool xPLASMONICS::GetPropertiesUrlFile(const string& url,const string& file,bool
 
 bool xPLASMONICS::GetProperties(const stringstream& stringstreamIN,bool QUIET) { //CO20191110
   bool LDEBUG=(FALSE || XHOST.DEBUG || !QUIET);
-  string soliloquy=XPID+"xPLASMONICS::GetProperties():";
   stringstream message;
   bool force_exit=XHOST.POSTPROCESS; //SC wants to exit here so we can fix the problem  // ME20200604 - do not exit with generate_aflowin_only
 
   bool ERROR_flag=FALSE;
   long double seconds=aurostd::get_seconds();
-  if(LDEBUG) cerr << soliloquy << " BEGIN (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " BEGIN (" << time_delay(seconds) << ")" << endl;
   clear(); // so it does not mess up vector/deque
   content=stringstreamIN.str();
   vcontent.clear();
@@ -9737,8 +9634,8 @@ bool xPLASMONICS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   if(filename=="") filename="stringstream";
 
   // ----------------------------------------------------------------------
-  if(LDEBUG) cerr << soliloquy << " vcontent.size()=" << vcontent.size() << endl;
-  if(LDEBUG) cerr << soliloquy << " vlines.size()=" << vlines.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vcontent.size()=" << vcontent.size() << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " vlines.size()=" << vlines.size() << endl;
   // ----------------------------------------------------------------------
 
   getEPS(); //extract eps from filename if possible
@@ -9748,11 +9645,11 @@ bool xPLASMONICS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   xcomplex<double> xcomp_tmp;
   venergy.clear();veels.clear();vdielectric.clear();  //clear
   for(uint iline=0;iline<vlines.size();iline++){
-    if(LDEBUG){cerr << soliloquy << " vlines[iline=" << iline << "]=\"" << vlines[iline] << "\"" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vlines[iline=" << iline << "]=\"" << vlines[iline] << "\"" << endl;}
     aurostd::string2tokens(vlines[iline],vtokens," ");
-    if(LDEBUG){cerr << soliloquy << " vtokens=" << aurostd::joinWDelimiter(vtokens,"|") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vtokens=" << aurostd::joinWDelimiter(vtokens,"|") << endl;}
     //there should be 5 columns
-    if(vtokens.size()!=5){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vcols!=5 (="+aurostd::utype2string(vtokens.size())+")",_FILE_NOT_FOUND_);}
+    if(vtokens.size()!=5){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vcols!=5 (="+aurostd::utype2string(vtokens.size())+")",_FILE_NOT_FOUND_);}
     //The file has 5 columns:
     //column1 = energy (eV)
     //column2 = do not consider this
@@ -9769,14 +9666,14 @@ bool xPLASMONICS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   // ----------------------------------------------------------------------   
   // ----------------------------------------------------------------------
   // DONE NOW RETURN  
-  if(LDEBUG) cerr << soliloquy << " END (" << time_delay(seconds) << ")" << endl;
+  if(LDEBUG) cerr << __AFLOW_FUNC__ << " END (" << time_delay(seconds) << ")" << endl;
   // ----------------------------------------------------------------------
   // DONE NOW RETURN
-  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << soliloquy << " ERROR_flag set in xPLASMONICS" << endl;
+  //[CO20200404 - OBSOLETE]if(ERROR_flag && !QUIET) cerr << "WARNING - " << __AFLOW_FUNC__ << " ERROR_flag set in xPLASMONICS" << endl;
   if(ERROR_flag){
     message << "ERROR_flag set in xPLASMONICS";
-    if(force_exit){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy, message, _RUNTIME_ERROR_);}
-    else{pflow::logger(_AFLOW_FILE_NAME_, soliloquy, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
+    if(force_exit){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _RUNTIME_ERROR_);}
+    else{pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_,QUIET);}
     return FALSE;
   }
   return TRUE;
@@ -9789,6 +9686,6 @@ bool xPLASMONICS::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
 #endif //  _AFLOW_OVASP_CPP_
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Stefano Curtarolo - 2007-2019
@@ -23,8 +23,7 @@ std::vector<xelement::xelement> velement(NUM_ELEMENTS);        // store starting
 namespace pflow {
   void XelementPrint(const string& options,ostream& oss) {
     bool LDEBUG=0;//(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"pflow::XelementPrint():";
-    if(LDEBUG) cerr << soliloquy << " [BEGIN]" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " [BEGIN]" << endl;
     if(LDEBUG) cerr << "options=" << options << endl;
     if(LDEBUG) cerr << "velement.size()=" << velement.size() << endl;
 
@@ -32,7 +31,7 @@ namespace pflow {
     aurostd::string2tokens(options,tokens,",");
     if(LDEBUG) cerr << "tokens.size()=" << tokens.size() << endl;
     if(tokens.size()==0) {
-      init::ErrorOption(options,soliloquy,"aflow --element=Z|name|symbol[,property[,property]....]");
+      init::ErrorOption(options,__AFLOW_FUNC__,"aflow --element=Z|name|symbol[,property[,property]....]");
     } 
     // move on
     string species=tokens.at(0);
@@ -41,7 +40,7 @@ namespace pflow {
     // try with number
     if(tokens.size()>=1) if(aurostd::string2utype<uint>(species)>0) Z=aurostd::string2utype<uint>(species);
     if(Z>103) {
-      init::ErrorOption(options,soliloquy,aurostd::liststring2string("aflow --element=Z|name|symbol[,property[,property]....]","Z outside [1,103] or name or symbol unrecognized"));
+      init::ErrorOption(options,__AFLOW_FUNC__,aurostd::liststring2string("aflow --element=Z|name|symbol[,property[,property]....]","Z outside [1,103] or name or symbol unrecognized"));
     }
     // try with symbol
     if(Z==0) {
@@ -178,7 +177,7 @@ namespace pflow {
       }
     }
 
-    if(LDEBUG) cerr << soliloquy << " [END]" << endl;
+    if(LDEBUG) cerr << __AFLOW_FUNC__ << " [END]" << endl;
   }
 }
 
@@ -751,7 +750,7 @@ namespace xelement {
       }
       return aurostd::joinWDelimiter(aurostd::vecDouble2vecString(vitems,_DOUBLE_WRITE_PRECISION_),delim); //CO20201111
     }
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyStringVector():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyStringVector():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return "";
   }
   string xelement::getPropertyString(const string& property,const string& delim,uint ncols) const { //CO20201111
@@ -847,7 +846,7 @@ namespace xelement {
     if(c==aurostd::toupper("HHIP")) return aurostd::utype2string(HHIP,_DOUBLE_WRITE_PRECISION_);
     if(c==aurostd::toupper("HHIR")) return aurostd::utype2string(HHIR,_DOUBLE_WRITE_PRECISION_);
     if(c==aurostd::toupper("xray_scatt")) return aurostd::utype2string(xray_scatt,_DOUBLE_WRITE_PRECISION_);
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyString():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyString():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return "";
   }
   double xelement::getPropertyDouble(const string& property,int index) const {
@@ -962,7 +961,7 @@ namespace xelement {
     if(c==aurostd::toupper("HHIP")) return HHIP;
     if(c==aurostd::toupper("HHIR")) return HHIR;
     if(c==aurostd::toupper("xray_scatt")) return xray_scatt;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return NNN;
   }
   const xvector<double>& xelement::getPropertyXVectorDouble(const string& property) const {
@@ -1058,7 +1057,7 @@ namespace xelement {
     //if(c==aurostd::toupper("HHIP")) return HHIP;
     //if(c==aurostd::toupper("HHIR")) return HHIR;
     //if(c==aurostd::toupper("xray_scatt")) return xray_scatt;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyXVectorDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyXVectorDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return lattice_constants; //return dummy
   }
   const vector<double>& xelement::getPropertyVectorDouble(const string& property) const {
@@ -1154,7 +1153,7 @@ namespace xelement {
     //if(c==aurostd::toupper("HHIP")) return HHIP;
     //if(c==aurostd::toupper("HHIR")) return HHIR;
     //if(c==aurostd::toupper("xray_scatt")) return xray_scatt;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyVectorDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyVectorDouble():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return energies_ionization; //return dummy
   }
   string xelement::getType(const string& property) const{ //CO20201111
@@ -1252,7 +1251,7 @@ namespace xelement {
     if(c==aurostd::toupper("HHIP")) return "number";
     if(c==aurostd::toupper("HHIR")) return "number";
     if(c==aurostd::toupper("xray_scatt")) return "number";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getType():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getType():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return "";
   }
   string xelement::getUnits(const string& property) const {
@@ -1349,7 +1348,7 @@ namespace xelement {
     if(c==aurostd::toupper("HHIP")) return units_HHIP;
     if(c==aurostd::toupper("HHIR")) return units_HHIR;
     if(c==aurostd::toupper("xray_scatt")) return units_xray_scatt;
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::getPropertyString():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::getPropertyString():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
     return "";
   }
   void xelement::convertUnits(const string& property,const string& units_new){
@@ -1357,10 +1356,9 @@ namespace xelement {
     //https://en.wikipedia.org/wiki/SI_base_unit
     //https://en.wikipedia.org/wiki/SI_derived_unit
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"xelement::convertUnits():";
     if(LDEBUG){
-      cerr << soliloquy << " property=" << property << endl;
-      cerr << soliloquy << " units_new=(" << units_new << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " property=" << property << endl;
+      cerr << __AFLOW_FUNC__ << " units_new=(" << units_new << ")" << endl;
     }
     string c=aurostd::toupper(property);
     vector<string> vproperties;
@@ -1375,8 +1373,8 @@ namespace xelement {
       converted=false;
       units_old=getUnits(vproperties[i]);
       if(LDEBUG){
-        cerr << soliloquy << " vproperties[i=" << i << "]=" << vproperties[i] << endl;
-        cerr << soliloquy << " getUnits(vproperties[i=" << i << "])=(" << units_old << ")" << endl;
+        cerr << __AFLOW_FUNC__ << " vproperties[i=" << i << "]=" << vproperties[i] << endl;
+        cerr << __AFLOW_FUNC__ << " getUnits(vproperties[i=" << i << "])=(" << units_old << ")" << endl;
       }
       if(units_old.empty()){continue;}
       double* dptr=NULL;
@@ -1476,10 +1474,10 @@ namespace xelement {
       if(vproperties[i]==aurostd::toupper("xray_scatt")) {dptr=&xray_scatt;sptr=&units_xray_scatt;}
 
       if(dptr==NULL && dvptr==NULL && dxvptr==NULL){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+        throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","Property not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
       }
       if(sptr==NULL){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","Original units not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
+        throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","Original units not found: "+property,_INPUT_ILLEGAL_);  //CO20200520
       }
       if(units_new=="SI"){
         if(units_old=="kg"){converted=true;}  //done
@@ -1498,21 +1496,21 @@ namespace xelement {
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=std::pow(1e-10,3.0);}
           (*sptr)="m^3";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="cm^2"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=std::pow(1e-2,2.0);}
           (*sptr)="m^2";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="g/cm^3"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-3*std::pow(1.0/1e-2,3.0);}
           (*sptr)="kg/m^3";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="pm"){
@@ -1520,46 +1518,46 @@ namespace xelement {
           if(dptr!=NULL){
             dold=(*dptr);
             if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-12;}
-            if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
             converted=true;
           }
           else if(dxvptr!=NULL){
             for(k=(*dxvptr).lrows;k<=(*dxvptr).urows;k++){
               dold=(*dxvptr)[k];
               if(dold!=NNN && dold!=AUROSTD_NAN){(*dxvptr)[k]*=1e-12;}
-              if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dxvptr)[k] << " (" << (*sptr) << ")" << endl;}
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dxvptr)[k] << " (" << (*sptr) << ")" << endl;}
             }
             converted=true;
           }else{
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","No pointer found",_RUNTIME_ERROR_);  //CO20200520
+            throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","No pointer found",_RUNTIME_ERROR_);  //CO20200520
           }
         }
         else if(units_old=="A"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-10;}
           (*sptr)="m";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="nm"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-9;}
           (*sptr)="m";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="eV"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=eV2J;}
           (*sptr)="J";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="eV/atom"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=eV2J*(1.0/atom2mol);}
           (*sptr)="J/mol";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="kJ/mol"){
@@ -1567,78 +1565,78 @@ namespace xelement {
           if(dptr!=NULL){
             dold=(*dptr);
             if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e3;}
-            if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
             converted=true;
           }
           else if(dvptr!=NULL){
             for(j=0;j<(*dvptr).size();j++){
               dold=(*dvptr)[j];
               if(dold!=NNN && dold!=AUROSTD_NAN){(*dvptr)[j]*=1e3;}
-              if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dvptr)[j] << " (" << (*sptr) << ")" << endl;}
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dvptr)[j] << " (" << (*sptr) << ")" << endl;}
             }
             converted=true;
           }else{
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","No pointer found",_RUNTIME_ERROR_);  //CO20200520
+            throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","No pointer found",_RUNTIME_ERROR_);  //CO20200520
           }
         }
         else if(units_old=="d.u.^{1/3}"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-2*std::pow((1.0/bohr2angstrom)*1e10,3.0);}
           (*sptr)="e-/m^3";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="mJ/m^2"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e-3;}
           (*sptr)="J/m^2";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="degC"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)+=273.15;}
           (*sptr)="K";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="atm"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=atm2Pa;}
           (*sptr)="Pa";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="MPa"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e6;}
           (*sptr)="Pa";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="GPa"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=1e9;}
           (*sptr)="Pa";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else if(units_old=="e-/atom"){
           dold=(*dptr);
           if(dold!=NNN && dold!=AUROSTD_NAN){(*dptr)*=(1.0/atom2mol);}
           (*sptr)="e-/mol";
-          if(LDEBUG){cerr << soliloquy << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " converted " << dold << " (" << units_old << ") to " << (*dptr) << " (" << (*sptr) << ")" << endl;}
           converted=true;
         }
         else{
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","Unknown units(_old) scheme: "+units_old,_RUNTIME_ERROR_);  //CO20200520
+          throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","Unknown units(_old) scheme: "+units_old,_RUNTIME_ERROR_);  //CO20200520
         }
       }
 
-      if(LDEBUG){cerr << soliloquy << " units_new=(" << (*sptr) << ")" << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " units_new=(" << (*sptr) << ")" << endl;}
 
       if(!converted){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::convertUnits():","Unknown units(_new) scheme: "+units_new,_INPUT_ILLEGAL_);  //CO20200520
+        throw aurostd::xerror(__AFLOW_FILE__,"xelement::convertUnits():","Unknown units(_new) scheme: "+units_new,_INPUT_ILLEGAL_);  //CO20200520
       }
     }
   }
@@ -1670,7 +1668,7 @@ namespace xelement {
     verbose=FALSE;
     uint Z=isElement(element);
     if(Z!=0) {(*this)=xelement(Z,oxidation_state);loadDefaultUnits();return;}  //CO20200520
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::xelement():","Element symbol/name does not exist: "+element,_VALUE_ILLEGAL_); //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::xelement():","Element symbol/name does not exist: "+element,_VALUE_ILLEGAL_); //CO20200520
   }
 
   // ********************************************************************************************************************************************************
@@ -11304,7 +11302,7 @@ namespace xelement {
     // [AFLOW]STOP=Lawrencium
     // ********************************************************************************************************************************************************
 
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"xelement::xelement():","Element number does not exist: "+aurostd::utype2string(ZZ),_VALUE_ILLEGAL_);  //CO20200520
+    throw aurostd::xerror(__AFLOW_FILE__,"xelement::xelement():","Element number does not exist: "+aurostd::utype2string(ZZ),_VALUE_ILLEGAL_);  //CO20200520
   }
 } // namespace xelement
 
@@ -11312,6 +11310,6 @@ namespace xelement {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************

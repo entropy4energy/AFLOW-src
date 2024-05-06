@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -845,10 +845,9 @@ namespace aflowMachL {
   }
   void insertCrystalProperties(const string& structure_path,const string& anion,const vector<string>& vheaders,vector<string>& vitems,aflowlib::_aflowlib_entry& entry,const string& e_props) {
     bool LDEBUG=(TRUE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::insertCrystalProperties():";
     uint i=0,index_cation=0,index_anion=0;
     string entry_path="/common/LIB2/RAW/"+structure_path+"/aflowlib.out";
-    if(!aurostd::FileExist(entry_path)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,entry_path+" not found",_FILE_NOT_FOUND_);}
+    if(!aurostd::FileExist(entry_path)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,entry_path+" not found",_FILE_NOT_FOUND_);}
     entry.file2aflowlib(entry_path);
     //
     //stoich features
@@ -863,8 +862,8 @@ namespace aflowMachL {
     vitems.push_back(aurostd::utype2string(entry.vgeometry[0]/entry.vgeometry[2],_DOUBLE_WRITE_PRECISION_));
     vitems.push_back(aurostd::utype2string(entry.natoms));
     index_cation=index_anion=AUROSTD_MAX_UINT;
-    if(entry.vspecies.size()!=2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"non-binary found",_FILE_CORRUPT_);}
-    if(!(entry.vspecies[0]==anion||entry.vspecies[1]==anion)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no "+anion+" found",_FILE_CORRUPT_);}
+    if(entry.vspecies.size()!=2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"non-binary found",_FILE_CORRUPT_);}
+    if(!(entry.vspecies[0]==anion||entry.vspecies[1]==anion)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no "+anion+" found",_FILE_CORRUPT_);}
     if(entry.vspecies[0]==anion){index_cation=1;index_anion=0;}else{index_cation=0;index_anion=1;}
     vitems.push_back(aurostd::utype2string(entry.vcomposition[index_cation]));
     vitems.push_back(aurostd::utype2string(entry.vcomposition[index_anion]));
@@ -882,7 +881,7 @@ namespace aflowMachL {
     vitems.push_back(aurostd::utype2string(entry.energy_cutoff,_DOUBLE_WRITE_PRECISION_));
     vitems.push_back(aurostd::utype2string(entry.enthalpy_formation_cell,_DOUBLE_WRITE_PRECISION_));
     vitems.push_back(aurostd::utype2string(entry.enthalpy_formation_atom,_DOUBLE_WRITE_PRECISION_));
-    if(entry.vnbondxx.size()!=3){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"non-binary found (nbondxx)",_FILE_CORRUPT_);}
+    if(entry.vnbondxx.size()!=3){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"non-binary found (nbondxx)",_FILE_CORRUPT_);}
     vitems.push_back(aurostd::utype2string(entry.vnbondxx[ (index_cation==0?0:2) ],_DOUBLE_WRITE_PRECISION_));
     vitems.push_back(aurostd::utype2string(entry.vnbondxx[ 1 ],_DOUBLE_WRITE_PRECISION_));
     vitems.push_back(aurostd::utype2string(entry.vnbondxx[ (index_cation==0?2:0) ],_DOUBLE_WRITE_PRECISION_));
@@ -900,11 +899,11 @@ namespace aflowMachL {
         found=true;
       }
     }
-    if(!found){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"oxidation_cation not found",_RUNTIME_ERROR_);}
+    if(!found){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"oxidation_cation not found",_RUNTIME_ERROR_);}
     double oxidation_anion=-(entry.vcomposition[index_cation]*oxidation_cation)/entry.vcomposition[index_anion];
     if(LDEBUG){
-      cerr << soliloquy << " oxidation_cation=" << oxidation_cation << endl;
-      cerr << soliloquy << " oxidation_anion=" << oxidation_anion << endl;
+      cerr << __AFLOW_FUNC__ << " oxidation_cation=" << oxidation_cation << endl;
+      cerr << __AFLOW_FUNC__ << " oxidation_anion=" << oxidation_anion << endl;
     }
     found=false;
     for(i=0;i<vheaders.size()&&!found;i++){
@@ -913,7 +912,7 @@ namespace aflowMachL {
         found=true;
       }
     }
-    if(!found){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"oxidation_anion not found",_RUNTIME_ERROR_);}
+    if(!found){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"oxidation_anion not found",_RUNTIME_ERROR_);}
     //
   }
   double getStatistic(const xvector<double>& xvec,const string& stat){
@@ -924,7 +923,7 @@ namespace aflowMachL {
     if(stat=="mean"){return aurostd::mean(xvec);}
     if(stat=="std"){return aurostd::stddev(xvec);}
     if(stat=="mode"){return aurostd::mode(xvec);}
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,"aflowMachL::getStatistic():","Unknown statistic: "+stat,_FILE_CORRUPT_);
+    throw aurostd::xerror(__AFLOW_FILE__,"aflowMachL::getStatistic():","Unknown statistic: "+stat,_FILE_CORRUPT_);
     return 0.0;
   }
   void insertElementalCombinations(const vector<string>& vproperties,vector<string>& vheaders){
@@ -947,7 +946,6 @@ namespace aflowMachL {
       bool vheaders_only,
       uint count_vcols){
     bool LDEBUG=(FALSE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::insertElementalCombinations():";
     vheaders.clear();vfeatures.clear();
     if(!_INJECT_ELEMENTAL_COMBINATIONS_){return;}
     if(count_vcols!=AUROSTD_MAX_UINT){vheaders.reserve(count_vcols);vfeatures.reserve(count_vcols);}
@@ -969,8 +967,8 @@ namespace aflowMachL {
 
     uint index_cation=0,index_anion=0;
     if(!vheaders_only){
-      if(entry.vspecies.size()!=2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"non-binary found",_FILE_CORRUPT_);}
-      if(!(entry.vspecies[0]==xel_anion.symbol||entry.vspecies[1]==xel_anion.symbol)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"no "+xel_anion.symbol+" found",_FILE_CORRUPT_);}
+      if(entry.vspecies.size()!=2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"non-binary found",_FILE_CORRUPT_);}
+      if(!(entry.vspecies[0]==xel_anion.symbol||entry.vspecies[1]==xel_anion.symbol)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no "+xel_anion.symbol+" found",_FILE_CORRUPT_);}
       if(entry.vspecies[0]==xel_anion.symbol){index_cation=1;index_anion=0;}else{index_cation=0;index_anion=1;}
     }
 
@@ -1058,7 +1056,7 @@ namespace aflowMachL {
       if(env=="atomenv"){property+="_"+ion;}
       property+="_"+stat;
       //
-      if(LDEBUG){cerr << soliloquy << " count_single=" << count++ << " " << property << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " count_single=" << count++ << " " << property << endl;}
       vheaders.push_back(property);
       if(vheaders_only==false){
         if(index_stat==0){  //do not waste cycles on recreating xvec over and over again
@@ -1067,9 +1065,9 @@ namespace aflowMachL {
             xvec_env.resize((int)std::ceil(M_X_bonds)+1);
             if(ion=="cation"){ncation=1;nanion=(uint)std::ceil(M_X_bonds);}
             else if(ion=="anion"){ncation=(uint)std::ceil(M_X_bonds);nanion=1;}
-            else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown ion: "+ion,_RUNTIME_ERROR_);}
+            else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown ion: "+ion,_RUNTIME_ERROR_);}
           }
-          else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown env: "+env,_RUNTIME_ERROR_);}
+          else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown env: "+env,_RUNTIME_ERROR_);}
           i=0;
           has_NaN=false;
           //cation
@@ -1085,13 +1083,13 @@ namespace aflowMachL {
           //
           if(has_NaN==false && divide_by_adjacency){xvec_env/=std::ceil(M_X_bonds);}
           if(LDEBUG){
-            cerr << soliloquy << " xvec[\""+property+"\"]=" << xvec_env << endl;
-            cerr << soliloquy << " has_NaN=" << has_NaN << endl;
+            cerr << __AFLOW_FUNC__ << " xvec[\""+property+"\"]=" << xvec_env << endl;
+            cerr << __AFLOW_FUNC__ << " has_NaN=" << has_NaN << endl;
           }
         }
         if(has_NaN){d=NNN;}
         else{d=getStatistic(xvec_env,stat);}
-        if(LDEBUG){cerr << soliloquy << " " << stat << "=" << d << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " " << stat << "=" << d << endl;}
         vfeatures.push_back(d);
       }
     }
@@ -1212,7 +1210,7 @@ namespace aflowMachL {
       if(env=="atomenv"){property+="_"+ion;}
       property+="_"+stat;
       //
-      if(LDEBUG){cerr << soliloquy << " count_double=" << count++ << " " << property << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " count_double=" << count++ << " " << property << endl;}
       vheaders.push_back(property);
       if(vheaders_only==false){
         if(index_stat==0){  //do not waste cycles on recreating xvec over and over again
@@ -1221,9 +1219,9 @@ namespace aflowMachL {
             xvec_env.resize((int)std::ceil(M_X_bonds)+1);
             if(ion=="cation"){ncation=1;nanion=(uint)std::ceil(M_X_bonds);}
             else if(ion=="anion"){ncation=(uint)std::ceil(M_X_bonds);nanion=1;}
-            else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown ion: "+ion,_RUNTIME_ERROR_);}
+            else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown ion: "+ion,_RUNTIME_ERROR_);}
           }
-          else{throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"Unknown env: "+env,_RUNTIME_ERROR_);}
+          else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown env: "+env,_RUNTIME_ERROR_);}
           i=0;
           has_NaN=false;
           //cation
@@ -1237,8 +1235,8 @@ namespace aflowMachL {
           //check issues with multiplication/division
           if(!std::isfinite(d3)){
             if(LDEBUG){
-              if(index_operation==0){cerr << soliloquy << " multiplication yields inf: " << d << " * " << d2 << endl;}
-              else{cerr << soliloquy << " division yields inf: " << d << " / " << d2 << endl;}
+              if(index_operation==0){cerr << __AFLOW_FUNC__ << " multiplication yields inf: " << d << " * " << d2 << endl;}
+              else{cerr << __AFLOW_FUNC__ << " division yields inf: " << d << " / " << d2 << endl;}
             }
             has_NaN=true;
           }
@@ -1255,8 +1253,8 @@ namespace aflowMachL {
           //check issues with multiplication/division
           if(!std::isfinite(d3)){
             if(LDEBUG){
-              if(index_operation==0){cerr << soliloquy << " multiplication yields inf: " << d << " * " << d2 << endl;}
-              else{cerr << soliloquy << " division yields inf: " << d << " / " << d2 << endl;}
+              if(index_operation==0){cerr << __AFLOW_FUNC__ << " multiplication yields inf: " << d << " * " << d2 << endl;}
+              else{cerr << __AFLOW_FUNC__ << " division yields inf: " << d << " / " << d2 << endl;}
             }
             has_NaN=true;
           }
@@ -1265,13 +1263,13 @@ namespace aflowMachL {
           //
           if(has_NaN==false && divide_by_adjacency){xvec_env/=std::ceil(M_X_bonds);}
           if(LDEBUG){
-            cerr << soliloquy << " xvec[\""+property+"\"]=" << xvec_env << endl;
-            cerr << soliloquy << " has_NaN=" << has_NaN << endl;
+            cerr << __AFLOW_FUNC__ << " xvec[\""+property+"\"]=" << xvec_env << endl;
+            cerr << __AFLOW_FUNC__ << " has_NaN=" << has_NaN << endl;
           }
         }
         if(has_NaN){d=NNN;}
         else{d=getStatistic(xvec_env,stat);}
-        if(LDEBUG){cerr << soliloquy << " " << stat << "=" << d << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " " << stat << "=" << d << endl;}
         vfeatures.push_back(d);
       }
     }
@@ -1294,26 +1292,25 @@ namespace aflowMachL {
   }
   void oneHotFeatures(vector<vector<string> >& table,const string& features_categories) {
     bool LDEBUG=(FALSE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::oneHotFeatures():";
     stringstream message;
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     message << "creating one-hot features for " << features_categories;
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     uint i=0,j=0,k=0;
 
     if(LDEBUG){
-      cerr << soliloquy << " table_orig=" << endl;
+      cerr << __AFLOW_FUNC__ << " table_orig=" << endl;
       for(i=0;i<table.size();i++){cerr << aurostd::joinWDelimiter(table[i],",") << endl;}
     }
 
-    if(table.size()<2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"table.size()<2",_RUNTIME_ERROR_);}
+    if(table.size()<2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"table.size()<2",_RUNTIME_ERROR_);}
 
     vector<string> vfeatures_categories;
     aurostd::string2tokens(features_categories,vfeatures_categories,",");
-    if(LDEBUG){cerr << soliloquy << " vfeatures_categories.size()=" << vfeatures_categories.size() << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vfeatures_categories.size()=" << vfeatures_categories.size() << endl;}
 
     //table[0] are headers
     vector<uint> vicol;
@@ -1327,7 +1324,7 @@ namespace aflowMachL {
         }
       }
     }
-    if(vfeatures_categories.size()!=vicol.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vfeatures_categories.size()!=vicol.size()",_RUNTIME_ERROR_);}
+    if(vfeatures_categories.size()!=vicol.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vfeatures_categories.size()!=vicol.size()",_RUNTIME_ERROR_);}
 
     //sort and reverse, so we can erase/insert
     std::sort(vicol.rbegin(),vicol.rend());
@@ -1341,8 +1338,8 @@ namespace aflowMachL {
       header=table[0][vicol[i]];
       getColumn(table,vicol[i],column,isfloat,isinteger,false);
       if(LDEBUG){
-        cerr << soliloquy << " column[" << header << "]=" << aurostd::joinWDelimiter(column,",") << endl;
-        cerr << soliloquy << " isinteger=" << isinteger << endl;
+        cerr << __AFLOW_FUNC__ << " column[" << header << "]=" << aurostd::joinWDelimiter(column,",") << endl;
+        cerr << __AFLOW_FUNC__ << " isinteger=" << isinteger << endl;
       }
       column_orig.clear();for(j=0;j<column.size();j++){column_orig.push_back(column[j]);} //column_orig=column;
       if(isinteger){
@@ -1354,11 +1351,11 @@ namespace aflowMachL {
       }else{
         std::sort(column.begin(),column.end());column.erase( std::unique( column.begin(), column.end() ), column.end() );  //get unique values
       }
-      if(LDEBUG){cerr << soliloquy << " unique=" << aurostd::joinWDelimiter(column,",") << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " unique=" << aurostd::joinWDelimiter(column,",") << endl;}
       delColumn(table,vicol[i]);
       for(k=0;k<column.size();k++){
         header_new=header+"_"+column[k];
-        if(LDEBUG){cerr << soliloquy << " header_new=" << header_new << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " header_new=" << header_new << endl;}
         table[0].insert(table[0].begin()+vicol[i]+k,header_new);
         for(j=1;j<table.size();j++){
           table[j].insert(table[j].begin()+vicol[i]+k, column_orig[j-1]==column[k]?"1":"0" );
@@ -1367,7 +1364,7 @@ namespace aflowMachL {
     }
 
     if(LDEBUG){
-      cerr << soliloquy << " table_new=" << endl;
+      cerr << __AFLOW_FUNC__ << " table_new=" << endl;
       for(i=0;i<table.size();i++){cerr << aurostd::joinWDelimiter(table[i],",") << endl;}
     }
 
@@ -1375,7 +1372,7 @@ namespace aflowMachL {
     uint ncols=table[0].size();
     for(i=0;i<table.size();i++){
       if(table[i].size()!=ncols){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"table[i="+aurostd::utype2string(i)+"].size()!=ncols",_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"table[i="+aurostd::utype2string(i)+"].size()!=ncols",_RUNTIME_ERROR_);
       }
     }
   }
@@ -1406,9 +1403,8 @@ namespace aflowMachL {
   }
   void reduceFeatures(vector<vector<string> >& table,const string& yheader,const vector<string>& vheaders2skip,double var_threshold,double ycorr_threshold,double selfcorr_threshold) {
     bool LDEBUG=(FALSE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::reduceFeatures():";
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     uint i=0,j=0;
 
@@ -1424,7 +1420,7 @@ namespace aflowMachL {
         }
       }
     }
-    if(vheaders2skip.size()!=vicol2skip.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vheaders2skip.size()!=vicol2skip.size()",_RUNTIME_ERROR_);}
+    if(vheaders2skip.size()!=vicol2skip.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vheaders2skip.size()!=vicol2skip.size()",_RUNTIME_ERROR_);}
 
     return reduceFeatures(table,yheader,vicol2skip,var_threshold,ycorr_threshold,selfcorr_threshold);
   }
@@ -1434,26 +1430,25 @@ namespace aflowMachL {
   }
   void reduceFeatures(vector<vector<string> >& table,const string& yheader,const vector<uint>& vicol2skip,double var_threshold,double ycorr_threshold,double selfcorr_threshold) {
     bool LDEBUG=(FALSE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::reduceFeatures():";
     stringstream message;
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     uint i=0,j=0,ncols=0,ncols_orig=0;
 
     if(LDEBUG){
-      cerr << soliloquy << " table_orig=" << endl;
+      cerr << __AFLOW_FUNC__ << " table_orig=" << endl;
       for(i=0;i<table.size();i++){cerr << aurostd::joinWDelimiter(table[i],",") << endl;}
     }
 
-    if(table.size()<2){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"table.size()<2",_RUNTIME_ERROR_);}
+    if(table.size()<2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"table.size()<2",_RUNTIME_ERROR_);}
 
     ncols=ncols_orig=table[0].size();
     message << "ncols_orig=" << ncols;
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     message << "converting string table to xvector table";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     vector<xvector<double> > xvtable;
     bool isfloat=false,isinteger=false;
@@ -1465,32 +1460,32 @@ namespace aflowMachL {
     uint yiheader=AUROSTD_MAX_UINT;
     for(i=0;i<ncols;i++){
       const string& header=table[0][i];
-      if(LDEBUG){cerr << soliloquy << " looking at column " << header << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking at column " << header << endl;}
       if(header==yheader){yiheader=i;}
       if(aurostd::WithinList(vicol2skip,i)){
-        if(LDEBUG){cerr << soliloquy << " skipping " << header << " as requested" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header << " as requested" << endl;}
         xvtable.push_back(nullxv);vmeans.push_back(0.0);vstddevs.push_back(0.0);continue;
       }
       getColumn(table,i,column,isfloat,isinteger,false);
       if(!isfloat){
-        if(LDEBUG){cerr << soliloquy << " skipping " << header << ": not floats" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header << ": not floats" << endl;}
         xvtable.push_back(nullxv);vmeans.push_back(0.0);vstddevs.push_back(0.0);continue;
       }
       xv=aurostd::vector2xvector<double>(column);
-      if(LDEBUG){cerr << soliloquy << " xv=" << xv << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xv=" << xv << endl;}
       xvtable.push_back(xv);vmeans.push_back(aurostd::mean(xv));vstddevs.push_back(aurostd::stddev(xv));
       xvindices.push_back(i);
     }
-    if(xvtable.size()!=ncols){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"xvtable.size()!=ncols",_RUNTIME_ERROR_);}
-    if(vmeans.size()!=ncols){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vmeans.size()!=ncols",_RUNTIME_ERROR_);}
-    if(vstddevs.size()!=ncols){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vstddevs.size()!=ncols",_RUNTIME_ERROR_);}
-    if(yiheader==AUROSTD_MAX_UINT){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"yiheader==AUROSTD_MAX_UINT",_INPUT_MISSING_);}
+    if(xvtable.size()!=ncols){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"xvtable.size()!=ncols",_RUNTIME_ERROR_);}
+    if(vmeans.size()!=ncols){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vmeans.size()!=ncols",_RUNTIME_ERROR_);}
+    if(vstddevs.size()!=ncols){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vstddevs.size()!=ncols",_RUNTIME_ERROR_);}
+    if(yiheader==AUROSTD_MAX_UINT){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"yiheader==AUROSTD_MAX_UINT",_INPUT_MISSING_);}
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
     //variance
 
     message << "identifying and removing null / low-variance features";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     //table[0] are headers
     //vector<uint> vicol2remove;
@@ -1500,29 +1495,29 @@ namespace aflowMachL {
     for(i=0;i<xvindices.size();i++){
       index=xvindices[i];
       const string& header=table[0][index];
-      if(LDEBUG){cerr << soliloquy << " looking at column " << header << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking at column " << header << endl;}
       const xvector<double>& xvec=xvtable[index];
-      if(LDEBUG){cerr << soliloquy << " xvec(orig  )=" << xvec << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(orig  )=" << xvec << endl;}
       removeNaN(xvec,xv_clean);
-      if(LDEBUG){cerr << soliloquy << " xvec(clean )=" << xv_clean << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(clean )=" << xv_clean << endl;}
       if(xv_clean.rows==0||xv_clean.rows==1){
-        if(LDEBUG){cerr << soliloquy << " removing " << header << ": " << (xv_clean.rows==0?"null-":"1-") << "vector" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing " << header << ": " << (xv_clean.rows==0?"null-":"1-") << "vector" << endl;}
         //vicol2remove.push_back(index);
         xvicol2remove[xvicol2remove.lrows+index]=1;
         continue;
       }
       if(xv_clean.rows<(xvec.rows/2)){
-        if(LDEBUG){cerr << soliloquy << " removing " << header << ": " << " vector more than half filled with NaNs (" << xv_clean.rows << " out of " << xvec.rows << ")" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing " << header << ": " << " vector more than half filled with NaNs (" << xv_clean.rows << " out of " << xvec.rows << ")" << endl;}
         //vicol2remove.push_back(index);
         xvicol2remove[xvicol2remove.lrows+index]=1;
         continue;
       }
       MinMaxScale(xv_clean);
-      if(LDEBUG){cerr << soliloquy << " xvec(scaled)=" << xv_clean << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(scaled)=" << xv_clean << endl;}
       var=aurostd::var(xv_clean,1); //sample variance
-      if(LDEBUG){cerr << soliloquy << " var(xvec)=" << var << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " var(xvec)=" << var << endl;}
       if(var<var_threshold){
-        if(LDEBUG){cerr << soliloquy << " no variance in column " << header << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " no variance in column " << header << endl;}
         //vicol2remove.push_back(index);
         xvicol2remove[xvicol2remove.lrows+index]=1;
         continue;
@@ -1532,14 +1527,14 @@ namespace aflowMachL {
     //std::sort(vicol2remove.begin(),vicol2remove.end());vicol2remove.erase( std::unique( vicol2remove.begin(), vicol2remove.end() ), vicol2remove.end() );  //get unique values
     //message << "found " << vicol2remove.size() << " null / low-variance columns";
     message << "found " << aurostd::sum(xvicol2remove) << " null / low-variance columns";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     //[ERASE IS TOO SLOW]if(0){  //erase is TOO slow
     //[ERASE IS TOO SLOW]  //sort and reverse, so we can erase/insert
     //[ERASE IS TOO SLOW]  std::sort(vicol2remove.rbegin(),vicol2remove.rend());
     //[ERASE IS TOO SLOW]
     //[ERASE IS TOO SLOW]  for(i=0;i<vicol2remove.size();i++){
-    //[ERASE IS TOO SLOW]    if(LDEBUG){cerr << soliloquy << " removing column " << table[0][vicol2remove[i]] << endl;}
+    //[ERASE IS TOO SLOW]    if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing column " << table[0][vicol2remove[i]] << endl;}
     //[ERASE IS TOO SLOW]    delColumn(table,vicol2remove[i]);
     //[ERASE IS TOO SLOW]  }
     //[ERASE IS TOO SLOW]}
@@ -1548,35 +1543,35 @@ namespace aflowMachL {
     //correlated with y
 
     message << "identifying and removing low-correlated features";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     //get xvec of y
     getColumn(table,yiheader,column,isfloat,isinteger,false);
     if(!isfloat){
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"yvec is not float",_INPUT_ILLEGAL_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"yvec is not float",_INPUT_ILLEGAL_);
     }
     xvector<double> yvec=aurostd::vector2xvector<double>(column);
-    if(LDEBUG){cerr << soliloquy << " yvec[" << yheader << "]=" << yvec << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " yvec[" << yheader << "]=" << yvec << endl;}
     double ymean=aurostd::mean(yvec);
     double ystddev=aurostd::stddev(yvec);
 
     double corr=0.0;
     for(i=0;i<xvindices.size();i++){
       index=xvindices[i];
-      if(LDEBUG){cerr << soliloquy << " index=" << index << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " index=" << index << endl;}
       const string& header=table[0][index];
       //if(aurostd::WithinList(vicol2remove,index))
       if(xvicol2remove[xvicol2remove.lrows+index]==1){
-        if(LDEBUG){cerr << soliloquy << " skipping " << header << ": to be removed" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header << ": to be removed" << endl;}
         continue;
       }
       const xvector<double>& xvec=xvtable[index]; //no need to remove NNN, correlation would be the same with 0 or NNN
-      if(LDEBUG){cerr << soliloquy << " xvec[" << header << "]=" << xvec << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec[" << header << "]=" << xvec << endl;}
 
       corr=std::pow(aurostd::correlation_Pearson_fast(xvec,vmeans[index],vstddevs[index],yvec,ymean,ystddev),2.0);
-      if(LDEBUG){cerr << soliloquy << " corr(xvec,yvec)^2=" << corr << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " corr(xvec,yvec)^2=" << corr << endl;}
       if(corr<ycorr_threshold){
-        if(LDEBUG){cerr << soliloquy << " low correlation between columns " << header << " and " <<  yheader << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " low correlation between columns " << header << " and " <<  yheader << endl;}
         //vicol2remove.push_back(index);
         xvicol2remove[xvicol2remove.lrows+index]=1;
       }
@@ -1585,13 +1580,13 @@ namespace aflowMachL {
     //std::sort(vicol2remove.begin(),vicol2remove.end());vicol2remove.erase( std::unique( vicol2remove.begin(), vicol2remove.end() ), vicol2remove.end() );  //get unique values
     //message << "found " << vicol2remove.size() << " null / low-variance / low-correlated columns";
     message << "found " << aurostd::sum(xvicol2remove) << " null / low-variance / low-correlated columns";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
     //self-correlated
 
     message << "identifying and removing self-correlated features";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     //uint ncpus=1;
     uint index2=0;
@@ -1599,32 +1594,32 @@ namespace aflowMachL {
     //if(ncpus==1){
     for(i=0;i<xvindices.size()-1;i++){
       index=xvindices[i];
-      if(1||LDEBUG){cerr << soliloquy << " index=" << index << endl;}
+      if(1||LDEBUG){cerr << __AFLOW_FUNC__ << " index=" << index << endl;}
       const string& header=table[0][index];
       //if(aurostd::WithinList(vicol2remove,index))
       if(xvicol2remove[xvicol2remove.lrows+index]==1){
-        if(LDEBUG){cerr << soliloquy << " skipping " << header << ": to be removed" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header << ": to be removed" << endl;}
         continue;
       }
       const xvector<double>& xvec=xvtable[index]; //no need to remove NNN, correlation would be the same with 0 or NNN
-      if(LDEBUG){cerr << soliloquy << " xvec[" << header << "]=" << xvec << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec[" << header << "]=" << xvec << endl;}
 
       for(j=i+1;j<xvindices.size();j++){
         index2=xvindices[j];
-        if(LDEBUG){cerr << soliloquy << " index2=" << index2 << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " index2=" << index2 << endl;}
         const string& header2=table[0][index2];
         //if(aurostd::WithinList(vicol2remove,index2))
         if(xvicol2remove[xvicol2remove.lrows+index2]==1){
-          if(LDEBUG){cerr << soliloquy << " skipping " << header2 << ": to be removed" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header2 << ": to be removed" << endl;}
           continue;
         }
         const xvector<double>& xvec2=xvtable[index2]; //no need to remove NNN, correlation would be the same with 0 or NNN
-        if(LDEBUG){cerr << soliloquy << " xvec2[" << header2 << "]=" << xvec2 << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec2[" << header2 << "]=" << xvec2 << endl;}
 
         corr=std::pow(aurostd::correlation_Pearson_fast(xvec,vmeans[index],vstddevs[index],xvec2,vmeans[index2],vstddevs[index2]),2.0);
-        if(LDEBUG){cerr << soliloquy << " corr(xvec,xvec2)^2=" << corr << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " corr(xvec,xvec2)^2=" << corr << endl;}
         if(corr>selfcorr_threshold){
-          if(LDEBUG){cerr << soliloquy << " high correlation between columns " << header << " and " <<  header2 << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " high correlation between columns " << header << " and " <<  header2 << endl;}
           //vicol2remove.push_back(index2);
           xvicol2remove[xvicol2remove.lrows+index2]=1;
         }
@@ -1647,14 +1642,14 @@ namespace aflowMachL {
     //std::sort(vicol2remove.begin(),vicol2remove.end());vicol2remove.erase( std::unique( vicol2remove.begin(), vicol2remove.end() ), vicol2remove.end() );  //get unique values
     //message << "removing " << vicol2remove.size() << " null / low-variance / low-correlated / self-correlated columns";
     message << "removing " << aurostd::sum(xvicol2remove) << " null / low-variance / low-correlated / self-correlated columns";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_NOTICE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_NOTICE_);
 
     //[ERASE IS TOO SLOW]if(0){  //erase is TOO slow
     //[ERASE IS TOO SLOW]  //sort and reverse, so we can erase/insert
     //[ERASE IS TOO SLOW]  std::sort(vicol2remove.rbegin(),vicol2remove.rend());
     //[ERASE IS TOO SLOW]
     //[ERASE IS TOO SLOW]  for(i=0;i<vicol2remove.size();i++){
-    //[ERASE IS TOO SLOW]    if(LDEBUG){cerr << soliloquy << " removing column " << table[0][vicol2remove[i]] << endl;}
+    //[ERASE IS TOO SLOW]    if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing column " << table[0][vicol2remove[i]] << endl;}
     //[ERASE IS TOO SLOW]    delColumn(table,vicol2remove[i]);
     //[ERASE IS TOO SLOW]  }
     //[ERASE IS TOO SLOW]}
@@ -1670,7 +1665,7 @@ namespace aflowMachL {
     //}
 
     message << "adding back Z_cation and Mendeleev_number_cation";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
     for(i=0;i<ncols;i++){
       if( table[0][i]=="Z_cation" || table[0][i]=="Mendeleev_number_cation" ){  //keep these
         xvicol2remove[xvicol2remove.lrows+i]=0;
@@ -1688,7 +1683,7 @@ namespace aflowMachL {
       }
       index++;
     }
-    if(LDEBUG){cerr << soliloquy << " done creating table_new" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " done creating table_new" << endl;}
 
     //for(i=0;i<table.size();i++){
     //  table_new.push_back(vector<string>(0));
@@ -1701,19 +1696,19 @@ namespace aflowMachL {
 
     //check we didn't mess up
     ncols=table[0].size();
-    //if((ncols_orig-ncols)!=vicol2remove.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"(ncols_orig-ncols)!=vicol2remove.size()",_RUNTIME_ERROR_);}
-    if((int)(ncols_orig-ncols)!=aurostd::sum(xvicol2remove)){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"(ncols_orig-ncols)!=aurostd::sum(xvicol2remove)",_RUNTIME_ERROR_);}
+    //if((ncols_orig-ncols)!=vicol2remove.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"(ncols_orig-ncols)!=vicol2remove.size()",_RUNTIME_ERROR_);}
+    if((int)(ncols_orig-ncols)!=aurostd::sum(xvicol2remove)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"(ncols_orig-ncols)!=aurostd::sum(xvicol2remove)",_RUNTIME_ERROR_);}
     for(i=0;i<table.size();i++){
       if(table[i].size()!=ncols){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"table[i="+aurostd::utype2string(i)+"].size()!=ncols",_RUNTIME_ERROR_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"table[i="+aurostd::utype2string(i)+"].size()!=ncols",_RUNTIME_ERROR_);
       }
     }
 
     message << "ncols_new=" << ncols;
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     if(1||LDEBUG){
-      cerr << soliloquy << " table_new=" << endl;
+      cerr << __AFLOW_FUNC__ << " table_new=" << endl;
       for(i=0;i<table.size();i++){cerr << aurostd::joinWDelimiter(table[i],",") << endl;}
     }
 
@@ -1721,7 +1716,6 @@ namespace aflowMachL {
 
   string reduceEProperties(double var_threshold,double selfcorr_threshold) {
     bool LDEBUG=(TRUE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::reduceEProperties():";
     stringstream message;
 
     uint i=0,j=0,ielement=0,index=0,index2=0;
@@ -1738,9 +1732,9 @@ namespace aflowMachL {
       }
     }
 
-    if(LDEBUG){cerr << soliloquy << " vproperties_elements_numbers=" << aurostd::joinWDelimiter(vproperties_elements_numbers,",") << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " vproperties_elements_numbers=" << aurostd::joinWDelimiter(vproperties_elements_numbers,",") << endl;}
 
-    if(!_TM_ONLY_){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"going beyond transition metals requires rewriting this function",_FILE_CORRUPT_);}
+    if(!_TM_ONLY_){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"going beyond transition metals requires rewriting this function",_FILE_CORRUPT_);}
 
     vector<vector<string> > vvtable;
     for(ielement=0;ielement<100;ielement++){
@@ -1752,7 +1746,7 @@ namespace aflowMachL {
       vvtable.push_back(vector<string>(0));
       insertElementalProperties(vproperties_elements_numbers,xel,vvtable.back());
       if(vvtable.back().size()!=vproperties_elements_numbers.size()){
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vvtable.back().size()["+aurostd::utype2string(vvtable.back().size())+"]!=vproperties_elements_numbers.size()["+aurostd::utype2string(vproperties_elements_numbers.size())+"]",_FILE_CORRUPT_);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vvtable.back().size()["+aurostd::utype2string(vvtable.back().size())+"]!=vproperties_elements_numbers.size()["+aurostd::utype2string(vproperties_elements_numbers.size())+"]",_FILE_CORRUPT_);
       }
     }
 
@@ -1769,7 +1763,7 @@ namespace aflowMachL {
 
     if(LDEBUG){
       for(i=0;i<vcols.size();i++){
-        cerr << soliloquy << " vcols[" << vproperties_elements_numbers[i] << "]=" << vcols[i] << endl;
+        cerr << __AFLOW_FUNC__ << " vcols[" << vproperties_elements_numbers[i] << "]=" << vcols[i] << endl;
       }
     }
 
@@ -1780,28 +1774,28 @@ namespace aflowMachL {
     for(i=0;i<vcols.size();i++){
       index=i;
       const string& header=vproperties_elements_numbers[index];
-      if(LDEBUG){cerr << soliloquy << " looking at column " << header << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " looking at column " << header << endl;}
       const xvector<double>& xvec=vcols[index];
       vmeans.push_back(aurostd::mean(xvec));vstddevs.push_back(aurostd::stddev(xvec));
-      if(LDEBUG){cerr << soliloquy << " xvec(orig  )=" << xvec << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(orig  )=" << xvec << endl;}
       removeNaN(xvec,xv_clean);
-      if(LDEBUG){cerr << soliloquy << " xvec(clean )=" << xv_clean << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(clean )=" << xv_clean << endl;}
       if(xv_clean.rows==0||xv_clean.rows==1){
-        if(LDEBUG){cerr << soliloquy << " removing " << header << ": " << (xv_clean.rows==0?"null-":"1-") << "vector" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing " << header << ": " << (xv_clean.rows==0?"null-":"1-") << "vector" << endl;}
         vicol2remove.push_back(index);
         continue;
       }
       if(xv_clean.rows<(xvec.rows/2)){
-        if(LDEBUG){cerr << soliloquy << " removing " << header << ": " << " vector more than half filled with NaNs (" << xv_clean.rows << " out of " << xvec.rows << ")" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " removing " << header << ": " << " vector more than half filled with NaNs (" << xv_clean.rows << " out of " << xvec.rows << ")" << endl;}
         vicol2remove.push_back(index);
         continue;
       }
       MinMaxScale(xv_clean);
-      if(LDEBUG){cerr << soliloquy << " xvec(scaled)=" << xv_clean << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec(scaled)=" << xv_clean << endl;}
       var=aurostd::var(xv_clean,1); //sample variance
-      if(LDEBUG){cerr << soliloquy << " var(xvec)=" << var << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " var(xvec)=" << var << endl;}
       if(var<var_threshold){
-        if(LDEBUG){cerr << soliloquy << " no variance in column " << header << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " no variance in column " << header << endl;}
         vicol2remove.push_back(index);
         continue;
       }
@@ -1809,35 +1803,35 @@ namespace aflowMachL {
 
     std::sort(vicol2remove.begin(),vicol2remove.end());vicol2remove.erase( std::unique( vicol2remove.begin(), vicol2remove.end() ), vicol2remove.end() );  //get unique values
     message << "found " << vicol2remove.size() << " null / low-variance columns";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     double corr=0.0;
     for(i=0;i<vcols.size();i++){
       index=i;
-      if(1||LDEBUG){cerr << soliloquy << " index=" << index << endl;}
+      if(1||LDEBUG){cerr << __AFLOW_FUNC__ << " index=" << index << endl;}
       const string& header=vproperties_elements_numbers[index];
       if(aurostd::WithinList(vicol2remove,index)){
-        if(LDEBUG){cerr << soliloquy << " skipping " << header << ": to be removed" << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header << ": to be removed" << endl;}
         continue;
       }
       const xvector<double>& xvec=vcols[index]; //no need to remove NNN, correlation would be the same with 0 or NNN
-      if(LDEBUG){cerr << soliloquy << " xvec[" << header << "]=" << xvec << endl;}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec[" << header << "]=" << xvec << endl;}
 
       for(j=i+1;j<vcols.size();j++){
         index2=j;
-        if(LDEBUG){cerr << soliloquy << " index2=" << index2 << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " index2=" << index2 << endl;}
         const string& header2=vproperties_elements_numbers[index2];
         if(aurostd::WithinList(vicol2remove,index2)){
-          if(LDEBUG){cerr << soliloquy << " skipping " << header2 << ": to be removed" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping " << header2 << ": to be removed" << endl;}
           continue;
         }
         const xvector<double>& xvec2=vcols[index2]; //no need to remove NNN, correlation would be the same with 0 or NNN
-        if(LDEBUG){cerr << soliloquy << " xvec2[" << header2 << "]=" << xvec2 << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " xvec2[" << header2 << "]=" << xvec2 << endl;}
 
         corr=std::pow(aurostd::correlation_Pearson_fast(xvec,vmeans[index],vstddevs[index],xvec2,vmeans[index2],vstddevs[index2]),2.0);
-        if(LDEBUG){cerr << soliloquy << " corr(xvec,xvec2)^2=" << corr << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " corr(xvec,xvec2)^2=" << corr << endl;}
         if(corr>selfcorr_threshold){
-          if(LDEBUG){cerr << soliloquy << " high correlation between columns " << header << " and " <<  header2 << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " high correlation between columns " << header << " and " <<  header2 << endl;}
           vicol2remove.push_back(index2);
         }
       }
@@ -1845,7 +1839,7 @@ namespace aflowMachL {
 
     std::sort(vicol2remove.begin(),vicol2remove.end());vicol2remove.erase( std::unique( vicol2remove.begin(), vicol2remove.end() ), vicol2remove.end() );  //get unique values
     message << "found " << vicol2remove.size() << " null / low-variance / self-correlated columns";
-    pflow::logger(_AFLOW_FILE_NAME_,soliloquy,message,cout,_LOGGER_MESSAGE_);
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,cout,_LOGGER_MESSAGE_);
 
     vector<string> vcol2remove;
     for(i=0;i<vicol2remove.size();i++){vcol2remove.push_back(vproperties_elements_numbers[vicol2remove[i]]);}
@@ -1857,17 +1851,16 @@ namespace aflowMachL {
     }
 
     if(LDEBUG){
-      cerr << soliloquy << " reduced " << vproperties_elements_full.size() << " elemental properties down to " << vproperties_elements_full_new.size() << " (reduced by " << (vproperties_elements_full.size()-vproperties_elements_full_new.size()) << ")" << endl;
-      cerr << soliloquy << " vproperties_elements_full_new=" << aurostd::joinWDelimiter(vproperties_elements_full_new,",") << endl;
+      cerr << __AFLOW_FUNC__ << " reduced " << vproperties_elements_full.size() << " elemental properties down to " << vproperties_elements_full_new.size() << " (reduced by " << (vproperties_elements_full.size()-vproperties_elements_full_new.size()) << ")" << endl;
+      cerr << __AFLOW_FUNC__ << " vproperties_elements_full_new=" << aurostd::joinWDelimiter(vproperties_elements_full_new,",") << endl;
     }
 
     return aurostd::joinWDelimiter(vproperties_elements_full_new,",");
   }
   void writeCoordCECSV() {
     bool LDEBUG=(TRUE || _DEBUG_ML_ || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::writeCoordCECSV():";
 
-    if(LDEBUG){cerr << soliloquy << " BEGIN" << endl;}
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
     uint ielement=0,ioxidation=0,i=0,j=0,k=0,ipp=0;
     string correction_line="",bader_line="",input_pre="",input="";
@@ -2005,7 +1998,7 @@ namespace aflowMachL {
     uint count_vcols_ecombo_coordce=vheaders_additional.size();
 
     if(LDEBUG){
-      for(i=0;i<vheaders.size();i++){cerr << soliloquy << " vheaders[i=" << i << "]=" << vheaders[i] << endl;}
+      for(i=0;i<vheaders.size();i++){cerr << __AFLOW_FUNC__ << " vheaders[i=" << i << "]=" << vheaders[i] << endl;}
     }
 
     for(i=0;i<vvlines.size();i++){vvlines[i].push_back(vheaders);}
@@ -2026,7 +2019,7 @@ namespace aflowMachL {
         }
         input_pre=xel_cation.symbol;
         input_pre+="_+"+aurostd::utype2string(ioxidation);
-        if(LDEBUG){cerr << soliloquy << " input=" << input_pre << endl;}
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " input=" << input_pre << endl;}
         vitems_pre.clear();
         //cation
         insertElementalProperties(vproperties_elements,xel_cation,vitems_pre);
@@ -2054,12 +2047,12 @@ namespace aflowMachL {
           //
           vitems.push_back(aurostd::utype2string(-3,_DOUBLE_WRITE_PRECISION_)); //ioxidation - fix later if needed
           try{species_pp=AVASP_Get_PseudoPotential_PAW_PBE(xel_N.symbol);}
-          catch(aurostd::xerror& excpt){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"cannot run AVASP_Get_PseudoPotential_PAW_PBE() for nitrogen",_FILE_CORRUPT_);}
+          catch(aurostd::xerror& excpt){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"cannot run AVASP_Get_PseudoPotential_PAW_PBE() for nitrogen",_FILE_CORRUPT_);}
           found_pp=false;
           for(ipp=0;ipp<vxpseudopotential.size()&&found_pp==false;ipp++) {
             if(vxpseudopotential[ipp].species_pp_type[0]=="PAW_PBE" && vxpseudopotential[ipp].species_pp[0]==species_pp){
               found_pp=true;
-              if(vxpseudopotential[ipp].species_pp_groundstate_structure[0]!="diatom"){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"pp_groundstate_structure for "+xel_N.symbol+" is NOT diatom",_INPUT_ILLEGAL_);}
+              if(vxpseudopotential[ipp].species_pp_groundstate_structure[0]!="diatom"){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"pp_groundstate_structure for "+xel_N.symbol+" is NOT diatom",_INPUT_ILLEGAL_);}
               //vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].species_Z[0],_DOUBLE_WRITE_PRECISION_)); //Z
               vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].species_pp_groundstate_energy[0],_DOUBLE_WRITE_PRECISION_)); //groundstate_energy
               vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].vEATOM[0],_DOUBLE_WRITE_PRECISION_)); //EATOM
@@ -2069,15 +2062,15 @@ namespace aflowMachL {
           vitems.push_back("0.0");  //no bader yet
 
           //
-          if(LDEBUG){cerr << soliloquy << " correction_line=\"" << correction_line << "\"" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " correction_line=\"" << correction_line << "\"" << endl;}
           aurostd::string2tokens(correction_line,vtokens," ");
-          if(vtokens.size()<16){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vtokens.size()<16",_FILE_CORRUPT_);}
+          if(vtokens.size()<16){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vtokens.size()<16",_FILE_CORRUPT_);}
           for(i=2;i<=11;i++){vitems.push_back(vtokens[i]);}
           M_X_bonds=aurostd::string2utype<double>(vtokens[11]);
-          if(LDEBUG){cerr << soliloquy << " M-X_bonds=" << M_X_bonds << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " M-X_bonds=" << M_X_bonds << endl;}
           //
           structure_path=vtokens[12];
-          if(LDEBUG){cerr << soliloquy << " structure_path=" << structure_path << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " structure_path=" << structure_path << endl;}
           //
           vitems.push_back(vtokens[13]);  //ncations_per_f.u.
           vitems.push_back(vtokens[14]);  //nanions_per_f.u.
@@ -2098,7 +2091,7 @@ namespace aflowMachL {
             for(uint ii=0;ii<vheaders.size()&&ii<vitems.size();ii++){
               cerr << vheaders[ii] << "=" << vitems[ii] << endl;
             }
-            throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vitems.size()["+aurostd::utype2string(vitems.size())+"]!=vheaders.size()["+aurostd::utype2string(vheaders.size())+"]",_FILE_CORRUPT_);
+            throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vitems.size()["+aurostd::utype2string(vitems.size())+"]!=vheaders.size()["+aurostd::utype2string(vheaders.size())+"]",_FILE_CORRUPT_);
           }
           vvlines[0].push_back(vitems);
         }
@@ -2113,12 +2106,12 @@ namespace aflowMachL {
           //
           vitems.push_back(aurostd::utype2string(-2,_DOUBLE_WRITE_PRECISION_)); //ioxidation - fix later if needed
           try{species_pp=AVASP_Get_PseudoPotential_PAW_PBE(xel_O.symbol);}
-          catch(aurostd::xerror& excpt){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"cannot run AVASP_Get_PseudoPotential_PAW_PBE() for oxygen",_FILE_CORRUPT_);}
+          catch(aurostd::xerror& excpt){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"cannot run AVASP_Get_PseudoPotential_PAW_PBE() for oxygen",_FILE_CORRUPT_);}
           found_pp=false;
           for(ipp=0;ipp<vxpseudopotential.size()&&found_pp==false;ipp++) {
             if(vxpseudopotential[ipp].species_pp_type[0]=="PAW_PBE" && vxpseudopotential[ipp].species_pp[0]==species_pp){
               found_pp=true;
-              if(vxpseudopotential[ipp].species_pp_groundstate_structure[0]!="diatom"){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"pp_groundstate_structure for "+xel_O.symbol+" is NOT diatom",_INPUT_ILLEGAL_);}
+              if(vxpseudopotential[ipp].species_pp_groundstate_structure[0]!="diatom"){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"pp_groundstate_structure for "+xel_O.symbol+" is NOT diatom",_INPUT_ILLEGAL_);}
               //vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].species_Z[0],_DOUBLE_WRITE_PRECISION_)); //Z
               vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].species_pp_groundstate_energy[0],_DOUBLE_WRITE_PRECISION_)); //groundstate_energy
               vitems.push_back(aurostd::utype2string(vxpseudopotential[ipp].vEATOM[0],_DOUBLE_WRITE_PRECISION_)); //EATOM
@@ -2127,22 +2120,22 @@ namespace aflowMachL {
           //
           bader_line=cce::get_Bader_templates(xel_cation.symbol);
           if(!bader_line.empty()){
-            if(LDEBUG){cerr << soliloquy << " bader_line=\"" << bader_line << "\"" << endl;}
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " bader_line=\"" << bader_line << "\"" << endl;}
             aurostd::string2tokens(bader_line,vtokens," ");
-            if(vtokens.size()<6){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vtokens.size()<13",_FILE_CORRUPT_);}
+            if(vtokens.size()<6){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vtokens.size()<13",_FILE_CORRUPT_);}
             vitems.push_back(vtokens[2]);
           }
 
           //
-          if(LDEBUG){cerr << soliloquy << " correction_line=\"" << correction_line << "\"" << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " correction_line=\"" << correction_line << "\"" << endl;}
           aurostd::string2tokens(correction_line,vtokens," ");
-          if(vtokens.size()<16){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vtokens.size()<16",_FILE_CORRUPT_);}
+          if(vtokens.size()<16){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vtokens.size()<16",_FILE_CORRUPT_);}
           for(i=2;i<=11;i++){vitems.push_back(vtokens[i]);}
           M_X_bonds=aurostd::string2utype<double>(vtokens[11]);
-          if(LDEBUG){cerr << soliloquy << " M-X_bonds=" << M_X_bonds << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " M-X_bonds=" << M_X_bonds << endl;}
           //
           structure_path=vtokens[12];
-          if(LDEBUG){cerr << soliloquy << " structure_path=" << structure_path << endl;}
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " structure_path=" << structure_path << endl;}
           //
           vitems.push_back(vtokens[13]);  //ncations_per_f.u.
           vitems.push_back(vtokens[14]);  //nanions_per_f.u.
@@ -2159,7 +2152,7 @@ namespace aflowMachL {
           insertElementalCombinations(vproperties_elements_numbers,xel_cation,xel_O,entry,M_X_bonds,natoms_per_fu_cation,natoms_per_fu_anion,vheaders_additional,vfeatures,false,count_vcols_ecombo_coordce);
           for(i=0;i<vfeatures.size();i++){vitems.push_back(aurostd::utype2string(vfeatures[i],_DOUBLE_WRITE_PRECISION_));}
           //
-          if(vitems.size()!=vheaders.size()){throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"vitems.size()!=vheaders.size()",_FILE_CORRUPT_);}
+          if(vitems.size()!=vheaders.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"vitems.size()!=vheaders.size()",_FILE_CORRUPT_);}
           vvlines[1].push_back(vitems);
         }
       }
@@ -2197,47 +2190,43 @@ namespace aflowMachL {
 //CO20211111
 
 namespace aflowMachL {
-  void PrintMTPCFGAlloy(const aurostd::xoption& vpflow){
-    bool LDEBUG=(1||FALSE || XHOST.DEBUG);
-    string soliloquy=XPID+"aflowMachL::PrintMTPCFGAlloy():";
-
-    string alloy=vpflow.getattachedscheme("PFLOW::ALLOY");
-    vector<string> velements=aurostd::getElements(alloy,pp_string);
-    if(LDEBUG){
-      cerr << soliloquy << " alloy=\"" << alloy << "\"" << endl;
-      cerr << soliloquy << " elements=" << aurostd::joinWDelimiter(velements,",") << endl;
-      cerr << soliloquy << " nelements=" << velements.size() << endl;
+  /// @brief prints data for IAP in JSON format
+  /// @param vpflow flag containing the alloy name
+  /// @authors
+  /// @mod{CO,20211111,created function}
+  /// @mod{SD,20221207,rewritten using EntryLoader}
+  void WriteFileIAPCFG(const aurostd::xoption& vpflow){
+    string alloy = vpflow.getattachedscheme("PFLOW::ALLOY");
+    aflowlib::EntryLoader el;
+    el.setSource(aflowlib::EntryLoader::Source::FILESYSTEM_RAW);
+    el.loadAlloy(alloy, false);
+    if (el.m_entries_flat->empty()) {
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "No entries found for " + alloy, _RUNTIME_ERROR_);
     }
-
-    stringstream output_ss;
-    string ROOT="/common/LIB"+aurostd::utype2string(velements.size())+"/LIB";
-    vector<string> vsystems,vprotos,vfiles,_velements;
-    aurostd::DirectoryLS(ROOT,vsystems);
-
+    string path = "";
+    vector<string> vfiles;
     xOUTCAR xout;
-    uint isystem=0,iproto=0,ifile=0;
-    for(isystem=0;isystem<vsystems.size();isystem++){
-      _velements=aurostd::getElements(vsystems[isystem],pp_string);
-      if(velements==_velements){
-        if(LDEBUG){cerr << soliloquy << " found " << vsystems[isystem] << endl;}
-        aurostd::DirectoryLS(ROOT+"/"+vsystems[isystem],vprotos);
-        std::sort(vprotos.begin(),vprotos.end());
-        for(iproto=0;iproto<vprotos.size();iproto++){
-          aurostd::DirectoryLS(ROOT+"/"+vsystems[isystem]+"/"+vprotos[iproto],vfiles);
-          for(ifile=0;ifile<vfiles.size();ifile++){
-            if(aurostd::substring2bool(vfiles[ifile],"OUTCAR.relax")){
-              pflow::logger(_AFLOW_FILE_NAME_,soliloquy,"Found "+vsystems[isystem]+"/"+vprotos[iproto]+"/"+vfiles[ifile],_LOGGER_MESSAGE_);
-              xout.initialize(ROOT+"/"+vsystems[isystem]+"/"+vprotos[iproto]+"/"+vfiles[ifile]);
-              if(!xout.GetIonicStepsData()){continue;}
-              pflow::logger(_AFLOW_FILE_NAME_,soliloquy,"Processing "+vsystems[isystem]+"/"+vprotos[iproto]+"/"+vfiles[ifile],_LOGGER_MESSAGE_);
-              xout.WriteMTPCFG(output_ss,"LIB"+aurostd::utype2string(velements.size())+"/LIB/"+vsystems[isystem]+"/"+vprotos[iproto]+"/"+vfiles[ifile],velements);
-            }
-          }
+    aurostd::JSON::object jo(aurostd::JSON::object_types::DICTIONARY);
+    jo["generator"] = "AFLOW " + string(AFLOW_VERSION);
+    jo["date"] = TODAY;
+    jo["alloy"] = alloy;
+    std::map<string, string> units = {{"lattice", "Ang"}, {"position", "fractional"}, {"force", "eV/Ang"}, {"energy", "eV/cell"}, {"stress", "kbar"}, {"enthalpy_formation_atom", "eV/atom"}};
+    jo["units"] = units;
+    jo["data"] = aurostd::JSON::object(aurostd::JSON::object_types::LIST);
+    for (std::shared_ptr<aflowlib::_aflowlib_entry> entry : *el.m_entries_flat) {
+      path = entry->getPathDirectory();
+      aurostd::DirectoryLS(path, vfiles);
+      for (size_t ifile = 0; ifile < vfiles.size(); ifile++) {
+        if (aurostd::substring2bool(vfiles[ifile], "OUTCAR.relax")) {
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Found - " + path + vfiles[ifile], _LOGGER_MESSAGE_);
+          xout.initialize(path + vfiles[ifile]);
+          if (!xout.GetIonicStepsData()) continue;
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Processing - " + path + vfiles[ifile], _LOGGER_MESSAGE_);
+          xout.AddStepsIAPCFG(jo, *entry);
         }
       }
     }
-
-    aurostd::stringstream2file(output_ss,"aflow_MTP_"+alloy+".cfg");
+    jo.saveFile(aurostd::getPWD() + "/aflow_IAP_" + alloy + ".json");
   }
 }
 //////////////////////////////////////////////////////////////////////////////////////
@@ -2246,7 +2235,7 @@ namespace aflowMachL {
 
 // **************************************************************************
 // *                                                                        *
-// *             STEFANO CURTAROLO - Duke University 2003-2021              *
+// *             STEFANO CURTAROLO - Duke University 2003-2023              *
 // *                                                                        *
 // **************************************************************************
 

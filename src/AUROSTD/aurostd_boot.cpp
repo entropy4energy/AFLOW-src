@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -141,6 +141,13 @@ template<class utype> bool initialize_scalar(utype d) {
 
   aurostd::JSONwriter jw; jw.addNumber("", d);//AS20201217
   jw.addNumber("", s); //DX20201230 - enables a string to be written as a number
+  o+=aurostd::WithinList(vu,u,(size_t)1); //SD20220705
+  o+=aurostd::WithinList(du,u,(size_t)1); //SD20220705
+  o+=aurostd::WithinList(vu,u); //SD20220705
+  o+=aurostd::WithinList(du,u); //SD20220705
+  vector<size_t> vst;
+  o+=aurostd::WithinList(vu,u,vst); //SD20220705
+  o+=aurostd::WithinList(du,u,vst); //SD20220705
   return (o<0);
 }
 
@@ -255,17 +262,27 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   o+=min(x,x);o+=min(x,x,x);o+=min(x,x,x,x);o+=min(x,x,x,x,x);o+=min(x,x,x,x,x,x);o+=sign(x);
   o+=_isinteger(x,x)+_iszero(x,x)+uniform(x)+uniform(x,x)+gaussian(x)+gaussian(x,x)+expdev(x)+laplacedev(x)+laplacedev(x,x);
   o+=_roundoff(x,x);
-  o+=combinations(x,x)+Cnk(x,x);
+  o+=aurostd::combinations(x,x)+aurostd::Cnk(x,x);
 
   // initialize xvectors
   aurostd::xvector<utype> v(2),w(2),vv,vvvv(1,2);		//CO20190329 - clang doesn't like x=x, changing to x=y
   std::vector<aurostd::xvector<utype> > vxv;
-  v(1);v[1];o+=sum(v);shellsort(heapsort(v+v));o+=modulus(v);o+=modulus2(v);v=x*v*x/x;v=+w;v=-w;v+=w;v-=w;v+=x;v-=x;v*=x;v/=x;		//CO20190329 - clang doesn't like x=x, changing to x=y
+  v(1);v[1];o+=sum(v);shellsort(heapsort(v+v));o+=modulus(v);o+=modulus2(v);v=x*v*x/x;v=+w;v=-w;v+=w;v-=w;v+=x;v-=x;v*=x;v/=x; //CO20190329 - clang doesn't like x=x, changing to x=y
+  v=x-v;v=x+v;v=v+x;v=v-x; //SD20220911
   v=v*i;v=nint(v);v=sign(v);v=i*v;v=v*d;v=d*v;v=d*v*d/d;o+=min(v);o+=max(v);o+=mini(v);o+=maxi(v);v=v+v;v=v-v;v=v-x;v=-v+v;
   cout<<v<<endl;o+=scalar_product(v,v);o+=cos(v,v);o+=sin(v,v);o+=angle(v,v);v=vector_product(v,v);
   trasp(v);
   aurostd::identical(v); //DX20210503
+  v=aurostd::exp(v); //SD20220511
+  v=aurostd::pow(v,(utype)1); //SD20220512
+  v=aurostd::pow(v,v); //SD20220512
   //  sin(v);sinh(v);cos(v);cosh(v);exp(v);
+  aurostd::linspace(d,d,i); //SD20220324
+  aurostd::elementwise_product(v,v); //SD20220422
+  aurostd::elements_product(v); //SD20220617
+  aurostd::xvector2utype<utype,utype>(v); //SD20220512
+  aurostd::xvector2utype<utype,double>(v); //SD20220512
+  aurostd::xvector2utype<utype,int>(v); //SD20220512
 
   vector<vector<utype> > vvu;sort(vvu.begin(),vvu.end(),aurostd::compareVecElements<utype>);  //CO20190629
   vector<xvector<utype> > vxvu;sort(vxvu.begin(),vxvu.end(),aurostd::compareXVecElements<utype>);  //CO20190629
@@ -286,13 +303,14 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   getGeneralNormal(vxv);
   v=aurostd::args2xvectorutype<utype>(vstring,c,v);v=aurostd::args2xvectorutype<utype>(vstring,c,i);
   aurostd::args2vectorutype<utype>(vstring,c);aurostd::args2dequeutype<utype>(dstring,c);
-  v.clear();clear(v);reshape(xvi,2,1);reshape(x);reshape(x,x);reshape(x,x,x);reshape(x,x,x,x);reshape(x,x,x,x,x);reshape(x,x,x,x,x,x);
+  v.clear();clear(v);reshape(xvi,2,1);
   //  sort2((unsigned long)1,v,v);sort2((unsigned long)1,xvd,xvi);sort2((unsigned long)1,xvi,xvd);
-  o+=isequal(v,v)+isequal(v,v,(utype) 0)+isequal(v,v,x)+isdifferent(v,v)+isdifferent(v,v,x)+isinteger(v,x);swap(v,1,1);shiftlrows(v,1);
+  o+=isequal(v,v)+isequal(v,v,(utype) 0)+isequal(v,v,x)+isdifferent(v,v)+isdifferent(v,v,x)+isinteger(v,x);swap(v,1,1);
   getQuartiles(v,x,x,x);
   o+=aurostd::mean(v);aurostd::meanWeighted(v,v);aurostd::meanWeighted(v,v,x);o+=aurostd::var(v,1);o+=aurostd::stddev(v,1);o+=aurostd::mode(v);o+=aurostd::correlation_Pearson_fast(v,v);o+=aurostd::correlation_Pearson_slow(v,v);o+=aurostd::correlation_Pearson_fast(v,x,x,v,x,x); //CO20190520
   v=aurostd::box_filter_xv<utype>(1);v=aurostd::box_filter_xv<utype>(1,1); //CO20190520
   v=aurostd::gaussian_filter_xv<utype>(x);v=aurostd::gaussian_filter_xv<utype>(x,1);v=aurostd::gaussian_filter_xv<utype>(x,1,1); //CO20190520
+  aurostd::gaussian_filter_get_window(x);  //CO20220627
   vector<uint> vii; //CO20190622
   o+=aurostd::getMAD(v,x);v=aurostd::convolution(v,v,0);v=aurostd::convolution(v,v,vii,0);v=aurostd::moving_average(v,x); //CO20190520
   vector<int> peaks=getPeaks(v);peaks=getPeaks(v,w);
@@ -316,6 +334,7 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   // initialize matrices
   utype* mstar;mstar=NULL;
   aurostd::xmatrix<utype> m(2),n(2),mm,mmm(2,3),m3(3,3),mmmmm(1,2,3,4),m5(1,2,mstar),mkron;		//CO20190329 - clang doesn't like x=x, changing to x=y
+  aurostd::xmatrix<double> dxm; //SD20220512
   xdouble(m);xint(m);m=+m;m=-m;o+=m(1)[1];o+=m(1,1);o+=m[1][1];m=identity(m);m=identity(x,1,1);m=identity(x,1);
   vv=m.getcol(1);vv=m.getdiag(0,1);m.setrow(v);m.setcol(v);m.setmat(n);m.setmat(v);m=n;m=m+n;m=m-n;m=m*n;v=v*m;adjointInPlace(m,n);n=adjoint(m);m=inverseByAdjoint(m);m=inverse(m);isNonInvertible(m);m=reduce_to_shortest_basis(m);		//CO20190329 - clang doesn't like x=x, changing to x=y  //CO20191110  //CO20191201  //CO20200127
   m*=(utype)5;m/=(utype)6;  //CO20190911
@@ -324,6 +343,14 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   m.getxvecInPlace(vv,1,1,1,1,1); //AZ20220704 
   vv=m.getxvec();vv=m.getxvec(1,1,1,1); //AZ20220704 
   m=x*m*x/x;o+=(m==m);o+=(m!=m);o+=trace(m);m=-n;traspSquareInPlace(m,false);traspInPlace(m,false);traspInPlace(m,m,false);m=trasp(m);clear(m);mkron=aurostd::KroneckerProduct(mm,mmm);		//CO20190329 - clang doesn't like x=x, changing to x=y
+  m=m+x;m=x+m; //SD20220518
+  o+=m(1)*v; //SD20220510
+  aurostd::LUPDecomposition(mm,dxm,dxm); //SD20220426
+  aurostd::LUPDecomposition(mm,dxm,dxm,dxm); //SD20220426
+  aurostd::inverseByQR(m3); //SD20220426
+  aurostd::inverseByLUP(m3); //SD20220426
+  aurostd::condition_number(m); //SD20220425
+  aurostd::HadamardProduct(mmm,mmm); //SD20220422
   o+=sum(m);o+=modulus(m);o+=modulussquare(m);o+=modulus2(m);m=nint(m);m=sign(m);o+=identical(m,m);o+=identical(m,m,x);o+=isdifferent(m,m);o+=isdifferent(m,m,x); //CO20191110
   o+=isequal(m,m);o+=isequal(m,m,x);cout<<m<<endl;
   roundoff(m);roundoff(m,x);m=exp(m);aurostd::abs(m);o+=max(m);xdouble(v);xint(v);
@@ -331,22 +358,25 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   o+=det(m);o+=determinant(m);m=submatrix(m,1,1);submatrixInPlace(m,m,1,1);o+=minordet(m,1,1);o+=minordeterminant(m,1,1);v*m;m*v;
   vector<utype> vvv=xvector2vector(v);vector2xvector(vvv,1);
   vector<string> vs;vxu=vector2xvector<utype>(vs,1); //CO20201111
-  vector<vector<utype> > mvv=xmatrix2vectorvector(m);vectorvector2xmatrix(mvv);
+  vector<vector<utype> > mvv=xmatrix2vectorvector(m);vectorvector2xmatrix(mvv,1,1);
+  vector<vector<string>> ms;vectorvector2xmatrix<utype>(ms,1,1); //SD20220504
   if(det(m)==0 || sum(m)==0) return FALSE;
-  reshape(m3,9,1);
-  reshape(v);reshape(v,v);reshape(v,v,v);reshape(v,v,v,v);reshape(v,v,v,v,v);reshape(v,v,v,v,v,v);
-  reshape_rows(v);reshape_rows(v,v);reshape_rows(v,v,v);reshape_rows(v,v,v,v);reshape_rows(v,v,v,v,v);reshape_rows(v,v,v,v,v,v);
-  reshape_cols(v);reshape_cols(v,v);reshape_cols(v,v,v);reshape_cols(v,v,v,v);reshape_cols(v,v,v,v,v);reshape_cols(v,v,v,v,v,v);
+  reshape(v);hstack(vxv);
+  reshape_rows(v);vstack(vxv);
   utype tol=(utype)0; //DX20171025
   o+=isequal(m,m)+isequal(m,m,(utype) 0)+isequal(m,m,x)+isdifferent(m,m)+isdifferent(m,m,x)+isinteger(m,x)+isdiagonal(m)+isdiagonal(m,tol)+issymmetric(m)+isantisymmetric(m);
   o+=isidentity(m); //CO
-  swap_cols(m,1,1);swap_columns(m,1,1);swap_rows(m,1,1);shiftlrows(m,1);shiftlcols(m,1);shiftlrowscols(m,1,1);  //CO20191201
+  swap_cols(m,1,1);swap_columns(m,1,1);swap_rows(m,1,1);  //CO20191201
   sin(m);sinh(m);cos(m);cosh(m);exp(m);
   aurostd::floor(m);aurostd::ceil(m);
   //ME20190718 - norms
   aurostd::l1_norm(m);aurostd::frobenius_norm(m);aurostd::l2_norm(m);aurostd::linf_norm(m);
   // aurostd::trunc(m);aurostd::round(m);
   polarDecomposition(m3,m3,m3); //DX20210111
+  aurostd::equilibrateMatrix(mmm,mmm,mmm,mmm); //SD20220425
+  aurostd::LinearLeastSquares(mmm,vxu); //SD20220426
+  aurostd::xmatrixdouble2utype<utype>(dxm); //SD20220512
+  aurostd::xmatrixutype2double(m); //SD20220512
 
   //[ME20180627 START]
   std::vector<int> stdv(3, 3),stdv2(2, 3),vind(3, 1),vind2(2),stdv0(3, 0); std::vector<utype> vut(3);
@@ -366,6 +396,19 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   t[0]=aurostd::sign(t[0]);t[0]=aurostd::abs(t[0]);t[0]=aurostd::floor(t[0]);t[0]=aurostd::ceil(t[0]);
   t[0]=aurostd::round(t[0]);x=aurostd::max(t[0]);x=aurostd::min(t[0]);x=aurostd::sum(t[0]);x=aurostd::trace(t[0]);
   //[ME20180627 END]
+
+  // initialize xfit
+  evalPolynomial(x,v); //SD20220512
+  evalPolynomial_xv(v,v); //SD20220512
+  evalPolynomial_xm(m,v); //SD20220512
+  evalPolynomialDeriv(x,v,v); //SD20220512
+  evalPolynomialDeriv(x,v,0); //SD20220512
+  evalPolynomialCoeff(v,0); //SD20220512
+  Vandermonde_matrix(v,1); //SD20220512
+  polynomialFindExtremum(v,x,x); //SD20220512
+  polynomialCurveFit(v,v,1,v); //SD20220512
+  companion_matrix(v); //SD20220512
+  polynomialFindRoots(v,v,v); //SD20220512
 
   //[OBSOLETE ME20180705]// initialize tensor3
   //[OBSOLETE ME20180705]aurostd::xtensor3<utype> t3(1),t3a(1),t3b(1),t3c(1,1),t3d(1,1,1);
@@ -555,6 +598,7 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
     deque<int> di; jwi.addVector("",di);//AS20201217
     vector<vector<int> > vvi; jwi.addMatrix("",vvi);//AS20201217
     deque<deque<int> > ddi; jwi.addMatrix("",ddi);
+    while(xc.increment()){xc.applyCombo(vvi);}  //CO20220627
 #endif
 #ifdef AUROSTD_INITIALIZE_UINT
     o+=aurostd::string2utype<uint>(aurostd::utype2string<uint>(uint())+aurostd::utype2string<uint>(uint(),int()));
@@ -571,6 +615,7 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
     deque<uint> dui; jwui.addVector("",dui);//AS20201217
     vector<vector<uint> > vvui; jwui.addMatrix("",vvui);//AS20201217
     deque<deque<uint> > ddui; jwui.addMatrix("",ddui);//AS20201217
+    vector<aflowlib::_aflowlib_entry> ventries;aurostd::reorder(ventries,vui,1);  //CO20221111
 #endif
 #ifdef AUROSTD_INITIALIZE_FLOAT
     if(1) { // AUROSTD_INITIALIZE_FLOAT
@@ -621,7 +666,7 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
       //[CO20191201 - should NOT be needed here, the output should be an int type]getSmithNormalForm(z,z,z,z); //CO20191201
       vector<double> vd;getElements("MnPd",vd);getElements("MnPd",vd,pp_string);getElements("MnPd",vd,pp_string,FileMESSAGE); //CO20200624
     }
-#endif   
+#endif
 #ifdef AUROSTD_INITIALIZE_LONG_DOUBLE
     if(1) { // AUROSTD_INITIALIZE_LONG_DOUBLE
       o+=initialize_scalar((long double)(1));
@@ -678,7 +723,7 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
 #ifdef AUROSTD_INITIALIZE_UNSIGNED_LONG_LONG_INT
     o+=aurostd::string2utype<unsigned long long int>(aurostd::utype2string<unsigned long long int>((unsigned long long int)(1))+aurostd::utype2string<unsigned long long int>((unsigned long long int)(1),int()));
     o+=initialize_scalar((unsigned long long int)(1));
-    // o+=initialize_xscalar_xvector_xmatrix_xtensor((unsigned long long int)(1));
+    o+=initialize_xscalar_xvector_xmatrix_xtensor((unsigned long long int)(1));
     // o+=initialize_xcomplex((unsigned long long int)(1));
     // xmatrix<(long long int)> m(1,1);GaussJordan(m,m);
     unsigned long long int ulligcd=1;_GCD(ulligcd,ulligcd,ulligcd,ulligcd,ulligcd);_GCD(ulligcd,ulligcd,ulligcd);  //CO20191201
@@ -699,7 +744,7 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

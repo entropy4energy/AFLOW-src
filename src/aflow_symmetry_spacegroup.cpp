@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Written by Richard H. Taylor
@@ -47,7 +47,6 @@ using namespace std;
 namespace SYM {
   void orient(xstructure& xstr, bool update_atom_positions) {
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::orient():";
     stringstream message;
     double sym_tol = xstr.sym_eps; //DX20190215 - added sym_tol 
     double tol = _ZERO_TOL_;
@@ -422,7 +421,7 @@ namespace SYM {
 
       // ==================== RHOMBOHEDRAL IN HEXAGONAL SETTING ==================== //
       if(lattice_label == 'X') {  //
-        if(LDEBUG) { cerr << function_name << " RHOMBOHEDRAL IN HEXAGONAL SETTING" << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " RHOMBOHEDRAL IN HEXAGONAL SETTING" << endl; }
         double angle;
         xvector<double> rotaxis;
         Screw S;
@@ -522,7 +521,7 @@ namespace SYM {
               SYM::FPOSMatch(atomic_basis_, obverse3, match_type3, lattice_basis_xmat, f2c, skew, sym_tol)) && //DX20190215 - _SYM_TOL_ to sym_tol //DX20190619 - lattice_basis_xmat and f2c as input, remove "Atom" prefix from name
             (match_type1 != match_type2 || match_type2 != match_type3 || match_type1 != match_type3)) {
           message << "PROBLEM TRANFORMING TO OBVERSE SETTING. QUITING PROGRAM [dir = " << xstr.directory << "].";
-          throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
         }
       }
       xstr.lattice = xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
@@ -1084,7 +1083,7 @@ uint xstructure::GetPrimitiveCell(void) {
     //DX20210129 [OBSOLETE]   if(aurostd::abs(tmp_atom.noncoll_spin(1))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(2))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(3))>_ZERO_TOL_){
     //DX20210129 [OBSOLETE]     tmp_atom.noncoll_spin_is_given = true; //DX20171205 - magnetic sym (non-collinear) //DX20191108 - fixed typo, should be noncoll_spin_is_given not spin_is_given
     //DX20210129 [OBSOLETE]   }
-    //DX20210129 [OBSOLETE]   (*this).AddAtom(tmp_atom);
+    //DX20210129 [OBSOLETE]   (*this).AddAtom(tmp_atom,false);  //CO20230319 - add by type
     //DX20210129 [OBSOLETE] }
   }
   //DX20210129 [OBSOLETE] (*this).num_each_type = numtypes;
@@ -1149,12 +1148,11 @@ namespace SYM {
 // **************************************************************************************************************************************************
 namespace SYM {
   deque<_atom> add_basis(vector<xvector<double> >& expanded_lattice_points, xmatrix<double>& L, xstructure& xstr) {
-    string function_name = XPID + "SYM::add_basis():";
     stringstream message;
     deque<_atom> out;
     if(xstr.atoms.size() == 0) {
-      message << function_name << " atoms deque is empty! [dir=" << xstr.directory << "]";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_INPUT_MISSING_);
+      message << __AFLOW_FUNC__ << " atoms deque is empty! [dir=" << xstr.directory << "]";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_MISSING_);
     }
     for (uint i = 0; i < expanded_lattice_points.size(); i++) {
       //cerr << "lattice point: " << expanded_lattice_points[i] << endl; //cartesian
@@ -1230,7 +1228,7 @@ namespace SYM {
       xstructure& CrystOut_prev, vector<xmatrix<double> >& candidate_lattice_vectors_prev,
       vector<char>& candidate_lattice_chars_prev, symfolder& checkops, SymmetryInformationITC& ITC_sym_info, bool& lattice_reformed,
       vector<int>& lattice_pgroups, vector<xmatrix<double> >& lattice_sym_mats,
-      vector<xmatrix<double> >& crystal_sym_mats, bool& symmetryfound) {
+      vector<xmatrix<double> >& crystal_sym_mats, bool& symmetryfound, bool foundspacegroup_global) {
     bool LDEBUG = (FALSE || XHOST.DEBUG);
 
     double sym_tol = xstr.sym_eps; //DX20190215 - get sym_tol
@@ -1241,6 +1239,7 @@ namespace SYM {
     xstr.GetPrimitive(); //DX20210401
     xstructure prim = xstr; //DX20210316 - store primitive
 
+    //vector<xmatrix<double> > lattice_vector_choices; //DX20220827
     xmatrix<double> L = xstr.lattice;
     deque<_atom> primitive_atomic_basis = xstr.atoms;
     for (uint i = 0; i < primitive_atomic_basis.size(); i++) {
@@ -1276,15 +1275,32 @@ namespace SYM {
     // ===== CRYSTAL SYSTEM AND LATTICE SYSTEM VARIABLES===== //
     string crystalsystem = "";
     string latticesystem = "";
+    vector<xmatrix<double> > candidate_lattice_vectors;
+    vector<char> candidate_lattice_chars;
+    bool lattice_vectors_found = false;
+    
+    uint sym_count = 0;
+    if(IT > 0) {
+        crystalsystem = crystalsystem_prev;
+        if((uint)(IT + sym_count) < candidate_lattice_vectors_prev.size()) {
+          candidate_lattice_vectors = candidate_lattice_vectors_prev;
+          candidate_lattice_chars = candidate_lattice_chars_prev;
+          lattice_vectors_found = true;
+        }
+      }
 
     // ===== Cell/Lattice Expansion coefficients ===== //
     int b = 1;
     int q = 3;
 
+    //// ===== Declare expanded lattice and expanded cell variables ===== //
+    //vector<xvector<double> > expanded_lattice_1 = expand_lattice(b, b, b, L);
+    //vector<xvector<double> > expanded_cell_1 = expand_cell(L);
+    
     // ===== Declare expanded lattice and expanded cell variables ===== //
-    vector<xvector<double> > expanded_lattice_1 = expand_lattice(b, b, b, L);
-    vector<xvector<double> > expanded_cell_1 = expand_cell(L);
-
+    vector<xvector<double> > expanded_lattice_1;
+    vector<xvector<double> > expanded_cell_1;
+    
     // ===== Declare symmetry operation variables ===== //
     vector<Screw> twofold_ops_vec;
     vector<Screw> rot_ops_vec;
@@ -1292,6 +1308,11 @@ namespace SYM {
     vector<xvector<double> > mirror_lattice_vectors;
     vector<xvector<double> > twofold_lattice_vectors;
     vector<xvector<double> > rot_lattice_vectors;
+
+    if(!lattice_vectors_found) {
+      expanded_lattice_1 = expand_lattice(b, b, b, L);
+      expanded_cell_1 = expand_cell(L);
+
 
     //double radius = RadiusSphereLattice(L);
     double radius = 2.0 * RadiusSphereLattice(L);
@@ -1332,13 +1353,14 @@ namespace SYM {
     // not hexagonal. You cannot go from a cubic lattice to the hexagonal crystal system by the addition
     // of internal atoms because a subgroup cannot be formed with a sixfold symmetry. However, threefold
     // symmetry axes exists in the original lattice allowing for the transition to the trigonal crystal system.
+    }
 
     // ========== Stores the lattice vector possibilities (different orientations, etc.) for a given lattice type ========== //
-    vector<xmatrix<double> > candidate_lattice_vectors;
-    vector<char> candidate_lattice_chars;
+    //DX20220914 vector<xmatrix<double> > candidate_lattice_vectors;
+    //DX20220914 vector<char> candidate_lattice_chars;
 
     // ===== Variables to keep track of status of symmetry search ===== //
-    uint sym_count = 0;
+    //DX20220914 [MOVED] uint sym_count = 0;
     bool reform = true;
 
     // ****************************************************************************************************************************************** //
@@ -1362,8 +1384,8 @@ namespace SYM {
       CrystOut_prev = xstr;
 
       // ===== Declare expanded lattice and expanded cell variables ===== //
-      vector<xvector<double> > expanded_lattice = expand_lattice(b, b, b, L);
-      vector<xvector<double> > expanded_cell = expand_cell(L);
+      //DX20220914 [OBSOLETE] vector<xvector<double> > expanded_lattice = expand_lattice(b, b, b, L);
+      //DX20220914 [OBSOLETE] vector<xvector<double> > expanded_cell = expand_cell(L);
       vector<xvector<double> > big_expanded = expand_lattice(q, q, q, L);
       deque<_atom> expanded_basis = add_basis(big_expanded, L, xstr);
 
@@ -1396,7 +1418,7 @@ namespace SYM {
 
       // ===== Determine if symmetry is found ===== //
       symmetryfound = false;
-      bool lattice_vectors_found = false;
+      //DX20220914 bool lattice_vectors_found = false;
       //When on second iteration, use only crystal system to designate cell (having both mcount and crystal system can lead to going into hexagonal
       //and orthorhombic sections which adds redundant atoms) 20130821
       if(IT == 0) {
@@ -1634,6 +1656,7 @@ namespace SYM {
       } else {
         start_index = 0;
       }
+      //lattice_vector_choices.clear(); //DX20220827
       for (uint i = start_index; i < candidate_lattice_vectors.size(); i++) {
         xmatrix<double> CL = candidate_lattice_vectors[i];
         if(LDEBUG) {
@@ -1704,7 +1727,7 @@ namespace SYM {
         //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE] xstr_out.species.clear();
         //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE] // Add new atomic basis
         //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE] for (uint c = 0; c < conventional_basis_atoms.size(); c++) {
-        //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE]   xstr_out.AddAtom(conventional_basis_atoms[c]);
+        //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE]   xstr_out.AddAtom(conventional_basis_atoms[c],false); //CO20230319 - add by type
         //DX20210315 [OBSOLETE]//DX20210129 [OBSOLETE] }
 
         //DX20210315 [OBSOLETE]//DX20190410 START
@@ -1774,11 +1797,15 @@ namespace SYM {
           if(i == candidate_lattice_vectors.size() - 1) {
             last_orientation = true;
           }
+          //lattice_vector_choices.push_back(CL);
+          //DX20220827 - break;
+          //DX2022088 - continue;
           break;
         }
 
         // ========== If all combinations of cell orientations are exhausted, reform the lattice ========== //
         if(i == candidate_lattice_vectors.size() - 1 && (checkops.commensurate == false || checkops.latticesystem == "REDO")) {  //added redo as test
+          if(foundspacegroup_global) { last_orientation = true; return xstr_out; } //DX20220924
           if(LDEBUG) { cerr << "SYM::ConventionalCell: All permutations of cell checked. Need to reform the lattice based on the crystal symmetry [dir=" << xstr.directory << "]." << endl; }
           //cerr << "i: " << i << endl;
           //cerr << "checkops.latticesystem: " << checkops.latticesystem << endl;
@@ -1879,7 +1906,13 @@ namespace SYM {
         if(LDEBUG) { cerr << "SYM::ConventionalCell: Conventional cell consistent with crystal symmetry is found [dir=" << xstr.directory << "]." << endl; }
         return xstr_out;
       }
+      // if we made it here, we've reformed the lattice and this is not the last orientation
+      //last_orientation = false; //DX20220924
     }
+    //cerr << "lattice_vector_choices= " << lattice_vector_choices.size() << endl;
+    //for(uint l=0;l<lattice_vector_choices.size(); l++){
+    //  cerr << "l=" << lattice_vector_choices[l] << endl;
+    //}
     xstr_out.standard_lattice_ITC = LPRIM;
     xstr_out.standard_basis_ITC = primitive_atomic_basis;
 
@@ -1895,7 +1928,6 @@ namespace SYM {
       vector<xmatrix<double> >& candidate_lattice_vectors, vector<char>& candidate_lattice_chars, double& tol) { //DX20190215 - added tol
     // CUBIC lattice vector criteria: Parallel to 3 equivalent fourfold axes.
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findCubicLattice():";
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -1910,7 +1942,7 @@ namespace SYM {
 
     // Check if any vectors are the same
     if(latticeVectorsSame(conven[0], conven[1], conven[2], tol)) { //DX20190215 - _SYM_TOL_ to tol
-      if(LDEBUG) { cerr << function_name << " Two or more of conventional basis vectors are the same..." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Two or more of conventional basis vectors are the same..." << endl; }
       return false;
     }
 
@@ -1918,12 +1950,12 @@ namespace SYM {
     if(aurostd::abs(aurostd::modulus(conven[0]) - aurostd::modulus(conven[1])) > tol && //DX20190215 - _SYM_TOL_ to tol
         aurostd::abs(aurostd::modulus(conven[0]) - aurostd::modulus(conven[2])) > tol && //DX20190215 - _SYM_TOL_ to tol
         aurostd::abs(aurostd::modulus(conven[2]) - aurostd::modulus(conven[1])) > tol) { //DX20190215 - _SYM_TOL_ to tol
-      if(LDEBUG) { cerr << function_name << " Lattice vectors are not the same length..." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Lattice vectors are not the same length..." << endl; }
       return false;
     }
 
     if(conven.size() != 3) {
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"There should be three and only three 4-fold axes",_INDEX_BOUNDS_);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"There should be three and only three 4-fold axes",_INDEX_BOUNDS_);
     }
 
     // ==== Orient into positive quadrant ==== //
@@ -1968,7 +2000,6 @@ namespace SYM {
     //       lattice vector c        : Parallel to 6-fold axis
     //       lattice vectors a, b    : Parallel to 2-fold axes (angle=120 degrees); a=b
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findTrigonalLattice():";
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -1996,14 +2027,14 @@ namespace SYM {
     }
 
     if(six_or_threefold_lattice_vectors.size() == 0) {
-      if(LDEBUG) { cerr << function_name << " c-axis not found. Tolerances may be too tight." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c-axis not found. Tolerances may be too tight." << endl; }
       return false;
     }
 
     conv_lattice_vec_c = six_or_threefold_lattice_vectors[0];
 
     if(conv_lattice_vec_c == null) {
-      if(LDEBUG) { cerr << function_name << " c-axis is null." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c-axis is null." << endl; }
       return false;
     }
     if(conv_lattice_vec_c[2] < 0.0) {
@@ -2048,7 +2079,7 @@ namespace SYM {
     abc_vecs.push_back(conv_lattice_vec_b);
     abc_vecs.push_back(conv_lattice_vec_c);
     if(anyNullVectors(abc_vecs, tol)) { //DX20190215 - _SYM_TOL_ to tol
-      if(LDEBUG) { cerr << function_name << " One or more of the lattice vectors is null" << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " One or more of the lattice vectors is null" << endl; }
       return false;
     }
 
@@ -2060,6 +2091,11 @@ namespace SYM {
     }
     candidate_lattice_vectors.push_back(CL);
     candidate_lattice_chars.push_back('h');
+    //DX20221110 - TRY OBVERSE SETTING - START
+    CL = xvec2xmat(-conv_lattice_vec_b, -conv_lattice_vec_a, conv_lattice_vec_c);
+    candidate_lattice_vectors.push_back(CL);
+    candidate_lattice_chars.push_back('h');
+    //DX20221110 - TRY OBVERSE SETTING - STOP
 
     return true;
   }
@@ -2076,7 +2112,6 @@ namespace SYM {
     //        lattice vector c        : Parallel to 4-fold axis
     //        lattice vectors a, b    : Parallel to 2-fold axes (angle=90 degrees); a=b
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findTetragonalLattice():";
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -2097,7 +2132,7 @@ namespace SYM {
     for (uint f = 0; f < fourfold_lattice_vectors.size(); f++) {
       conv_lattice_vec_c = fourfold_lattice_vectors[f];
       if(conv_lattice_vec_c == null) {
-        if(LDEBUG) { cerr << function_name << " c-axis is null." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " c-axis is null." << endl; }
         return false;
       }
 
@@ -2167,7 +2202,7 @@ namespace SYM {
         if(f != fourfold_lattice_vectors.size() - 1) {
           continue;
         } else {
-          if(LDEBUG) { cerr << function_name << " One or more of the lattice vectors is null" << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " One or more of the lattice vectors is null" << endl; }
           return false;
         }
       }
@@ -2189,6 +2224,9 @@ namespace SYM {
         CL = xvec2xmat(conv_lattice_vec_a, conv_lattice_vec_b, conv_lattice_vec_c);
         candidate_lattice_vectors.push_back(CL);
         candidate_lattice_chars.push_back('t');
+        CL = xvec2xmat(conv_lattice_vec_b, conv_lattice_vec_a, conv_lattice_vec_c); //DX20231010 - check alternative lattice vector order to minimize Wyckoff enumeration
+        candidate_lattice_vectors.push_back(CL); //DX20231010 - check alternative lattice vector order to minimize Wyckoff enumeration
+        candidate_lattice_chars.push_back('t'); //DX20231010 - check alternative lattice vector order to minimize Wyckoff enumeration
       } //DX20210107
     } //DX20210107
 
@@ -2211,7 +2249,6 @@ namespace SYM {
     // num_reinitials : variable to scan through combinations of vectors in monoclinic plane (e,f, or g: shortest vectors in plane)
     // IT            : scan through unique axis b or c
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findMonoclinicLattice():";
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -2228,37 +2265,43 @@ namespace SYM {
       if(mirror_lattice_vectors.size() > 1) {
         if(aurostd::modulus(mirror_lattice_vectors[1]) < aurostd::modulus(mirror_lattice_vectors[0])) {
           possible_h_lats.push_back(mirror_lattice_vectors[1]);
+          possible_h_lats.push_back(-mirror_lattice_vectors[1]); //DX20221129
           possible_h_lats.push_back(mirror_lattice_vectors[0]);
+          possible_h_lats.push_back(-mirror_lattice_vectors[0]); //DX20221129
         } else {
           possible_h_lats.push_back(mirror_lattice_vectors[0]);
+          possible_h_lats.push_back(-mirror_lattice_vectors[0]); //DX20221129
           possible_h_lats.push_back(mirror_lattice_vectors[1]);
+          possible_h_lats.push_back(-mirror_lattice_vectors[1]); //DX20221129
         }
         if(LDEBUG) {
-          cerr << function_name << " Two choices for unique axis. " << endl;
-          cerr << function_name << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
-          cerr << function_name << " choice 2: " << possible_h_lats[1] << " (mod=" << aurostd::modulus(possible_h_lats[1]) << ")" << endl;
+          cerr << __AFLOW_FUNC__ << " Two choices for unique axis. " << endl;
+          cerr << __AFLOW_FUNC__ << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
+          cerr << __AFLOW_FUNC__ << " choice 2: " << possible_h_lats[1] << " (mod=" << aurostd::modulus(possible_h_lats[1]) << ")" << endl;
         }
       } 
       else {
         possible_h_lats.push_back(mirror_lattice_vectors[0]);
+        possible_h_lats.push_back(-mirror_lattice_vectors[0]); //DX20221129
         if(LDEBUG) {
-          cerr << function_name << " One choice for unique axis. " << endl;
-          cerr << function_name << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
+          cerr << __AFLOW_FUNC__ << " One choice for unique axis. " << endl;
+          cerr << __AFLOW_FUNC__ << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
         }
       }
     } else if(twofold_lattice_vectors.size() > 0) {
       possible_h_lats.push_back(twofold_lattice_vectors[0]);
+      possible_h_lats.push_back(-twofold_lattice_vectors[0]); //DX20221129
       if(LDEBUG) {
-        cerr << function_name << " One choice for unique axis. " << endl;
-        cerr << function_name << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
+        cerr << __AFLOW_FUNC__ << " One choice for unique axis. " << endl;
+        cerr << __AFLOW_FUNC__ << " choice 1: " << possible_h_lats[0] << " (mod=" << aurostd::modulus(possible_h_lats[0]) << ")" << endl;
       }
     }
     if(possible_h_lats.size() == 0) {
-      if(LDEBUG) { cerr << function_name << " No unique axis found" << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " No unique axis found" << endl; }
       return false;
     }
     if(possible_h_lats[0] == null) {
-      if(LDEBUG) { cerr << function_name << " Unique axis is null" << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Unique axis is null" << endl; }
       return false;
     }
     // ===== Determine direction of unique axis ===== //
@@ -2278,7 +2321,7 @@ namespace SYM {
       vector<vector<int> > index;  //DX20180110 - scoping issue; place here, not outside for loop
       vector<double> total_mod;  //DX20180110 - scoping issue; place here, not outside for loop
       if(LDEBUG) {
-        cerr << function_name << " Testing choice " << h+1  << ": " << possible_h_lats[h] << endl;
+        cerr << __AFLOW_FUNC__ << " Testing choice " << h+1  << ": " << possible_h_lats[h] << endl;
       }
       h_lat = possible_h_lats[h];
       possible_efg_vectors = find_vectors_inplane(big_expanded, h_lat, tol); //DX20190215 - added tol
@@ -2390,10 +2433,10 @@ namespace SYM {
       }
       // === Check if 2 or more vectors were chosen to comprise the monoclinic plane === //
       if(index.size() <= 1 && h == possible_h_lats.size() - 1) {
-        if(LDEBUG) { cerr << function_name << " No lattice vectors found in the monoclinic plane" << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " No lattice vectors found in the monoclinic plane" << endl; }
         return false;
       } else if(index.size() <= 1 && h < possible_h_lats.size() - 1) {
-        if(LDEBUG) { cerr << function_name << " Not enought lattice vectors found in monoclinic plane. Try the other unique axis." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Not enought lattice vectors found in monoclinic plane. Try the other unique axis." << endl; }
         possible_efg_vectors.clear();
         index.clear();
         total_mod.clear();
@@ -2414,16 +2457,16 @@ namespace SYM {
       double mod_g = aurostd::modulus(tranvec_g);
 
       if(LDEBUG) { 
-        cerr << function_name << " 1st shortest vector in monoclinic plane (e): " << tranvec_e << " (mod=" << mod_e << ")." << endl;
-        cerr << function_name << " 2nd shortest vector in monoclinic plane (f): " << tranvec_f << " (mod=" << mod_f << ")." << endl;
-        cerr << function_name << " 3rd shortest vector in monoclinic plane (g): " << tranvec_g << " (mod=" << mod_g << ")." << endl;
-        cerr << function_name << " Angle between e and f: " << aurostd::angle(tranvec_e,tranvec_f)*180.0/Pi_r << endl;
-        cerr << function_name << " Angle between f and g: " << aurostd::angle(tranvec_f,tranvec_g)*180.0/Pi_r << endl;
-        cerr << function_name << " Angle between g and e: " << aurostd::angle(tranvec_g,tranvec_e)*180.0/Pi_r << endl;
+        cerr << __AFLOW_FUNC__ << " 1st shortest vector in monoclinic plane (e): " << tranvec_e << " (mod=" << mod_e << ")." << endl;
+        cerr << __AFLOW_FUNC__ << " 2nd shortest vector in monoclinic plane (f): " << tranvec_f << " (mod=" << mod_f << ")." << endl;
+        cerr << __AFLOW_FUNC__ << " 3rd shortest vector in monoclinic plane (g): " << tranvec_g << " (mod=" << mod_g << ")." << endl;
+        cerr << __AFLOW_FUNC__ << " Angle between e and f: " << aurostd::angle(tranvec_e,tranvec_f)*180.0/Pi_r << endl;
+        cerr << __AFLOW_FUNC__ << " Angle between f and g: " << aurostd::angle(tranvec_f,tranvec_g)*180.0/Pi_r << endl;
+        cerr << __AFLOW_FUNC__ << " Angle between g and e: " << aurostd::angle(tranvec_g,tranvec_e)*180.0/Pi_r << endl;
       }
 
       if(mod_e <= _ZERO_TOL_ || mod_f <= _ZERO_TOL_ || mod_g <= _ZERO_TOL_) {
-        if(LDEBUG) { cerr << function_name << " One or more lattice vectors in the monoclinic plane is null" << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " One or more lattice vectors in the monoclinic plane is null" << endl; }
         return false;
       }
 
@@ -2539,7 +2582,6 @@ namespace SYM {
     // ORTHORHOMBIC lattice vector criteria:
     //        lattice vectors a,b,c   : Parallel to 2-fold axis (or two 2-fold and one mirror)
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findOrthorhombicLattice():";
 
     xmatrix<double> CL;
     vector<xvector<double> > conven;
@@ -2563,12 +2605,12 @@ namespace SYM {
           SYM::checkAngle(conven[1], conven[2], (Pi_r / 2.0), tol)) { //DX20190215 - _SYM_TOL_ to tol
         //print(conven);
         if(latticeVectorsSame(conven[0], conven[1], conven[2], tol)) { //DX20190215 - _SYM_TOL_ to tol
-          if(LDEBUG) { cerr << function_name << " Two or more of conventional basis vectors are the same..." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Two or more of conventional basis vectors are the same..." << endl; }
           conven.clear();
         } else if(SYM::checkAngle(conven[0], conven[1], Pi_r, tol) && //DX20190215 - _SYM_TOL_ to tol
             SYM::checkAngle(conven[0], conven[2], Pi_r, tol) && //DX20190215 - _SYM_TOL_ to tol
             SYM::checkAngle(conven[1], conven[2], Pi_r, tol)) { //DX20190215 - _SYM_TOL_ to tol
-          if(LDEBUG) { cerr << function_name << " Two or more of conventional basis vectors are the same..." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Two or more of conventional basis vectors are the same..." << endl; }
           conven.clear();
         } else {
           break;
@@ -2579,7 +2621,7 @@ namespace SYM {
       combiset = AllCombination42(3, totalcount, combiset);
     }
     if(conven.size() == 0) {
-      if(LDEBUG) { cerr << function_name << " No conventional basis vectors found...." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " No conventional basis vectors found...." << endl; }
       return false;
     }
 
@@ -2618,7 +2660,6 @@ namespace SYM {
     //        lattice vector c       : Parallel to 6- or 3-fold axis
     //        lattice vectors a,b    : Parallel to 2-fold axes; Angle ab = 120 degrees
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findRhombohedralLattice():";
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -2645,13 +2686,13 @@ namespace SYM {
       }
     }
     if(six_or_threefold_lattice_vectors.size() == 0) {
-      if(LDEBUG) { cerr << function_name << " No 3- or 6-fold axis found." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " No 3- or 6-fold axis found." << endl; }
       return false;
     }
 
     conv_lattice_vec_c = six_or_threefold_lattice_vectors[0];
     if(conv_lattice_vec_c == null) {
-      if(LDEBUG) { cerr << function_name << " No 3- or 6-fold axis found." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " No 3- or 6-fold axis found." << endl; }
       return false;
     }
 
@@ -2687,7 +2728,7 @@ namespace SYM {
     abc_vecs.push_back(conv_lattice_vec_b);
     abc_vecs.push_back(conv_lattice_vec_c);
     if(anyNullVectors(abc_vecs, tol)) { //DX20190215 - _SYM_TOL_ to tol
-      if(LDEBUG) { cerr << function_name << " One or more of the lattice vectors is null." << endl; }
+      if(LDEBUG) { cerr << __AFLOW_FUNC__ << " One or more of the lattice vectors is null." << endl; }
       return false;
     }
 
@@ -2718,8 +2759,7 @@ namespace SYM {
     // help determine the length of and angles between the rhombohedral lattice vectors
 
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::findRhombohedralSetting():";
-    if(LDEBUG) { cerr << function_name << " Finding rhombohedral setting of structure ..." << endl; }
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Finding rhombohedral setting of structure ..." << endl; }
 
     xmatrix<double> CL;
     xvector<double> conv_lattice_vec_a;
@@ -2740,14 +2780,14 @@ namespace SYM {
 
     double alpha_prime = std::acos(((2.0*mod_hex_c*mod_hex_c) - (3.0*mod_hex_a*mod_hex_a))/(2.0*(mod_hex_c*mod_hex_c + 3.0*mod_hex_a*mod_hex_a)));
 
-    if(LDEBUG) { cerr << function_name << " Modulus of rhombohedral lattice vectors (a prime) is " << mod_aprime << "." << endl; }
-    if(LDEBUG) { cerr << function_name << " Angle between all rhombohedral lattice vectors (alpha prime) is " << alpha_prime << "." << endl; }
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Modulus of rhombohedral lattice vectors (a prime) is " << mod_aprime << "." << endl; }
+    if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Angle between all rhombohedral lattice vectors (alpha prime) is " << alpha_prime << "." << endl; }
 
     // find lattice vectors that are of size mod_aprime
     vector<xvector<double> > candidate_rhl_setting_vectors;
     for (uint i = 0; i < big_expanded.size(); i++) {
       if(aurostd::abs(aurostd::modulus(big_expanded[i]) - mod_aprime) < tol){ //DX20190215 - _SYM_TOL_ to tol
-        if(LDEBUG) { cerr << function_name << " Found candidate vector: " << big_expanded[i]  << "." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Found candidate vector: " << big_expanded[i]  << "." << endl; }
         candidate_rhl_setting_vectors.push_back(big_expanded[i]);
       }
     }
@@ -2918,7 +2958,6 @@ namespace SYM {
 namespace SYM {
   symfolder check_ccell(xstructure& xstr, SymmetryInformationITC& ITC_sym_info) {
     bool LDEBUG = (FALSE || XHOST.DEBUG);
-    string function_name = XPID + "SYM::check_ccell():";
 
     symfolder SOps;
     xstructure xstr_CCell = xstr;
@@ -3148,7 +3187,7 @@ namespace SYM {
         }
 
         if(ident_trans == 0) {
-          if(LDEBUG) { cerr << function_name << " ERROR: Could not find identity." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " ERROR: Could not find identity." << endl; }
           SOps.latticesystem = "REDO";
           SOps.commensurate = false;
           return SOps;
@@ -3175,7 +3214,7 @@ namespace SYM {
 
       // === If not found, change tolerances and redo symmetry search (otherwise, segmentation fault) === //
       if(pointgroup_crystalsystem[0] == "REDO") {
-        if(LDEBUG) { cerr << function_name << " WARNING: Point group mapping failed (number of symmetry elements does not match with a given point group) [dir=" << xstr.directory << "]." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " WARNING: Point group mapping failed (number of symmetry elements does not match with a given point group) [dir=" << xstr.directory << "]." << endl; }
         SOps.latticesystem = "REDO";
         SOps.commensurate = false;
         return SOps;
@@ -3220,7 +3259,7 @@ namespace SYM {
     if(centeringops.size() != centeringgroups) {
       // === If not restart from the beginning, changing the tolerance === //
       if(LDEBUG) { 
-        cerr << function_name << " WARNING: Centering operations incommensurate... [dir=" << xstr.directory << "]." << endl;
+        cerr << __AFLOW_FUNC__ << " WARNING: Centering operations incommensurate... [dir=" << xstr.directory << "]." << endl;
       }
       SOps.latticesystem = "REDO";
       SOps.commensurate = false;
@@ -3405,10 +3444,9 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& setting) {
 uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int& setting, bool& no_scan) //DX20180806 - added setting
 { //CO20200106 - patching for auto-indenting
   bool LDEBUG = (FALSE || XHOST.DEBUG);
-  string function_name = XPID + "xstructure::SpaceGroup_ITC():";
   stringstream message;
   if(use_tol < _ZERO_TOL_) {
-    cerr << function_name << " ERROR: Tolerance cannot be zero (i.e. less than 1e-10) [dir=" << (*this).directory << "]." << endl;
+    cerr << __AFLOW_FUNC__ << " ERROR: Tolerance cannot be zero (i.e. less than 1e-10) [dir=" << (*this).directory << "]." << endl;
     return 0;
   }
 
@@ -3418,9 +3456,15 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   }
   min_dist = (*this).dist_nn_min;
   if(use_tol > min_dist) {
-    cerr << function_name << " ERROR: The tolerance cannot be larger than the minimum interatomic distance (" << min_dist << " Angstroms). [dir= " << (*this).directory << "]" << endl;
+    cerr << __AFLOW_FUNC__ << " ERROR: The tolerance cannot be larger than the minimum interatomic distance (" << min_dist << " Angstroms). [dir= " << (*this).directory << "]" << endl;
     return 0;
   }
+
+  // If iomode is WYCKCAR, convert to IOVASP temporarily, otherwise, printing of ITC lattice parameters/coordinates
+  // gets messed up (this is just a printing problem when debugging)
+  // DX20221128
+  int iomode_tmp = (*this).iomode;
+  if((*this).iomode==IOVASP_WYCKCAR) { iomode_tmp = (*this).iomode; (*this).iomode=IOVASP_POSCAR; }
 
   // ===== Initialize symmetry elements and set tolerance ===== //
   SymmetryInformationITC ITC_sym_info; //DX20190215
@@ -3455,7 +3499,7 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
     }
   }
   if(num_species_label != xstr.atoms.size() && num_species_label != 0) {
-    cerr << function_name << " POSCAR ERROR (Some atoms labeled, others are not ... please label all atoms) [dir= " << (*this).directory << "]." << endl;
+    cerr << __AFLOW_FUNC__ << " POSCAR ERROR (Some atoms labeled, others are not ... please label all atoms) [dir= " << (*this).directory << "]." << endl;
     return 0;
   }
   // If iatoms output, assign fake names (useful for wyccar output)
@@ -3470,9 +3514,9 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   xstr.MinkowskiBasisReduction();
 
   // ===== Declare variables ===== //
-  ostringstream woss;  //stringstream for wyccar
-  int spacegroup = 0;
-  bool foundspacegroup = false;
+  ostringstream woss, woss_min;  //stringstream for wyccar //DX+KC20221115 - need to store minimum wyccar stringstream for aflow --wyckoff --print=json
+  int spacegroup = 0, spacegroup_global = 0; //DX20220920
+  bool foundspacegroup = false, foundspacegroup_global = false; //DX20220827 - added foundspacegroup_global
   deque<_atom> atomicbasis;
   vector<int> insym;  //vector of index of symmetry operations found inside cell
   vector<xvector<double> > translations;
@@ -3486,14 +3530,14 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   ITC_sym_info.initgenerators(""); //DX20190215
   vector<int> reduction_by_generator_set;
   vector<vector<vector<double> > > RHS_shifts;
-  xvector<double> OriginShift;
+  xvector<double> OriginShift, OriginShift_Wyckoff_min;
   //DX20190215 [OBSOLETE]using SYM::sym_mats;
   //DX20190215 [OBSOLETE]using SYM::symbol;
   //DX20190215 [OBSOLETE]using SYM::sym_mats_direction;
   //DX20190215 [OBSOLETE]extern vector<xmatrix<double> > sym_mats;
   //DX20190215 [OBSOLETE]extern vector<string> symbol;
   //DX20190215 [OBSOLETE]extern SYM::hash sym_mats_direction;
-  xstructure CCell;
+  xstructure CCell, CCell_Wyckoff_min; //DX20220827 - added Wyckoff_min
   char latticetypechar = '\0'; //DX20180514 - added initialization
 
   int cell_choice = setting; //DX20180806 - use setting instead of 0
@@ -3518,13 +3562,16 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   //  bool first_wyckoff = true;
   bool found_all_wyckoff = false;
   string spacegroupstring = "";
-  vector<int> wyckoffmult;                   // Wyckoff multiplicity
-  vector<string> general_wyckoff_position;   // General wyckoff positions
-  vector<string> wyckoffsymbols;             // Wyckoff symbol
-  deque<_atom> wyckoffPositionsVector;       // Stored Wyckoff coordinate
-  vector<string> wyckoffSymbols;             // Stored Wyckoff symbol
-  vector<wyckoffsite_ITC> wyckoffVariables;  //variable values + atom chemical label + wyckoff symbol
-  vector<vector<vector<string> > > tmpvvvstring;
+                  
+  int min_wyckoff_sum = 1e9, minimum_scheme_sum = 1e9, global_min_wyckoff_sum = 1e9; //DX20220827 - track minimum Wyckoff sum
+  vector<int> min_Wyckoff_numbers, global_min_Wyckoff_numbers; //DX20221103
+  vector<int> wyckoffmult, wyckoffmult_min;                   // Wyckoff multiplicity //DX20220827 - added min variant
+  vector<string> general_wyckoff_position, general_wyckoff_position_min;   // General wyckoff positions //DX20220827 - added min variant
+  vector<string> wyckoffsymbols, wyckoffsymbols_min;             // Wyckoff symbol //DX20220827 - added min variant
+  deque<_atom> wyckoffPositionsVector, wyckoffPositionsVector_min;       // Stored Wyckoff coordinate //DX20220827 - added min variant
+  vector<string> wyckoffSymbols, wyckoffSymbols_min;             // Stored Wyckoff symbol //DX20220827 - added min variant
+  vector<wyckoffsite_ITC> wyckoffVariables, wyckoffVariables_min;  //variable values + atom chemical label + wyckoff symbol //DX20220827 - added min variant
+  vector<vector<vector<string> > > tmpvvvstring, tmpvvvstring_min; //DX20220827 - added min variant
 
   // === Tolerance boolean === //
   bool last_orientation = false;
@@ -3532,6 +3579,7 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
 
   bool lattice_reformed = false;
   bool symmetryfound = false;
+  bool tested_all_lattices = false;
 
   string crystalsystem_prev = "";  //Correct conventional cell
 
@@ -3546,101 +3594,53 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
     uint gencentops = 0;
     vector<string> pointgroupops;
     uint centeringgroups = 1;
+      
 
-    ///// PUT IN STANDARD PRIMITIVE FORM /////
-    // ========== Make the xstructure in primitive form if this is the first iteration, or the tolerance has been changed ========== //
-    if(first_run_or_new_tol == true) {
-      sym_eps = xstr.sym_eps; //DX20180226 - added sym eps temp variable
-      sym_eps_change_count = xstr.sym_eps_change_count; //DX20180226 - added sym eps change count
-      no_scan = xstr.sym_eps_no_scan; //DX20210430 - added no_scan
-      xstr = xstr_orig;
-      xstr.sym_eps = sym_eps; //DX20190314 - need to update sym_eps, since the structure was overwritten 
-      xstr.sym_eps_change_count = sym_eps_change_count; //DX20180423 - need to update change count, since the structure was overwritten 
-      xstr.sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
-      CCell.free();
-      xstr.MinkowskiBasisReduction();
-      //DX20210401 [OBSOLETE] xstr.GetPrimitiveCell();
-      xstr.GetPrimitive(); //DX20210401
-
-      // ===== Ensure Cartesian coordinates are consistent with fractional coordinates ===== //
-      for (uint i = 0; i < xstr.atoms.size(); i++) {
-        xstr.atoms[i].cpos = F2C(xstr.lattice, xstr.atoms[i].fpos);
-      }
-      xstr.BringInCell();
-      first_run_or_new_tol = false;
-    }
-
-    // ===== If the last possible orientation of the conventional cell was attempted, and was incommensurate, change tolerance ===== //
-    if(last_orientation == true) {
-      lattice_reformed = false;
-      lattice_pgroups.clear();
-      lattice_sym_mats.clear();
-      crystal_sym_mats.clear();
-      if(!no_scan){
-        SYM::change_tolerance(xstr,xstr.sym_eps, min_dist, no_scan); //DX20190215 - _SYM_TOL_ to xstr.sym_eps
+    while(!tested_all_lattices) {
+      if(LDEBUG) { cerr << "SYM::SpaceGroup_ITC: [BEGINNING OF LOOP] iterate=" << iterate << " : min_wyckoff_sum=" << min_wyckoff_sum << " vs global=" << global_min_wyckoff_sum << endl; }
+      ///// PUT IN STANDARD PRIMITIVE FORM /////
+      // ========== Make the xstructure in primitive form if this is the first iteration, or the tolerance has been changed ========== //
+      if(first_run_or_new_tol == true) {
+        sym_eps = xstr.sym_eps; //DX20180226 - added sym eps temp variable
         sym_eps_change_count = xstr.sym_eps_change_count; //DX20180226 - added sym eps change count
+        no_scan = xstr.sym_eps_no_scan; //DX20210430 - added no_scan
+        xstr = xstr_orig;
+        xstr.sym_eps = sym_eps; //DX20190314 - need to update sym_eps, since the structure was overwritten 
+        xstr.sym_eps_change_count = sym_eps_change_count; //DX20180423 - need to update change count, since the structure was overwritten 
         xstr.sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
-      }
-      else {
-        (*this).sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
-        return 0;
-      }
-      first_run_or_new_tol = true;
-      iterate = -1;
-      cell_choice = setting; //DX20180806 - use setting instead of 0
-      last_orientation = false;
-      symmetryfound = false;
-      continue;
-    }
-    iterate++;
-    insym.clear();
-    all_atom_maps.clear();
-    all_type_maps.clear();
-    reduction_by_generator_set.clear();
-    RHS_shifts.clear();
-    OriginShift.clear();
-    atomicbasis.clear();
-    translations.clear();
-    pointgroup = "";
+        CCell.free();
+        xstr.MinkowskiBasisReduction();
+        //DX20210401 [OBSOLETE] xstr.GetPrimitiveCell();
+        xstr.GetPrimitive(); //DX20210401
 
-    SYM::symfolder checkops;
-
-    ///// FIND CONVENTIONAL CELL /////
-    //manual or not manual mode
-    if(MAN_IT != -1) {
-      int IT = iterate;
-      // ===== Conventional Cell Routine ===== //
-      CCell = SYM::ConventionalCell(xstr, IT, cell_choice, last_orientation, crystalsystem_prev, CrystOut_prev, candidate_lattice_vectors_prev,
-          candidate_lattice_chars_prev, checkops, ITC_sym_info, lattice_reformed, lattice_pgroups, lattice_sym_mats, crystal_sym_mats,
-          symmetryfound);
-      // ===== If the conventional cell was not found, change the tolerance ===== //
-      if(symmetryfound == false) {
-        lattice_reformed = false;
-        lattice_pgroups.clear();
-        lattice_sym_mats.clear();
-        crystal_sym_mats.clear();
-        if(!no_scan){
-          SYM::change_tolerance(xstr,xstr.sym_eps, min_dist, no_scan); //DX20190215 - _SYM_TOL_ to xstr.sym_eps
-          sym_eps_change_count = xstr.sym_eps_change_count; //DX20180226 - added sym eps change count
-          xstr.sym_eps_no_scan = no_scan; //DX20180226 - added sym eps change count
+        // ===== Ensure Cartesian coordinates are consistent with fractional coordinates ===== //
+        for (uint i = 0; i < xstr.atoms.size(); i++) {
+          xstr.atoms[i].cpos = F2C(xstr.lattice, xstr.atoms[i].fpos);
         }
-        else {
-          (*this).sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
-          return 0;
-        }
-        first_run_or_new_tol = true;
-        iterate = -1;
-        continue;
+        xstr.BringInCell();
+        first_run_or_new_tol = false;
       }
-      iterate = IT;
-    } else {
-      iterate = MAN_IT;
-      // ===== Conventional Cell Routine ===== //
-      CCell = SYM::ConventionalCell(xstr, iterate, cell_choice, last_orientation, crystalsystem_prev, CrystOut_prev, candidate_lattice_vectors_prev,
-          candidate_lattice_chars_prev, checkops, ITC_sym_info, lattice_reformed, lattice_pgroups, lattice_sym_mats, crystal_sym_mats,
-          symmetryfound);
-      // ===== If the conventional cell was not found, change the tolerance ===== //
-      if(symmetryfound == false) {
+
+      // ===== If the last possible orientation of the conventional cell was attempted, and was incommensurate, change tolerance ===== //
+      if(last_orientation == true) {
+        // If we found the space group in an earlier iteration
+        if(foundspacegroup_global) {
+          if(LDEBUG) { cerr << "SYM::SpaceGroup_ITC: Explored all iterations, use the lattice and origin choice that found a valid space group." << endl; }
+          foundspacegroup = true;
+          spacegroup = spacegroup_global;
+          CCell = CCell_Wyckoff_min;
+          // update Wyckoff info
+          wyckoffmult = wyckoffmult_min;
+          wyckoffsymbols = wyckoffsymbols_min;
+          wyckoffPositionsVector = wyckoffPositionsVector_min;
+          wyckoffSymbols = wyckoffSymbols_min;
+          wyckoffVariables = wyckoffVariables_min;
+          tmpvvvstring = tmpvvvstring_min;
+          woss.str(""); woss << woss_min.str(); //DX+KC20221103 - added woss_min for aflow --wyckoff --print=json
+          // update shifts
+          OriginShift = OriginShift_Wyckoff_min;
+          break;
+        }
         lattice_reformed = false;
         lattice_pgroups.clear();
         lattice_sym_mats.clear();
@@ -3656,549 +3656,721 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
         }
         first_run_or_new_tol = true;
         iterate = -1;
+        cell_choice = setting; //DX20180806 - use setting instead of 0
+        last_orientation = false;
+        symmetryfound = false;
         continue;
       }
-    }
-    if(LDEBUG) {
-      cerr << function_name << " Conventional cell: " << endl;
-      cerr << CCell << endl;
-    }
+      iterate++;
+      insym.clear();
+      all_atom_maps.clear();
+      all_type_maps.clear();
+      reduction_by_generator_set.clear();
+      RHS_shifts.clear();
+      OriginShift.clear();
+      atomicbasis.clear();
+      translations.clear();
+      pointgroup = "";
 
+      SYM::symfolder checkops;
 
-    // === Find ratio of lattice vectors === //
-    xmatrix<double> f2c = trasp(CCell.lattice);
-    xmatrix<double> c2f = inverse(trasp(CCell.lattice));
-
-    atomicbasis = CCell.atoms;
-
-    // === Obtain symmetry elements from the symmetry check (checkops) from the Conventional Cell routine === //
-    insym = checkops.insym;
-    vector<xvector<double> > centeringops = checkops.centeringops;
-    pointgroupops = checkops.pointgroupops;
-    translations = checkops.translations;
-    all_atom_maps = checkops.all_atom_maps;
-    all_type_maps = checkops.all_type_maps;
-
-    vector<xmatrix<double> > pointgroup_mats;
-    vector<string> secondpgops;
-    reduced_insym.clear();
-    for (uint i = 0; i < insym.size(); i++) {
-      pointgroup_mats.push_back(ITC_sym_info.sym_mats[insym[i]]);
-      if(i % centeringops.size() == 0) {
-        secondpgops.push_back(ITC_sym_info.symbol[insym[i]]);
-        reduced_insym.push_back(insym[i]);
+      ///// FIND CONVENTIONAL CELL /////
+      //manual or not manual mode
+      if(MAN_IT != -1) {
+        int IT = iterate;
+        // ===== Conventional Cell Routine ===== //
+        CCell = SYM::ConventionalCell(xstr, IT, cell_choice, last_orientation, crystalsystem_prev, CrystOut_prev, candidate_lattice_vectors_prev,
+            candidate_lattice_chars_prev, checkops, ITC_sym_info, lattice_reformed, lattice_pgroups, lattice_sym_mats, crystal_sym_mats,
+            symmetryfound, foundspacegroup_global); //DX20220927 - added foundspacegroup_global
+        // ===== If the conventional cell was not found, change the tolerance ===== //
+        if(symmetryfound == false) {
+          if(foundspacegroup_global && last_orientation) {
+          if(LDEBUG) { cerr << "SYM::SpaceGroup_ITC: Last lattice choice/orientation was explored. Consistent symmetry was found with a different choice/orientation, so we will use that conventional cell." << endl; }
+            continue;
+        }
+          lattice_reformed = false;
+          lattice_pgroups.clear();
+          lattice_sym_mats.clear();
+          crystal_sym_mats.clear();
+          if(!no_scan){
+            SYM::change_tolerance(xstr,xstr.sym_eps, min_dist, no_scan); //DX20190215 - _SYM_TOL_ to xstr.sym_eps
+            sym_eps_change_count = xstr.sym_eps_change_count; //DX20180226 - added sym eps change count
+            xstr.sym_eps_no_scan = no_scan; //DX20180226 - added sym eps change count
+          }
+          else {
+            (*this).sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
+            return 0;
+          }
+          first_run_or_new_tol = true;
+          iterate = -1;
+          continue;
+        }
+        iterate = IT;
+      } else {
+        iterate = MAN_IT;
+        // ===== Conventional Cell Routine ===== //
+        CCell = SYM::ConventionalCell(xstr, iterate, cell_choice, last_orientation, crystalsystem_prev, CrystOut_prev, candidate_lattice_vectors_prev,
+            candidate_lattice_chars_prev, checkops, ITC_sym_info, lattice_reformed, lattice_pgroups, lattice_sym_mats, crystal_sym_mats,
+            symmetryfound, foundspacegroup_global); //DX20220927 - added foundspacegroup_global
+        // ===== If the conventional cell was not found, change the tolerance ===== //
+        if(symmetryfound == false) {
+          lattice_reformed = false;
+          lattice_pgroups.clear();
+          lattice_sym_mats.clear();
+          crystal_sym_mats.clear();
+          if(!no_scan){
+            SYM::change_tolerance(xstr,xstr.sym_eps, min_dist, no_scan); //DX20190215 - _SYM_TOL_ to xstr.sym_eps
+            sym_eps_change_count = xstr.sym_eps_change_count; //DX20180226 - added sym eps change count
+            xstr.sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
+          }
+          else {
+            (*this).sym_eps_no_scan = no_scan; //DX20210430 - added no_scan
+            return 0;
+          }
+          first_run_or_new_tol = true;
+          iterate = -1;
+          continue;
+        }
       }
-    }
-
-    // ===== Determine the pointgroup and crystal system based on the symmetry operations found ===== //
-    pointgroup = SYM::point_group_library_search(secondpgops, CCell.crystal_system_ITC, centeringops.size());
-    sg_search.clear();
-
-    // ===== Use the point group and the lattice type/lattice centering to narrow down the space group ===== //
-    sg_search = SYM::PointGroup_SpaceGroup(pointgroup, CCell.bravais_label_ITC);
-    // If we are looking at the rhombohedral setting, we need to use bravais label 'R' instead of 'P' //DX20180807 
-    //DX20190130 - add anrl cell choice : if(cell_choice == 1 && CCell.lattice_label_ITC == 'r') //DX20180807
-    if((cell_choice == SG_SETTING_1 || cell_choice == SG_SETTING_ANRL) && CCell.lattice_label_ITC == 'r') //DX20190131 - add anrl setting
-    { //CO20200106 - patching for auto-indenting
-      sg_search = SYM::PointGroup_SpaceGroup(pointgroup, 'R'); //DX20180807
-    } //DX20180807
-    if(LDEBUG) {
-      cerr << function_name << " Possible space groups based on point group (PG=" << pointgroup << "): ";
-      for(uint s=0;s<sg_search.size();s++){
-        cerr << sg_search[s] << " "; 
+      if(LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " Conventional cell: " << endl;
+        cerr << CCell << endl;
       }
-      cerr << "[dir=" << xstr.directory << "]." << endl;
-    }
-    //print(sg_search);
-    //xb();
-    // === DIVIDE SYMMETRY BY CENTERING OPERATIONS === //
-    gencentops = 0;
-    centeringgroups = 1;
-    if(CCell.bravais_label_ITC == 'I' || CCell.bravais_label_ITC == 'C') {
-      gencentops = 1;
-      centeringgroups = 2;
-    }
-    if(CCell.bravais_label_ITC == 'F') {
-      gencentops = 2;
-      centeringgroups = 4;
-    }
-    if(CCell.bravais_label_ITC == 'R') {
-      gencentops = 1;
-      centeringgroups = 3;
-    }
 
-    latticetypechar = CCell.lattice_label_ITC;
 
-    // *********************************************************************************************************************************
-    // Find the correct origin with respect to the International Tables of Crystallography (ITC)
-    // *********************************************************************************************************************************
-    vector<int> FCG;  //first_centered_group;
-    FCG.clear();
+      // === Find ratio of lattice vectors === //
+      xmatrix<double> f2c = trasp(CCell.lattice);
+      xmatrix<double> c2f = inverse(trasp(CCell.lattice));
 
-    // DEBUG
-    //for(uint i=0;i<pointgroupops.size();i++){
-    //   cerr << pointgroupops[i] << endl;
-    //}
-    //for(uint i=0;i<insym.size();i++){
-    //   cerr << insym[i] << endl;
-    //}
-    // DEBUG
+      atomicbasis = CCell.atoms;
 
-    if(gencentops == 0) {  //No centeringops means that FCG should simply be an index for finalsymbolset
-      for (uint i = 0; i < pointgroupops.size(); i++) {
-        FCG.push_back(i);
-        //cerr << "FCG.at(i): " << FCG.at(i) << endl;
+      // === Obtain symmetry elements from the symmetry check (checkops) from the Conventional Cell routine === //
+      insym = checkops.insym;
+      vector<xvector<double> > centeringops = checkops.centeringops;
+      pointgroupops = checkops.pointgroupops;
+      translations = checkops.translations;
+      all_atom_maps = checkops.all_atom_maps;
+      all_type_maps = checkops.all_type_maps;
+
+      vector<xmatrix<double> > pointgroup_mats;
+      vector<string> secondpgops;
+      reduced_insym.clear();
+      for (uint i = 0; i < insym.size(); i++) {
+        pointgroup_mats.push_back(ITC_sym_info.sym_mats[insym[i]]);
+        if(i % centeringops.size() == 0) {
+          secondpgops.push_back(ITC_sym_info.symbol[insym[i]]);
+          reduced_insym.push_back(insym[i]);
+        }
       }
-    } else {
-      //CANT DO PRIMITIVE SET WITHOUT KNOWING ORIGIN (?) (SEE BRUTE FORCE METHOD AT END OF LOOP)
 
-      // === Initialize containers for centered groups. === //
-      vector<int> tmp;
-      for (uint i = 0; i < pointgroupops.size(); i++) {
-        //METHOD 1 (PRIMITIVE CELL):
-        //atom tmp;
-        //tmp.coord = mod_one_xvec(ITC_sym_info.sym_mats[insym[i]]*primitive_set_in_conventional[0].coord + translations[i]);
-        //tmp.type = primitive_set_in_conventional[0].type;
-        //
-        //if(invec_atom(primitive_set_in_conventional,tmp,1e-4)){ //double tol
-        //cerr << ITC_sym_info.symbol[insym[i]] << " " << dirparam[insym[i]] << "  " <<  translations[i] << endl;
-        //FCG.push_back(i);
-        //}
+      // ===== Determine the pointgroup and crystal system based on the symmetry operations found ===== //
+      pointgroup = SYM::point_group_library_search(secondpgops, CCell.crystal_system_ITC, centeringops.size());
+      sg_search.clear();
 
-        //METHOD 2 (DIFFERENCE OF SHIFTS):
-        //bool add = true;
-        //for(int j=1;j<centeringops.size();j++){
-        //	if((aurostd::modulus(translations[i])-aurostd::modulus(centeringops[j])) > -tol ){
-        //	  add = false;
-        //	}
-        //}
-        //if(add == true){
-        //	cerr << ITC_sym_info.symbol[insym[i]] << " " << dirparam[insym[i]] << "  " <<  translations[i] << endl;
-        //	FCG.push_back(i);
-        //}
+      // ===== Use the point group and the lattice type/lattice centering to narrow down the space group ===== //
+      sg_search = SYM::PointGroup_SpaceGroup(pointgroup, CCell.bravais_label_ITC);
+      //std::reverse(sg_search.begin(), sg_search.end()); //DX20221230 - reverse to give preference to higher space groups
+      // If we are looking at the rhombohedral setting, we need to use bravais label 'R' instead of 'P' //DX20180807 
+      //DX20190130 - add anrl cell choice : if(cell_choice == 1 && CCell.lattice_label_ITC == 'r') //DX20180807
+      if((cell_choice == SG_SETTING_1 || cell_choice == SG_SETTING_ANRL) && CCell.lattice_label_ITC == 'r') //DX20190131 - add anrl setting
+      { //CO20200106 - patching for auto-indenting
+        sg_search = SYM::PointGroup_SpaceGroup(pointgroup, 'R'); //DX20180807
+      } //DX20180807
+      if(LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " Possible space groups based on point group (PG=" << pointgroup << "): ";
+        for(uint s=0;s<sg_search.size();s++){
+          cerr << sg_search[s] << " "; 
+        }
+        cerr << "[dir=" << xstr.directory << "]." << endl;
+      }
+      //DEBUG print(sg_search);
+      //DEBUG xb();
+      // === DIVIDE SYMMETRY BY CENTERING OPERATIONS === //
+      gencentops = 0;
+      centeringgroups = 1;
+      if(CCell.bravais_label_ITC == 'I' || CCell.bravais_label_ITC == 'C') {
+        gencentops = 1;
+        centeringgroups = 2;
+      }
+      if(CCell.bravais_label_ITC == 'F') {
+        gencentops = 2;
+        centeringgroups = 4;
+      }
+      if(CCell.bravais_label_ITC == 'R') {
+        gencentops = 1;
+        centeringgroups = 3;
+      }
 
-        //METHOD 3: BRUTE FORCE:
-        FCG.clear();
+      latticetypechar = CCell.lattice_label_ITC;
+
+      // *********************************************************************************************************************************
+      // Find the correct origin with respect to the International Tables of Crystallography (ITC)
+      // *********************************************************************************************************************************
+      vector<int> FCG;  //first_centered_group;
+      FCG.clear();
+
+      // DEBUG
+      //for(uint i=0;i<pointgroupops.size();i++){
+      //   cerr << pointgroupops[i] << endl;
+      //}
+      //for(uint i=0;i<insym.size();i++){
+      //   cerr << insym[i] << endl;
+      //}
+      // DEBUG
+
+      if(gencentops == 0) {  //No centeringops means that FCG should simply be an index for finalsymbolset
         for (uint i = 0; i < pointgroupops.size(); i++) {
           FCG.push_back(i);
           //cerr << "FCG.at(i): " << FCG.at(i) << endl;
         }
-      }
-    }
-    //cerr << "FCG: " << endl;
-    //print(FCG);
-    //throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Throw for debugging purposes.",_GENERIC_ERROR_);
+      } else {
+        //CANT DO PRIMITIVE SET WITHOUT KNOWING ORIGIN (?) (SEE BRUTE FORCE METHOD AT END OF LOOP)
 
-    stringstream axis_cell;
-    axis_cell.str(std::string());
-    //DX20180806 [OBSOLETE] axis_cell << CCell.lattice_label_ITC << cell_choice;
-    axis_cell << cell_choice; //DX20180806 - use setting
-    // ===== Construct the generator set based on the cell choice/unique axis ===== //
-    ITC_sym_info.initgenerators(axis_cell.str());
+        // === Initialize containers for centered groups. === //
+        vector<int> tmp;
+        for (uint i = 0; i < pointgroupops.size(); i++) {
+          //METHOD 1 (PRIMITIVE CELL):
+          //atom tmp;
+          //tmp.coord = mod_one_xvec(ITC_sym_info.sym_mats[insym[i]]*primitive_set_in_conventional[0].coord + translations[i]);
+          //tmp.type = primitive_set_in_conventional[0].type;
+          //
+          //if(invec_atom(primitive_set_in_conventional,tmp,1e-4)){ //double tol
+          //cerr << ITC_sym_info.symbol[insym[i]] << " " << dirparam[insym[i]] << "  " <<  translations[i] << endl;
+          //FCG.push_back(i);
+          //}
 
-    // ===== Check if space group = 1 ===== //
-    if(sg_search.size() == 1 && sg_search[0] == 1) {
-      spacegroup = 1;
-      foundspacegroup = true;
-      //cerr << "Space Group " << sg_search[0] << endl;
-    }
-    // ===== Check other space groups (2-230), and find origin ===== //
-    for (uint j = 0; j < ITC_sym_info.sgindex.size(); j++) {
-      if(aurostd::WithinList(sg_search, ITC_sym_info.sgindex[j])) { //DX20210422 - SYM::invec() -> aurostd::WithinList()
-        //DEBUGGER:
-        if(LDEBUG) {
-          cerr << function_name << " Checking generators for space group: " << ITC_sym_info.sgindex[j] << " (with cell choice = " << axis_cell.str() << ")." <<  endl;
-        }
-        //cerr << "////////////////////////////////////////" << endl;
+          //METHOD 2 (DIFFERENCE OF SHIFTS):
+          //bool add = true;
+          //for(int j=1;j<centeringops.size();j++){
+          //	if((aurostd::modulus(translations[i])-aurostd::modulus(centeringops[j])) > -tol ){
+          //	  add = false;
+          //	}
+          //}
+          //if(add == true){
+          //	cerr << ITC_sym_info.symbol[insym[i]] << " " << dirparam[insym[i]] << "  " <<  translations[i] << endl;
+          //	FCG.push_back(i);
+          //}
 
-        uint match_count = 0;
-        // === Obtain origin shift set from the ITC === //
-        vector<xvector<double> > ITCshiftset;
-
-        // === For certian space groups, the cell choice and unique axis are important (i.e. MCL). === //
-        ITCshiftset = SYM::ReturnITCGenShift(ITC_sym_info.sgindex[j], axis_cell.str());
-        //cerr << "library shift set: "<< endl;
-        //print(ITCshiftset);
-        //xb();
-
-        // === GET COMBINATIONS OF POSSIBLE GENERATOR OPERATIONS === //
-        vector<vector<int> > op_ind;  // operation indices divided by type eg: 2+ : (1,3) -1: (2,4)
-        for (uint i = 0; i < ITC_sym_info.generators[j].size(); i++) {
-          //cerr << ITC_sym_info.generators[j][i].direction << endl;
-          vector<int> sub;
-          for (uint k = 0; k < FCG.size(); k++) {
-            string symboltmp = "";
-            //For the purpose of the reduction by generators, and due to the representation of symmetry
-            //operations as operations about the origin plus a shift, must equate the glides
-            //with a mirror operation
-            if(ITC_sym_info.generators[j][i].symbol == "c" || ITC_sym_info.generators[j][i].symbol == "b" ||
-                ITC_sym_info.generators[j][i].symbol == "a" || ITC_sym_info.generators[j][i].symbol == "n" ||
-                ITC_sym_info.generators[j][i].symbol == "d") {
-              symboltmp = "m";
-            } else {
-              symboltmp = ITC_sym_info.generators[j][i].symbol;
-            }
-            if(pointgroupops[FCG[k]] == symboltmp && ITC_sym_info.sym_mats_direction[insym[FCG[k]] + 1] == ITC_sym_info.generators[j][i].direction) {
-              sub.push_back(FCG[k]);
-              match_count++;
-            }
+          //METHOD 3: BRUTE FORCE:
+          FCG.clear();
+          for (uint i = 0; i < pointgroupops.size(); i++) {
+            FCG.push_back(i);
+            //cerr << "FCG.at(i): " << FCG.at(i) << endl;
           }
-          //xb();
-          //print(sub);
-          op_ind.push_back(sub);
         }
+      }
+      //cerr << "FCG: " << endl;
+      //print(FCG);
+      //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Throw for debugging purposes.",_GENERIC_ERROR_);
 
-        vector<vector<int> > CG;  //centered groups
-        CG.clear();
-        vector<int> CGtmp;
+      stringstream axis_cell;
+      axis_cell.str(std::string());
+      //DX20180806 [OBSOLETE] axis_cell << CCell.lattice_label_ITC << cell_choice;
+      axis_cell << cell_choice; //DX20180806 - use setting
+      // ===== Construct the generator set based on the cell choice/unique axis ===== //
+      ITC_sym_info.initgenerators(axis_cell.str());
 
-        // === GET COMBINATIONS OF GENERATORS SINCE THE OPERATIONS CANNOT BE SPLIT BY CENTERING GROUPS WITHOUT KNOWLEDGE OF ORIGIN === //
-        int numofgens = ITC_sym_info.generators[j].size();
-        if(numofgens == 5) {
-          for (uint ix = 0; ix < op_ind[0].size(); ix++) {
-            for (uint jx = 0; jx < op_ind[1].size(); jx++) {
-              for (uint kx = 0; kx < op_ind[2].size(); kx++) {
-                for (uint lx = 0; lx < op_ind[3].size(); lx++) {
-                  for (uint mx = 0; mx < op_ind[4].size(); mx++) {
+      // ===== Check if space group = 1 ===== //
+      if(sg_search.size() == 1 && sg_search[0] == 1) {
+        spacegroup = 1;
+        foundspacegroup = true;
+        if(LDEBUG) { cerr << "Space Group " << sg_search[0] << endl; }
+      }
+      // ===== Check other space groups (2-230), and find origin ===== //
+      for (uint j = 0; j < ITC_sym_info.sgindex.size(); j++) {
+      //for (int j = ITC_sym_info.sgindex.size()-1; j>=0; j--) //DX20221230 - reverse order to give preference to higher space groups
+        if(aurostd::WithinList(sg_search, ITC_sym_info.sgindex[j])) { //DX20210422 - SYM::invec() -> aurostd::WithinList()
+          //DEBUGGER:
+          if(LDEBUG) {
+            cerr << __AFLOW_FUNC__ << " Checking generators for space group: " << ITC_sym_info.sgindex[j] << " (with cell choice = " << axis_cell.str() << ")." <<  endl;
+          }
+          //cerr << "////////////////////////////////////////" << endl;
+
+          uint match_count = 0;
+          // === Obtain origin shift set from the ITC === //
+          vector<xvector<double> > ITCshiftset;
+
+          // === For certian space groups, the cell choice and unique axis are important (i.e. MCL). === //
+          ITCshiftset = SYM::ReturnITCGenShift(ITC_sym_info.sgindex[j], axis_cell.str());
+          //cerr << "library shift set: "<< endl;
+          //print(ITCshiftset);
+          //xb();
+
+          // === GET COMBINATIONS OF POSSIBLE GENERATOR OPERATIONS === //
+          vector<vector<int> > op_ind;  // operation indices divided by type eg: 2+ : (1,3) -1: (2,4)
+          for (uint i = 0; i < ITC_sym_info.generators[j].size(); i++) {
+            //cerr << ITC_sym_info.generators[j][i].direction << endl;
+            vector<int> sub;
+            for (uint k = 0; k < FCG.size(); k++) {
+              string symboltmp = "";
+              //For the purpose of the reduction by generators, and due to the representation of symmetry
+              //operations as operations about the origin plus a shift, must equate the glides
+              //with a mirror operation
+              if(ITC_sym_info.generators[j][i].symbol == "c" || ITC_sym_info.generators[j][i].symbol == "b" ||
+                  ITC_sym_info.generators[j][i].symbol == "a" || ITC_sym_info.generators[j][i].symbol == "n" ||
+                  ITC_sym_info.generators[j][i].symbol == "d") {
+                symboltmp = "m";
+              } else {
+                symboltmp = ITC_sym_info.generators[j][i].symbol;
+              }
+              if(pointgroupops[FCG[k]] == symboltmp && ITC_sym_info.sym_mats_direction[insym[FCG[k]] + 1] == ITC_sym_info.generators[j][i].direction) {
+                sub.push_back(FCG[k]);
+                match_count++;
+              }
+            }
+            //xb();
+            //print(sub);
+            op_ind.push_back(sub);
+          }
+
+          vector<vector<int> > CG;  //centered groups
+          CG.clear();
+          vector<int> CGtmp;
+
+          // === GET COMBINATIONS OF GENERATORS SINCE THE OPERATIONS CANNOT BE SPLIT BY CENTERING GROUPS WITHOUT KNOWLEDGE OF ORIGIN === //
+          int numofgens = ITC_sym_info.generators[j].size();
+          if(numofgens == 5) {
+            for (uint ix = 0; ix < op_ind[0].size(); ix++) {
+              for (uint jx = 0; jx < op_ind[1].size(); jx++) {
+                for (uint kx = 0; kx < op_ind[2].size(); kx++) {
+                  for (uint lx = 0; lx < op_ind[3].size(); lx++) {
+                    for (uint mx = 0; mx < op_ind[4].size(); mx++) {
+                      CGtmp.push_back(op_ind[0][ix]);
+                      CGtmp.push_back(op_ind[1][jx]);
+                      CGtmp.push_back(op_ind[2][kx]);
+                      CGtmp.push_back(op_ind[3][lx]);
+                      CGtmp.push_back(op_ind[4][mx]);
+                      CG.push_back(CGtmp);
+                      CGtmp.clear();
+                    }
+                  }
+                }
+              }
+            }
+          } else if(numofgens == 4) {
+            for (uint ix = 0; ix < op_ind[0].size(); ix++) {
+              for (uint jx = 0; jx < op_ind[1].size(); jx++) {
+                for (uint kx = 0; kx < op_ind[2].size(); kx++) {
+                  for (uint lx = 0; lx < op_ind[3].size(); lx++) {
                     CGtmp.push_back(op_ind[0][ix]);
                     CGtmp.push_back(op_ind[1][jx]);
                     CGtmp.push_back(op_ind[2][kx]);
                     CGtmp.push_back(op_ind[3][lx]);
-                    CGtmp.push_back(op_ind[4][mx]);
                     CG.push_back(CGtmp);
                     CGtmp.clear();
                   }
                 }
               }
             }
-          }
-        } else if(numofgens == 4) {
-          for (uint ix = 0; ix < op_ind[0].size(); ix++) {
-            for (uint jx = 0; jx < op_ind[1].size(); jx++) {
-              for (uint kx = 0; kx < op_ind[2].size(); kx++) {
-                for (uint lx = 0; lx < op_ind[3].size(); lx++) {
+          } else if(numofgens == 3) {
+            for (uint ix = 0; ix < op_ind[0].size(); ix++) {
+              for (uint jx = 0; jx < op_ind[1].size(); jx++) {
+                for (uint kx = 0; kx < op_ind[2].size(); kx++) {
                   CGtmp.push_back(op_ind[0][ix]);
                   CGtmp.push_back(op_ind[1][jx]);
                   CGtmp.push_back(op_ind[2][kx]);
-                  CGtmp.push_back(op_ind[3][lx]);
                   CG.push_back(CGtmp);
                   CGtmp.clear();
                 }
               }
             }
-          }
-        } else if(numofgens == 3) {
-          for (uint ix = 0; ix < op_ind[0].size(); ix++) {
-            for (uint jx = 0; jx < op_ind[1].size(); jx++) {
-              for (uint kx = 0; kx < op_ind[2].size(); kx++) {
+          } else if(numofgens == 2) {
+            for (uint ix = 0; ix < op_ind[0].size(); ix++) {
+              for (uint jx = 0; jx < op_ind[1].size(); jx++) {
                 CGtmp.push_back(op_ind[0][ix]);
                 CGtmp.push_back(op_ind[1][jx]);
-                CGtmp.push_back(op_ind[2][kx]);
                 CG.push_back(CGtmp);
                 CGtmp.clear();
               }
             }
-          }
-        } else if(numofgens == 2) {
-          for (uint ix = 0; ix < op_ind[0].size(); ix++) {
-            for (uint jx = 0; jx < op_ind[1].size(); jx++) {
+          } else if(numofgens == 1) {
+            for (uint ix = 0; ix < op_ind[0].size(); ix++) {
               CGtmp.push_back(op_ind[0][ix]);
-              CGtmp.push_back(op_ind[1][jx]);
               CG.push_back(CGtmp);
               CGtmp.clear();
             }
           }
-        } else if(numofgens == 1) {
-          for (uint ix = 0; ix < op_ind[0].size(); ix++) {
-            CGtmp.push_back(op_ind[0][ix]);
-            CG.push_back(CGtmp);
-            CGtmp.clear();
-          }
-        }
-        // ===== Need to determine the reconcile the differences in the translations and ITC shift set ===== //
-        //cerr << "match_count: " << match_count << endl;
-        //cerr << "ITC_sym_info.generators[j].size()*(centeringgroups): " << ITC_sym_info.generators[j].size()*(centeringgroups) << endl;
-        if(match_count == ITC_sym_info.generators[j].size() * (centeringgroups)) {
-          if(LDEBUG) {
-            cerr << function_name << " Generator reduction matches for space group: " << ITC_sym_info.sgindex[j] << endl;
-          }
-          //cerr << "GENERATOR REDUCTION MATCH: SG" <<  ITC_sym_info.sgindex[j] << endl;
-          //for(uint ix=0;ix<CG.size();ix++){
-          //   cerr << "CG: " << endl;
-          //   print(CG[ix]);
-          //}
-          vector<xvector<double> > oneshiftset;
-          vector<xmatrix<double> > onerotset;
-          for (uint ix = 0; ix < CG.size(); ix++) {
-            onerotset.clear();
-            oneshiftset.clear();
-            for (uint k = 0; k < CG[ix].size(); k++) {
-              onerotset.push_back(Ident - ITC_sym_info.sym_mats[insym[CG[ix][k]]]);
-              oneshiftset.push_back(ITCshiftset[k] - translations[CG[ix][k]]);
+          // ===== Need to determine the reconcile the differences in the translations and ITC shift set ===== //
+          //cerr << "match_count: " << match_count << endl;
+          //cerr << "ITC_sym_info.generators[j].size()*(centeringgroups): " << ITC_sym_info.generators[j].size()*(centeringgroups) << endl;
+          if(match_count == ITC_sym_info.generators[j].size() * (centeringgroups)) {
+            if(LDEBUG) {
+              cerr << __AFLOW_FUNC__ << " Generator reduction matches for space group: " << ITC_sym_info.sgindex[j] << endl;
             }
-            //print(oneshiftset);
-            //xb();
-            //print(onerotset);
-            //xb();
-
-            // ===== It becomes a linear algebra problem to solve for a consistent origin shift ===== //
-            vector<double> RHS;
-            vector<xvector<double> > LHS;
-            xvector<double> SOL;
-            for (uint l = 0; l < oneshiftset.size(); l++) {
-              for (int k = 1; k < 4; k++) {
-                RHS.push_back(oneshiftset[l][k]);
-                LHS.push_back(SYM::extract_row(onerotset[l], k));
+            if(LDEBUG) {
+              cerr << __AFLOW_FUNC__ << "GENERATOR REDUCTION MATCH: SG" <<  ITC_sym_info.sgindex[j] << endl;
+              for(uint ix=0;ix<CG.size();ix++){
+                cerr << __AFLOW_FUNC__ << " CG: " << endl;
+                print(CG[ix]);
               }
             }
-            reduction_by_generator_set.push_back(j);
-            if(SYM::solve_overdetermined_system(LHS, RHS, OriginShift, CCell.lattice, CCell.dist_nn_min, CCell.sym_eps)) { //DX20190215 - added sym_eps
+            vector<xvector<double> > oneshiftset;
+            vector<xmatrix<double> > onerotset;
+            for (uint ix = 0; ix < CG.size(); ix++) {
+              onerotset.clear();
+              oneshiftset.clear();
+              for (uint k = 0; k < CG[ix].size(); k++) {
+                onerotset.push_back(Ident - ITC_sym_info.sym_mats[insym[CG[ix][k]]]);
+                oneshiftset.push_back(ITCshiftset[k] - translations[CG[ix][k]]);
+              }
               if(LDEBUG) {
-                cerr << function_name << " Generators and origin shift of space group #" << ITC_sym_info.sgindex[j] << " matched to ITC. Testing Wyckoff positions [dir=" << xstr.directory << "]." << endl;
+                cerr << __AFLOW_FUNC__ << "Set of possible shifts: " << endl;
+                print(oneshiftset);
+                xb();
+                cerr << __AFLOW_FUNC__ << "Set of possible rotations: " << endl;
+                print(onerotset);
+                xb();
               }
 
-              //cerr << "Space Group " << ITC_sym_info.sgindex[j] << endl;
-              //cerr << "ORIGIN SHIFT: " ;
-              //cerr << OriginShift << endl;
-              //xb();
-              spacegroup = ITC_sym_info.sgindex[j];
-              //for(int s=0;s<insym.size();s++){
-              //cerr << "#" << s << " (" << insym[s]+1 << ") " <<  ITC_sym_info.symbol[insym[s]] << " " << dirparam[insym[s]] << "  " <<  translations[s] << endl;
-              //}
-              //cerr << "Indices of centered group operations (refer to above): ";
-              //print(CG[ix]); //indices that define a centered group as in ITC.
-              foundspacegroup = true;
-              //DX20180613 - do not break loop in case we need to check other generators - break;
-            }
-            else {
-              if(LDEBUG) {
-                cerr << function_name << " Generators and origin shift of space group #" << ITC_sym_info.sgindex[j] << " COULD NOT be matched to ITC [dir=" << xstr.directory << "]." << endl;
+              // ===== It becomes a linear algebra problem to solve for a consistent origin shift ===== //
+              vector<double> RHS;
+              vector<xvector<double> > LHS;
+              xvector<double> SOL;
+              for (uint l = 0; l < oneshiftset.size(); l++) {
+                for (int k = 1; k < 4; k++) {
+                  RHS.push_back(oneshiftset[l][k]);
+                  LHS.push_back(SYM::extract_row(onerotset[l], k));
+                }
               }
-            }
-            //DX20180613 - do not break loop in case we need to check other generators - if(foundspacegroup == true) {
-            //DX20180613 - do not break loop in case we need to check other generators -   break;
-            //DX20180613 - do not break loop in case we need to check other generators - }
-            // ***********************************************************************************************************************************
-            // Determine the Wyckoff positions (and verify the space group)
-            // ***********************************************************************************************************************************
-            // This section maps the atoms in the cell to their corresponding Wyckoff positions.  
-            // It is possible that multiple space groups may be consistent with the origin shift.  
-            // Thus, the Wyckoff position seach is an additional check to verify the space group.  If the
-            // Wyckoff positions are inconsistent, then we search the "sgsearch" list for another possible space group candidate.
-            if(foundspacegroup == true) {
-              bool obverse_force_transformed = false;
-              // ===== Group atoms into equivalent atoms (i.e. mapped onto one another by a symmetry operator) ===== //
-              deque<deque<_atom> > equivalent_atoms = SYM::groupSymmetryEquivalentAtoms(atomicbasis, CCell.lattice, pointgroup_mats, translations, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
-              // ===== Once grouped into equivalent atoms, apply the origin shift ===== //
-              deque<deque<_atom> > equivalent_atoms_shifted = SYM::shiftSymmetryEquivalentAtoms(equivalent_atoms, CCell.lattice, OriginShift, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
-
-              // If Rhombohedral, a shift may reveal it is not in the obverse setting
-              if(CCell.lattice_label_ITC == 'R' && !SYM::isObverseSetting(CCell.lattice, equivalent_atoms_shifted, CCell.dist_nn_min, CCell.sym_eps)) { //DX20190215 - added sym_eps
-                // To store the unshifted, simply shift back
-                xvector<double> ReverseOriginShift = -OriginShift;
-                equivalent_atoms = SYM::shiftSymmetryEquivalentAtoms(equivalent_atoms_shifted, CCell.lattice, ReverseOriginShift, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
-                deque<_atom> atoms_tmp;
-                for (uint i = 0; i < equivalent_atoms.size(); i++) {
-                  for (uint j = 0; j < equivalent_atoms[i].size(); j++) {
-                    atoms_tmp.push_back(equivalent_atoms[i][j]);
-                  }
+              reduction_by_generator_set.push_back(j);
+              if(SYM::solve_overdetermined_system(LHS, RHS, OriginShift, CCell.lattice, CCell.dist_nn_min, CCell.sym_eps)) { //DX20190215 - added sym_eps
+                if(LDEBUG) {
+                  cerr << __AFLOW_FUNC__ << " Generators and origin shift of space group #" << ITC_sym_info.sgindex[j] << " matched to ITC. Testing Wyckoff positions [dir=" << xstr.directory << "]." << endl;
                 }
-                atomicbasis = atoms_tmp;
-                CCell.atoms = atoms_tmp;
+
+                //cerr << "Space Group " << ITC_sym_info.sgindex[j] << endl;
+                //cerr << "ORIGIN SHIFT: " ;
+                //cerr << OriginShift << endl;
+                //xb();
+                spacegroup = ITC_sym_info.sgindex[j];
+                //for(int s=0;s<insym.size();s++){
+                //cerr << "#" << s << " (" << insym[s]+1 << ") " <<  ITC_sym_info.symbol[insym[s]] << " " << dirparam[insym[s]] << "  " <<  translations[s] << endl;
+                //}
+                //cerr << "Indices of centered group operations (refer to above): ";
+                //print(CG[ix]); //indices that define a centered group as in ITC.
+                foundspacegroup = true;
+                //DX20180613 - do not break loop in case we need to check other generators - break;
               }
-
-              // =============== Obtain Wyckoff positions from the ITC =============== //
-              stringstream axis_cell;
-              axis_cell.str(std::string());
-              //DX20180806 [OBSOLETE] axis_cell << CCell.lattice_label_ITC << cell_choice;
-              axis_cell << cell_choice; //DX20180806 - use setting
-              if(LDEBUG) { cerr << function_name << " Lattice type (unique axis if specified) and cell choice  : " << axis_cell.str() << endl; }
-              //DX20190215 [OBSOLETE] SYM::initsgs(axis_cell.str());
-              ITC_sym_info.initsgs(axis_cell.str()); //DX20190215
-              //DX20190215 [OBSOLETE]extern vector<string> gl_sgs;
-              //DX20190215 [OBSOLETE]using SYM::gl_sgs;
-              spacegroupstring = ITC_sym_info.gl_sgs[spacegroup - 1];
-              wyckoffmult = SYM::get_multiplicities(spacegroupstring);
-              //print(wyckoffmult);
-              general_wyckoff_position = SYM::findGeneralWyckoffPosition(spacegroupstring, wyckoffmult[1]); //DX20170831
-              wyckoffsymbols = SYM::get_symmetry_symbols(spacegroupstring);
-              //cerr << "WYCKOFFSYMBOLS: " << endl;
-              //print(wyckoffsymbols);
-              //throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,"Throw for debugging purposes.",_GENERIC_ERROR_);
-              //xb();
-
-              // ========== Match equivalent atoms to Wyckoff positions consistent with ITC ========== //
-              vector<int> wyckoffsymbols_mult_index;  //wyckoff symbols with specified multiplicity index
-
-              // ===== Determine minimum enumerated Wyckoff letter set ===== //
-              // There may be variability in the choice of the Wyckoff letters if the multiplicity
-              // and the site symmetry are the same.  We choose the Wyckoff Position scheme with the
-              // smallest Wyckoff lettering combination possible (i.e, sum of enumerated Wyckoff letters
-              // are minimized) --David Hicks.
-
-              vector<xvector<double> > possible_shifts;
-              vector<bool> shift_valid;
-              bool orig_origin_shift = true;
-              bool other_shifts_explored = false;
-              bool final_shift = false;
-              uint origin_shift_index = 0;
-              vector<int> sum_wyckoff_letters;
-
-              while (orig_origin_shift == true || final_shift == false) {
-                // ========== Pick origin shift to test for Wyckoff Positions ========== //
-
-                // === Clear vector variables from previous loop === //
-                wyckoffsymbols_mult_index.clear();
-                wyckoffVariables.clear();
-                wyckoffPositionsVector.clear();
-                woss.str("");
-                wyckoffSymbols.clear();
-
-                // === Scan through all possible origin shifts (original origin shift + ones to minimize wyckoff letters) === //
-                if(other_shifts_explored == false) {
-                  // === If not the original origin shift trial === //
-                  if(possible_shifts.size() > 0) {
-                    if(LDEBUG) {
-                      cerr << function_name << " Exploring possible shifts to find minimum enumerated Wyckoff set. Testing shift "
-                        << origin_shift_index << " (" << origin_shift_index+1 << " of " << possible_shifts.size() << "): "
-                        << possible_shifts[origin_shift_index] << "." << endl;
-                    }
-                    xvector<double> previous_shift;
-                    if(origin_shift_index > 0) {
-                      previous_shift = possible_shifts[origin_shift_index - 1];
-                    }
-                    SYM::shiftWyckoffPositions(equivalent_atoms_shifted, previous_shift, possible_shifts[origin_shift_index]);
-                    //DX20180928 test - SYM::shiftWyckoffPositions(equivalent_atoms_shifted, possible_shifts, origin_shift_index);
-                    origin_shift_index++;
-
-                    // == Signifies when all possible origin shifts have been tested == //
-                    if(origin_shift_index == possible_shifts.size()) {
-                      other_shifts_explored = true;
-                    }
-                  }
-                } 
-                else {
-                  if(LDEBUG) {
-                    cerr << function_name << " Tested (" << possible_shifts.size() << ") possible origin choices. Finding minimum enumerated Wyckoff letters from valid shifts." << endl;
-                  }
-                  //If all possible origin shifts scanned, pick the one with the minimum sum of enumerated Wyckoff letters
-                  int min_wyckoff_config = 0;
-                  int min_wyckoff_sum = sum_wyckoff_letters[0];
-                  for (uint s = 0; s < sum_wyckoff_letters.size(); s++) {
-                    if(min_wyckoff_sum > sum_wyckoff_letters[s] && shift_valid[s]) {
-                      min_wyckoff_config = s;
-                      min_wyckoff_sum = sum_wyckoff_letters[s];
-                    }
-                  }
-                  xvector<double> shift_for_min_wyckoff_config;
-                  if(min_wyckoff_config > 0) {
-                    shift_for_min_wyckoff_config = possible_shifts[min_wyckoff_config-1];
-                    OriginShift = OriginShift + shift_for_min_wyckoff_config; //DX NEW
-                  }
-                  SYM::shiftWyckoffPositions(equivalent_atoms_shifted, possible_shifts[origin_shift_index-1], shift_for_min_wyckoff_config);
-                  final_shift = true;
+              else {
+                if(LDEBUG) {
+                  cerr << __AFLOW_FUNC__ << " Generators and origin shift of space group #" << ITC_sym_info.sgindex[j] << " COULD NOT be matched to ITC [dir=" << xstr.directory << "]." << endl;
                 }
-                // Find the Wyckoff positions in the ITC standard representation
-                //perhaps change findWyckoffPositions to mapEquivalentAtomsToWyckoffPositions
-                found_all_wyckoff = SYM::findWyckoffPositions(CCell, atomicbasis, tmpvvvstring, equivalent_atoms, equivalent_atoms_shifted, 
-                    foundspacegroup, spacegroupstring, orig_origin_shift, OriginShift, 
-                    wyckoffmult, wyckoffsymbols, wyckoffVariables, wyckoffPositionsVector, 
-                    wyckoffSymbols, woss, obverse_force_transformed);
-                shift_valid.push_back(found_all_wyckoff);
-                if(found_all_wyckoff == false && orig_origin_shift == true) {
-                  foundspacegroup=false;
-                  break;
-                } else if(found_all_wyckoff == false && orig_origin_shift == false) {
-                  sum_wyckoff_letters.push_back(100);
-                  continue;
-                }
-                // ===== Determine multiplicity, letters, and site symmetry in WYCCAR ===== //
-                // This allows us to investigate if there are other Wyckoff positions corresponding to the
-                // ones in the POSCAR which will find the "lowest" Wyckoff letter enumeration scheme
+              }
+              //DX20180613 - do not break loop in case we need to check other generators - if(foundspacegroup == true) {
+              //DX20180613 - do not break loop in case we need to check other generators -   break;
+              //DX20180613 - do not break loop in case we need to check other generators - }
+              // ***********************************************************************************************************************************
+              // Determine the Wyckoff positions (and verify the space group)
+              // ***********************************************************************************************************************************
+              // This section maps the atoms in the cell to their corresponding Wyckoff positions.  
+              // It is possible that multiple space groups may be consistent with the origin shift.  
+              // Thus, the Wyckoff position seach is an additional check to verify the space group.  If the
+              // Wyckoff positions are inconsistent, then we search the "sgsearch" list for another possible space group candidate.
+              if(foundspacegroup == true) {
+                bool obverse_force_transformed = false;
+                // ===== Group atoms into equivalent atoms (i.e. mapped onto one another by a symmetry operator) ===== //
+                deque<deque<_atom> > equivalent_atoms = SYM::groupSymmetryEquivalentAtoms(atomicbasis, CCell.lattice, pointgroup_mats, translations, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
+                // ===== Once grouped into equivalent atoms, apply the origin shift ===== //
+                deque<deque<_atom> > equivalent_atoms_shifted = SYM::shiftSymmetryEquivalentAtoms(equivalent_atoms, CCell.lattice, OriginShift, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
 
-                // ===== Extract Wyckoff info ===== 
-                vector<int> wyckoff_mult;
-                vector<string> wyckoff_letter;
-                vector<string> wyckoff_site_sym;
-                for (uint w = 0; w < wyckoffSymbols.size(); w++) {
-                  //cerr << "wyckoffSymbols: " << wyckoffSymbols[w] << endl;
-                  vector<string> tokens;
-                  aurostd::string2tokens(wyckoffSymbols[w], tokens, " ");
-                  if(tokens.size()==3){
-                    wyckoff_mult.push_back(aurostd::string2utype<int>(tokens[0]));
-                    wyckoff_letter.push_back(tokens[1]);
-                    wyckoff_site_sym.push_back(tokens[2]);
+                // If Rhombohedral, a shift may reveal it is not in the obverse setting
+                if(CCell.lattice_label_ITC == 'R' && !SYM::isObverseSetting(CCell.lattice, equivalent_atoms_shifted, CCell.dist_nn_min, CCell.sym_eps)) { //DX20190215 - added sym_eps
+                  // To store the unshifted, simply shift back
+                  xvector<double> ReverseOriginShift = -OriginShift;
+                  equivalent_atoms = SYM::shiftSymmetryEquivalentAtoms(equivalent_atoms_shifted, CCell.lattice, ReverseOriginShift, CCell.dist_nn_min, CCell.sym_eps); //DX20190215 - added sym_eps
+                  deque<_atom> atoms_tmp;
+                  for (uint i = 0; i < equivalent_atoms.size(); i++) {
+                    for (uint j = 0; j < equivalent_atoms[i].size(); j++) {
+                      atoms_tmp.push_back(equivalent_atoms[i][j]);
+                    }
                   }
+                  atomicbasis = atoms_tmp;
+                  CCell.atoms = atoms_tmp;
                 }
 
-                // ===== Calculate the sum of the enumerated wyckoff letters ===== //
-                sum_wyckoff_letters.push_back(aurostd::sum(SYM::enumerate_wyckoff_letters(wyckoff_letter)));
+                // =============== Obtain Wyckoff positions from the ITC =============== //
+                stringstream axis_cell;
+                axis_cell.str(std::string());
+                //DX20180806 [OBSOLETE] axis_cell << CCell.lattice_label_ITC << cell_choice;
+                axis_cell << cell_choice; //DX20180806 - use setting
+                if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Lattice type (unique axis if specified) and cell choice  : " << axis_cell.str() << endl; }
+                //DX20190215 [OBSOLETE] SYM::initsgs(axis_cell.str());
+                ITC_sym_info.initsgs(axis_cell.str()); //DX20190215
+                //DX20190215 [OBSOLETE]extern vector<string> gl_sgs;
+                //DX20190215 [OBSOLETE]using SYM::gl_sgs;
+                spacegroupstring = ITC_sym_info.gl_sgs[spacegroup - 1];
+                wyckoffmult = SYM::get_multiplicities(spacegroupstring);
+                //print(wyckoffmult);
+                general_wyckoff_position = SYM::findGeneralWyckoffPosition(spacegroupstring, wyckoffmult[1]); //DX20170831
+                wyckoffsymbols = SYM::get_symmetry_symbols(spacegroupstring);
+                //cerr << "WYCKOFFSYMBOLS: " << endl;
+                //print(wyckoffsymbols);
+                //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Throw for debugging purposes.",_GENERIC_ERROR_);
+                //xb();
 
-                // ===== If we have performed the original origin shift, now check the other possibilites ===== //
-                if(orig_origin_shift == true) {
-                  orig_origin_shift = false;
+                // ========== Match equivalent atoms to Wyckoff positions consistent with ITC ========== //
+                vector<int> wyckoffsymbols_mult_index;  //wyckoff symbols with specified multiplicity index
 
-                  // ===== Identify minimum enumerated Wyckoff letter occuring in structure ===== // 
-                  int min_enumerated_letter = 1e9;
-                  int min_multiplicity = 1e9;
-                  string min_letter;
-                  string min_site_sym;
-                  for (uint w = 0; w < wyckoff_mult.size(); w++) {
-                    int enumerated_letter = SYM::enumerate_wyckoff_letter(wyckoff_letter[w]);
-                    if(enumerated_letter < min_enumerated_letter){
-                      min_multiplicity = wyckoff_mult[w];
-                      min_letter = wyckoff_letter[w];
-                      min_site_sym = wyckoff_site_sym[w];
-                      min_enumerated_letter = enumerated_letter;
+                // ===== Determine minimum enumerated Wyckoff letter set ===== //
+                // There may be variability in the choice of the Wyckoff letters if the multiplicity
+                // and the site symmetry are the same.  We choose the Wyckoff Position scheme with the
+                // smallest Wyckoff lettering combination possible (i.e, sum of enumerated Wyckoff letters
+                // are minimized) --David Hicks.
+
+                vector<xvector<double> > possible_shifts;
+                vector<bool> shift_valid;
+                bool orig_origin_shift = true;
+                bool other_shifts_explored = false;
+                bool final_shift = false;
+                uint origin_shift_index = 0;
+                vector<int> sum_wyckoff_letters;
+                vector<vector<int> > all_enumerated_wyckoff_letters; //DX20221103
+
+                while (orig_origin_shift == true || final_shift == false) {
+                  // ========== Pick origin shift to test for Wyckoff Positions ========== //
+
+                  // === Clear vector variables from previous loop === //
+                  wyckoffsymbols_mult_index.clear();
+                  wyckoffVariables.clear();
+                  wyckoffPositionsVector.clear();
+                  woss.str("");
+                  wyckoffSymbols.clear();
+
+                  // === Scan through all possible origin shifts (original origin shift + ones to minimize wyckoff letters) === //
+                  if(other_shifts_explored == false) {
+                    // === If not the original origin shift trial === //
+                    if(possible_shifts.size() > 0) {
+                      if(LDEBUG) {
+                        cerr << __AFLOW_FUNC__ << " Exploring possible shifts to find minimum enumerated Wyckoff set. Testing shift "
+                          << origin_shift_index << " (" << origin_shift_index+1 << " of " << possible_shifts.size() << "): "
+                          << possible_shifts[origin_shift_index] << "." << endl;
+                      }
+                      //[DX20221001 - OBSOLETE]// if shift is zero, skip
+                      //[DX20221001 - OBSOLETE]if(aurostd::iszero(possible_shifts[origin_shift_index])) {
+                      //[DX20221001 - OBSOLETE]  origin_shift_index++;
+                      //[DX20221001 - OBSOLETE]  if(origin_shift_index == possible_shifts.size()) {
+                      //[DX20221001 - OBSOLETE]    other_shifts_explored = true;
+                      //[DX20221001 - OBSOLETE]  }
+                      //[DX20221001 - OBSOLETE]  if(LDEBUG) {
+                      //[DX20221001 - OBSOLETE]    cerr << "SYM::SpaceGroup_ITC: Skipping shift of zero (already checked)." << endl;
+                      //[DX20221001 - OBSOLETE]  }
+                      //[DX20221001 - OBSOLETE]  continue;
+                      //[DX20221001 - OBSOLETE]}
+
+                      xvector<double> previous_shift;
+                      if(origin_shift_index > 0) {
+                        previous_shift = possible_shifts[origin_shift_index - 1];
+                      }
+                      SYM::shiftWyckoffPositions(equivalent_atoms_shifted, previous_shift, possible_shifts[origin_shift_index]);
+                      //DX20180928 test - SYM::shiftWyckoffPositions(equivalent_atoms_shifted, possible_shifts, origin_shift_index);
+                      origin_shift_index++;
+
+                      // == Signifies when all possible origin shifts have been tested == //
+                      if(origin_shift_index == possible_shifts.size()) {
+                        other_shifts_explored = true;
+                      }
                     }
-                  }
-
-                  // ===== Determine current Wyckoff lettering enumeration ===== //
-                  vector<int> found_enumerated_Wyckoff_numbers = SYM::enumerate_wyckoff_letters(wyckoff_letter);
-                  int sum_enumerated_found_letters = aurostd::sum(found_enumerated_Wyckoff_numbers);
-
-                  // ===== Determine minimum Wyckoff lettering enumeration ===== //
-                  vector<string> minimum_enumerated_Wyckoff_letters = SYM::get_minimum_enumerated_Wyckoff_letters(spacegroupstring, wyckoff_mult, wyckoff_site_sym);
-                  vector<int> minimum_enumerated_Wyckoff_numbers = SYM::enumerate_wyckoff_letters(minimum_enumerated_Wyckoff_letters);
-                  int minimum_scheme_sum = aurostd::sum(minimum_enumerated_Wyckoff_numbers);
-
-                  // ===== If we do not have the minimum enumerated Wyckoff letter set, check possible origin shifts ===== //
-                  if(sum_enumerated_found_letters > minimum_scheme_sum) {
-                    if(LDEBUG) {
-                      cerr << function_name << " Enumerated Wyckoff letters is not minimized; check origin shifts." << endl;
-                    }
-                    possible_shifts = SYM::get_possible_origin_shifts(spacegroupstring, min_multiplicity, min_site_sym);
-                  }
+                  } 
                   else {
+                    if(LDEBUG) {
+                      cerr << __AFLOW_FUNC__ << " Tested (" << possible_shifts.size() << ") possible origin choices. Finding minimum enumerated Wyckoff letters from valid shifts." << endl;
+                    }
+                    //If all possible origin shifts scanned, pick the one with the minimum sum of enumerated Wyckoff letters
+                    int min_wyckoff_config = 0;
+                    //DX20220828 - int min_wyckoff_sum = sum_wyckoff_letters[0];
+                    min_wyckoff_sum = sum_wyckoff_letters[0]; //DX20220828
+                    min_Wyckoff_numbers = all_enumerated_wyckoff_letters[0]; //DX20220828
+                    for (uint s = 0; s < sum_wyckoff_letters.size(); s++) {
+                      if(LDEBUG) { cerr << __AFLOW_FUNC__ << "shift_valid[s]=" << shift_valid[s] << " sum_wyckoff_letters[s]=" << aurostd::joinWDelimiter(all_enumerated_wyckoff_letters[s], ",") << endl; }
+                      if((min_wyckoff_sum > sum_wyckoff_letters[s] && shift_valid[s]) || 
+                        (min_wyckoff_sum==sum_wyckoff_letters[s] && all_enumerated_wyckoff_letters[s]<min_Wyckoff_numbers)) //DX20221110 - added tie-breaker
+                      {
+                        min_wyckoff_config = s;
+                        min_wyckoff_sum = sum_wyckoff_letters[s];
+                        min_Wyckoff_numbers = all_enumerated_wyckoff_letters[s];
+                      }
+                    }
+                    xvector<double> shift_for_min_wyckoff_config;
+                    if(min_wyckoff_config > 0) {
+                      shift_for_min_wyckoff_config = possible_shifts[min_wyckoff_config-1];
+                      OriginShift = OriginShift + shift_for_min_wyckoff_config; //DX NEW
+                    }
+                    SYM::shiftWyckoffPositions(equivalent_atoms_shifted, possible_shifts[origin_shift_index-1], shift_for_min_wyckoff_config);
                     final_shift = true;
                   }
+                  // Find the Wyckoff positions in the ITC standard representation
+                  //perhaps change findWyckoffPositions to mapEquivalentAtomsToWyckoffPositions
+                  found_all_wyckoff = SYM::findWyckoffPositions(CCell, atomicbasis, tmpvvvstring, equivalent_atoms, equivalent_atoms_shifted, 
+                      foundspacegroup, spacegroupstring, orig_origin_shift, OriginShift, 
+                      wyckoffmult, wyckoffsymbols, wyckoffVariables, wyckoffPositionsVector, 
+                      wyckoffSymbols, woss, obverse_force_transformed);
+                  shift_valid.push_back(found_all_wyckoff);
+                  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Shift is valid ? : " << found_all_wyckoff << endl; }
+                  if(found_all_wyckoff == false && orig_origin_shift == true) {
+                    foundspacegroup=false;
+                    break;
+                  } else if(found_all_wyckoff == false && orig_origin_shift == false) {
+                    sum_wyckoff_letters.push_back(AUROSTD_MAX_INT); //DX20220827 - changed from 100 to AUROSTD_MAX_DOUBLE
+                    vector<int> vec_int_tmp;
+                    all_enumerated_wyckoff_letters.push_back(vec_int_tmp); //DX20221103 
+                    continue;
+                  }
+                  // ===== Determine multiplicity, letters, and site symmetry in WYCCAR ===== //
+                  // This allows us to investigate if there are other Wyckoff positions corresponding to the
+                  // ones in the POSCAR which will find the "lowest" Wyckoff letter enumeration scheme
+                  // ===== Extract Wyckoff info =====
+                  vector<GroupedWyckoffPosition> grouped_Wyckoff_positions_structure;
+                  vector<wyckoffsite_ITC> sorted_Wyckoff_sites = wyckoffVariables;
+                  std::sort(sorted_Wyckoff_sites.begin(), sorted_Wyckoff_sites.end(), sortWyckoffByLetter); //DX20221201 - need to sort for tie-breaker
+                  std::sort(sorted_Wyckoff_sites.begin(), sorted_Wyckoff_sites.end(), sortWyckoffByType); //DX20221201 - need to sort for tie-breaker
+                  compare::groupWyckoffPositions(sorted_Wyckoff_sites, grouped_Wyckoff_positions_structure);
+                  if(LDEBUG) {
+                    string Wyckoff_string_structure = anrl::groupedWyckoffPosition2ANRLString(grouped_Wyckoff_positions_structure, true);
+                    cerr << __AFLOW_FUNC__ << "Wyckoff_string_structure=" << Wyckoff_string_structure << endl;
+                  }
+                  vector<int> wyckoff_mult;
+                  vector<string> wyckoff_letter;
+                  vector<string> wyckoff_site_sym;
+
+                  // ---------------------------------------------------------------------------
+                  // Store the wyckoff information into vectors
+                  // DX20221201 - updated the loop below to use the sorted/grouped Wyckoff positions
+                  // (sorting is required to find the minimum enumerated Wyckoff set)
+                  for (uint w = 0; w < grouped_Wyckoff_positions_structure.size(); w++) {
+                    for (uint x = 0; x < grouped_Wyckoff_positions_structure[w].multiplicities.size(); x++) {
+                      wyckoff_mult.push_back(grouped_Wyckoff_positions_structure[w].multiplicities[x]);
+                      wyckoff_letter.push_back(grouped_Wyckoff_positions_structure[w].letters[x]);
+                      wyckoff_site_sym.push_back(grouped_Wyckoff_positions_structure[w].site_symmetries[x]);
+                    }
+                  }
+
+                  // ===== Calculate the sum of the enumerated wyckoff letters ===== //
+                  vector<int> enumerated_wyckoff_letters = SYM::enumerate_wyckoff_letters(wyckoff_letter); //DX20221103
+                  sum_wyckoff_letters.push_back(aurostd::sum(enumerated_wyckoff_letters));
+                  all_enumerated_wyckoff_letters.push_back(enumerated_wyckoff_letters); //DX20221103
+
+                  // ===== If we have performed the original origin shift, now check the other possibilites ===== //
+                  if(orig_origin_shift == true) {
+                    orig_origin_shift = false;
+
+                    // ===== Identify minimum enumerated Wyckoff letter occuring in structure ===== // 
+                    int min_enumerated_letter = 1e9;
+                    int min_multiplicity = 1e9;
+                    string min_letter;
+                    string min_site_sym;
+                    for (uint w = 0; w < wyckoff_mult.size(); w++) {
+                      int enumerated_letter = SYM::enumerate_wyckoff_letter(wyckoff_letter[w]);
+                      if(enumerated_letter < min_enumerated_letter){
+                        min_multiplicity = wyckoff_mult[w];
+                        min_letter = wyckoff_letter[w];
+                        min_site_sym = wyckoff_site_sym[w];
+                        min_enumerated_letter = enumerated_letter;
+                      }
+                    }
+
+                    // ===== Determine current Wyckoff lettering enumeration ===== //
+                    vector<int> found_enumerated_Wyckoff_numbers = SYM::enumerate_wyckoff_letters(wyckoff_letter);
+                    int sum_enumerated_found_letters = aurostd::sum(found_enumerated_Wyckoff_numbers);
+
+                    // ===== Determine minimum Wyckoff lettering enumeration (only need to do this once) ===== //
+                    if(minimum_scheme_sum==1e9) {
+                      vector<string> minimum_enumerated_Wyckoff_letters = SYM::get_minimum_enumerated_Wyckoff_letters(spacegroupstring, wyckoff_mult, wyckoff_site_sym);
+                      vector<int> minimum_enumerated_Wyckoff_numbers = SYM::enumerate_wyckoff_letters(minimum_enumerated_Wyckoff_letters);
+                      //int minimum_scheme_sum = aurostd::sum(minimum_enumerated_Wyckoff_numbers);
+                      minimum_scheme_sum = aurostd::sum(minimum_enumerated_Wyckoff_numbers); //DX20220828
+                    }
+
+                    // ===== If we do not have the minimum enumerated Wyckoff letter set, check possible origin shifts ===== //
+                    if(LDEBUG){ cerr << __AFLOW_FUNC__ << "SYM::SpaceGroup_ITC: minimum_scheme_sum=" << minimum_scheme_sum << " vs current=" << sum_enumerated_found_letters << endl; }
+                    if(sum_enumerated_found_letters >= minimum_scheme_sum) { //DX20221127 - added = condition, keep this condition in case we want to skip it later
+                      if(LDEBUG) {
+                        cerr << __AFLOW_FUNC__ << " Enumerated Wyckoff letters is not minimized; check origin shifts." << endl;
+                      }
+                      possible_shifts = SYM::get_possible_origin_shifts(spacegroupstring, min_multiplicity, min_site_sym);
+                      min_wyckoff_sum = sum_enumerated_found_letters; //DX20230112
+                      min_Wyckoff_numbers = found_enumerated_Wyckoff_numbers; //DX20230110
+                    }
+                    else {
+                      final_shift = true;
+                      min_wyckoff_sum = sum_enumerated_found_letters; //DX20220828
+                      min_Wyckoff_numbers = found_enumerated_Wyckoff_numbers; //DX20230110
+                    }
+                  }
                 }
               }
-            }
-            if(foundspacegroup == true && found_all_wyckoff == true) { //DX20180613 - moved generator loop
-              break; //DX20180613 - moved generator loop
+              if(foundspacegroup == true && found_all_wyckoff == true) { //DX20180613 - moved generator loop
+                break; //DX20180613 - moved generator loop
+              } //DX20180613 - moved generator loop
             } //DX20180613 - moved generator loop
           } //DX20180613 - moved generator loop
-        } //DX20180613 - moved generator loop
+          if(foundspacegroup == true && found_all_wyckoff == true) {
+            break;
+          }
+        }
         if(foundspacegroup == true && found_all_wyckoff == true) {
           break;
         }
       }
-      if(foundspacegroup == true && found_all_wyckoff == true) {
-        break;
+      //cerr << "SPACEGROUP:: " <<spacegroup << endl;
+      if(foundspacegroup == true) {
+        if(LDEBUG) {
+          cerr << "SYM::SpaceGroup_ITC: spacegroup=" << spacegroup << " iterate=" << iterate << " : min_wyckoff_sum=" << min_wyckoff_sum << " vs global=" << global_min_wyckoff_sum << " (spacegroup_global=" << spacegroup_global << ")" <<  endl;
+          cerr << "SYM::SpaceGroup_ITC: min_Wyckoff_numbers: " << min_Wyckoff_numbers.size() << " " << aurostd::joinWDelimiter(min_Wyckoff_numbers,",") << endl;
+          cerr << "SYM::SpaceGroup_ITC: global_min_Wyckoff_numbers: size=" << global_min_Wyckoff_numbers.size() << " enumerations=" << aurostd::joinWDelimiter(global_min_Wyckoff_numbers,",") << endl;
+        }
+        foundspacegroup_global = true;
+        //spacegroup_global = spacegroup;
+        if(spacegroup_global == 0) { spacegroup_global = spacegroup; } //DX20221229
+        foundspacegroup = false;
+        //if(min_wyckoff_sum<global_min_wyckoff_sum || 
+        if(spacegroup >= spacegroup_global &&
+            (min_wyckoff_sum<global_min_wyckoff_sum || 
+           (min_wyckoff_sum==global_min_wyckoff_sum && global_min_Wyckoff_numbers.size()>0 && min_Wyckoff_numbers<global_min_Wyckoff_numbers))
+        ) { //DX20221103 - added tie-breaker
+          // update minimum Wyckoff sum
+          spacegroup_global = spacegroup; //DX20221229
+          global_min_wyckoff_sum = min_wyckoff_sum;
+          global_min_Wyckoff_numbers = min_Wyckoff_numbers; //DX20221103
+          // update CCell
+          CCell_Wyckoff_min = CCell;
+          // update Wyckoff info
+          wyckoffmult_min = wyckoffmult;
+          wyckoffsymbols_min = wyckoffsymbols;
+          wyckoffPositionsVector_min = wyckoffPositionsVector;
+          wyckoffSymbols_min = wyckoffSymbols;
+          wyckoffVariables_min = wyckoffVariables;
+          tmpvvvstring_min = tmpvvvstring;
+          woss_min.str(""); woss_min << woss.str(); //DX+KC20221103 - added woss_min for aflow --wyckoff --print=json
+          // update shifts
+          OriginShift_Wyckoff_min = OriginShift;
+        }
+        if(iterate == (int)candidate_lattice_vectors_prev.size()-1) {//DX20221201 [do not stop searching once minimum Wyckoff sequence is found - need to keep searching to get most alphabetical from left to right] 
+          tested_all_lattices = true;
+          foundspacegroup = true;
+          spacegroup = spacegroup_global;
+          CCell = CCell_Wyckoff_min;
+          // update Wyckoff info
+          wyckoffmult = wyckoffmult_min;
+          wyckoffsymbols = wyckoffsymbols_min;
+          wyckoffPositionsVector = wyckoffPositionsVector_min;
+          wyckoffSymbols = wyckoffSymbols_min;
+          wyckoffVariables = wyckoffVariables_min;
+          tmpvvvstring = tmpvvvstring_min;
+          woss.str(""); woss << woss_min.str(); //DX+KC20221103 - added woss_min for aflow --wyckoff --print=json
+          // update shifts
+          OriginShift = OriginShift_Wyckoff_min;
+        }
+        // loop through conventional lattices
+        // else continue looking
       }
-    }
-    //cerr << "SPACEGROUP:: " <<spacegroup << endl;
-    if(foundspacegroup == true) {
-      break;
-    } 
+    } // end of tested_all_lattices
   }
-  if(foundspacegroup == false) {
+  if(foundspacegroup_global == false) { //DX20220827 - changed from foundspacegroup to foundspacegroup_global
     message << "Failed to find WYCKOFF POSITIONS, ORIGIN SHIFT, or inconsistent number of GENERATORS [dir=" << (*this).directory << "].";
-    throw aurostd::xerror(_AFLOW_FILE_NAME_,function_name,message,_RUNTIME_ERROR_);
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
   }
 
-  if(LDEBUG) { cerr << function_name << " Tolerance used to obtain this space group: " << CCell.sym_eps << " [dir=" << xstr.directory << "]." << endl; } //DX20190215 - _SYM_TOL_ to CCell.sym_eps
+  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Tolerance used to obtain this space group: " << CCell.sym_eps << " [dir=" << xstr.directory << "]." << endl; } //DX20190215 - _SYM_TOL_ to CCell.sym_eps
   if(CCell.sym_eps != use_tol) { //DX20190215 - _SYM_TOL_ to CCell.sym_eps
     //cerr << "TOL: " << CCell.sym_eps << endl; //DX20190215 - _SYM_TOL to CCell.sym_eps
     use_tol = CCell.sym_eps; //DX20190215 - _SYM_TOL to CCell.sym_eps
@@ -4303,6 +4475,10 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   (*this).origin_ITC = OriginShift; //DX20170830 - SGDATA
   (*this).general_position_ITC = general_wyckoff_position; //DX20170830 - SGDATA
   //cerr << "TOLERANCE USED: " << (*this).sym_eps << endl; //DX20190215 - _SYM_TOL to (*this).sym_eps
+  
+  // convert iomode to original format
+  (*this).iomode = iomode_tmp;
+  
   return (uint)spacegroup;
 }
 
@@ -4461,6 +4637,6 @@ namespace SYM {
 // d.hicks@duke.edu
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

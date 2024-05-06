@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 // Stefano Curtarolo
@@ -85,6 +85,33 @@ namespace aurostd {
     return aurostd::PaddedPRE(sss,16,"0");
   }
 
+  /// @brief convert a crc64 hash (uint64_t) to a compact human readable string
+  /// @param crc hash result (or other uint64_t)
+  /// @param width number of characters
+  /// @note if the given crc is too small the result is padded with the first entry in aurostd::human_alphanum_choices
+  /// @note if width is zero the max length string is returned without padding
+  /// @authors
+  /// @mod{HE,20230221,created}
+  string crc2human(const uint64_t crc, const uint width){
+    string result = "";
+    uint64_t work = crc;
+    while (work > 0) {
+      result += human_alphanum_choices[work % human_alphanum_choices.size()];
+      work = work / human_alphanum_choices.size();
+      if (width>0 && result.size()>=width) break;
+    }
+    if (result.size() < width) result.insert(result.size(), width - result.size(), human_alphanum_choices[0]);
+    return result;
+  }
+
+  /// @brief uses crc64 to create a compact human readable hash string
+  /// @param crc hash result (or other uint64_t)
+  /// @param width number of characters
+  /// @note if width is zero the max length string is returned without padding
+  string crc2human(const string & input, const uint width) {
+    return crc2human(crc64(input), width);
+  }
+
   /* Test main */
   int crc64_main(void) {
     //  printf("e9c6d914c4b8d9ca == %016llx\n",(unsigned long long) aurostd::crc64(0,(unsigned char*)"123456789",9));
@@ -100,7 +127,7 @@ namespace aurostd {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 

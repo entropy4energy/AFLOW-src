@@ -1,6 +1,6 @@
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
 
@@ -112,7 +112,6 @@ namespace apennsy_std {
       const char* _superlatt,
       const char* _proto,
       bool VERB) {
-    string soliloquy=XPID+"apennsy_std::read_VASPIN():";
     stringstream message;
     ifstream File,FileResult;
     ofstream FileOut;
@@ -139,7 +138,7 @@ namespace apennsy_std {
       if(VERB) cerr << "FILE=[" << FileName << "]" << "  ";
       File.open(FileName.c_str(),std::ios::in);
       if(!File.good()) {
-        throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,"file not found: "+FileName,_FILE_CORRUPT_); //CO20200624
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"file not found: "+FileName,_FILE_CORRUPT_); //CO20200624
       }
     }
     { // GET AA and BB NUMBERS
@@ -165,15 +164,15 @@ namespace apennsy_std {
     }
     if(AA>APENNSY_AAmax) {
       message << "AA>Amax: " << AA << ">" << APENNSY_AAmax;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
     }
     if(BB>APENNSY_BBmax) {
       message << "BB>Bmax: " << BB << ">" << APENNSY_BBmax;
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
     }
     if(BB>0 && BB<AA) {
       message << "BB<AA";
-      throw aurostd::xerror(_AFLOW_FILE_NAME_,soliloquy,message,_INPUT_ILLEGAL_); //CO20200624
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_); //CO20200624
     }
     Cb=(double) BB/(AA+BB);
     { // FORMULA
@@ -1367,6 +1366,6 @@ namespace apennsy_std {
 
 // ***************************************************************************
 // *                                                                         *
-// *           Aflow STEFANO CURTAROLO - Duke University 2003-2021           *
+// *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************

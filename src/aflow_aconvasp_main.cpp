@@ -309,6 +309,7 @@ uint PflowARGs(vector<string> &argv,vector<string> &cmds,aurostd::xoption &vpflo
       }
     }
     vpflow.args2addattachedscheme(argv,cmds,"PFLOW::LOAD_LIBRARY","--load_library=|--loadlibrary=|--ll=","");  //get libraries to load
+    vpflow.args2addattachedscheme(argv,cmds,"CHULL::LOAD_ENTRIES_FROM_FILE","--load_entries_from_file=|--load_file=","");  //get libraries to load //CO20240502
     vpflow.args2addattachedscheme(argv,cmds,"CHULL::NEGLECT","--neglect=|--ban=",""); //remove by auid from chull calculation
     vpflow.flag("CHULL::SEE_NEGLECT",aurostd::args2flag(argv,cmds,"--see_neglect|--seeneglect|--sn")); //see why compounds get neglected
     vpflow.args2addattachedscheme(argv,cmds,"CHULL::REMOVE_EXTREMA","--remove_extreme_points=|--removeextremepoints=|--remove_extrema=|--removeextrema=|--rep=","");   //set threshold, from bottom for enthalpy of formation, from top for entropic temperature, units of meV OR K

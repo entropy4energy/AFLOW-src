@@ -1,5 +1,6 @@
 3.2.15 - 2024/XX/XX
         Location: https://github.com/entropy4energy/AFLOW-src/releases/tag/v3.2.15
+        -- fixed broken parser for APL Born effective charges (XX)
         -- rearranged QHA code to enable calculation of thermodynamic properties if isEOS and isQHA (CO)
         -- adding --load_entries_from_file to CHULL (CO)
 3.2.14 - 2023/10/25

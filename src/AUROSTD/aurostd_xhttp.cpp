@@ -128,6 +128,11 @@ namespace aurostd {
     return result;
   }
 
+  string httpJoinURL(const xURL& url){  //CO20221209
+    return url.scheme+"://"+url.host+url.path+url.query;  //CO+WJ20231006 - removing strange characters in the path OR the query
+    //deal with port later... need a bool to tell if a port was there originally (:)
+  }
+
   /// @brief build a new xURL struct from a redirect location
   /// @param base_url url that initiated the redirection
   /// @param new_location new location - url or path (absolute or relative)
@@ -186,6 +191,13 @@ namespace aurostd {
     pos_newline_border = response.find(delimiter + delimiter);
     header_raw = response.substr(0, pos_newline_border);
     response.erase(0, pos_newline_border + offset + offset);
+    if(pos_newline_border==string::npos){response.clear();} //CO20221209 - this means the response is null
+
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " pos_newline_border=" << pos_newline_border << endl;
+      cerr << __AFLOW_FUNC__ << " header_raw=" << endl << "\"" << header_raw << "\"" << endl;
+      cerr << __AFLOW_FUNC__ << " response=" << endl << "\"" << response << "\"" << endl;
+    }
 
     // check if Transfer-Encoding is chunked
     bool isChunked = ( header_raw.find("chunked") != std::string::npos );
@@ -200,6 +212,8 @@ namespace aurostd {
     pos_newline_border = status_line.find(' ', split + 1);
     status_code = aurostd::string2utype<uint>(status_line.substr(split, pos_newline_border - split));
 
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " status_code=" << status_code << endl;}
+
     // extract the header data
     std::string key = "";
     std::string item = "";
@@ -207,7 +221,7 @@ namespace aurostd {
       split = header_raw.find(':');
       pos_newline_border = header_raw.find(delimiter);
       if (pos_newline_border != std::string::npos) {
-        header_raw.substr(0, split);
+        //[CO2023119 - does nothing, must have been for the key below]header_raw.substr(0, split);
         // Header field name are case-insensitive
         key = aurostd::tolower(header_raw.substr(0, split));
         item = aurostd::RemoveWhiteSpacesFromTheFrontAndBack(header_raw.substr(split + 1, pos_newline_border - split - 1));
@@ -224,6 +238,7 @@ namespace aurostd {
 
     // in HTTP1.1 data is mostly sent in chunks
     if (isChunked) {
+      output.clear(); //WJ20231025 Clear output var (otherwise response gets added twice later)
       size_t chuck_length = 0;
       while (!response.empty() && chunk_length_octet != "0") {
         pos_newline_border = response.find(delimiter);
@@ -313,13 +328,15 @@ namespace aurostd {
     unsigned long loaded_bytes = 0;
 
     // build request and save its length
-    request_len = asprintf(&request, request_template, (url.path + url.query).c_str(), url.host.c_str(), AFLOW_VERSION);
+    request_len = asprintf(&request, request_template, (url.path + url.query).c_str(), url.host.c_str(), AFLOW_VERSION);  //CO20231228 - valgrind reports memory leak here because there is no free(request)
 
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " request:" << endl << "---request begin---" << endl << request << endl << "---request end---" << endl;}
 
     // get the TCP protocol entry
     protocol_entry = getprotobyname("tcp");
     if (protocol_entry == nullptr) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to get TCP protocol entry!" << endl;
+      free(request);  //CO20231228 - freeing memory from asprintf() above
       return false;
     }
 
@@ -327,6 +344,7 @@ namespace aurostd {
     socket_file_descriptor = socket(AF_INET, SOCK_STREAM, protocol_entry->p_proto);
     if (socket_file_descriptor == -1) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to open socket!" << endl;
+      free(request);  //CO20231228 - freeing memory from asprintf() above
       return false;
     }
 
@@ -334,16 +352,19 @@ namespace aurostd {
     host_entry = gethostbyname(url.host.c_str());
     if (host_entry == nullptr) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to find information on '" << url.host << "'!" << endl;
+      free(request);  //CO20231228 - freeing memory from asprintf() above
       return false;
     }
 
     ip_address = (*(struct in_addr *) *(host_entry->h_addr_list)).s_addr;
     ip_address_str = httpGetIP4String(ip_address);
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " ip_address_str=" << ip_address_str << endl;}
 
     socket_entry.sin_addr.s_addr = ip_address;
     socket_entry.sin_family = AF_INET;
     if (url.port > 65535) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to connect to " << url.host << " as port is out of range (" << url.port << ">65535)" << endl;
+      free(request);  //CO20231228 - freeing memory from asprintf() above
       return false;
     }
     socket_entry.sin_port = htons((short) url.port);
@@ -351,6 +372,7 @@ namespace aurostd {
     // start connection
     if (connect(socket_file_descriptor, (struct sockaddr *) &socket_entry, sizeof(socket_entry)) == -1) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to connect to " << url.host << " (" << ip_address_str << ":" << url.port << ")" << endl;
+      free(request);  //CO20231228 - freeing memory from asprintf() above
       return false;
     }
     if (LDEBUG)
@@ -362,11 +384,14 @@ namespace aurostd {
       nbytes_last = write(socket_file_descriptor, request + nbytes_total, request_len - nbytes_total);
       if (nbytes_last == -1) {
         if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to send the request to " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
+        free(request);  //CO20231228 - freeing memory from asprintf() above
         return false;
       }
       nbytes_total += nbytes_last;
     }
     if (LDEBUG) cerr << __AFLOW_FUNC__ << " Request written (" << nbytes_total << " bytes)" << endl;
+
+    free(request);  //CO20231228 - freeing memory from asprintf() above, should be completely safe here
 
     // read the response
     if (LDEBUG) cerr << __AFLOW_FUNC__ << " Start reading response:";
@@ -377,7 +402,10 @@ namespace aurostd {
       }
       response += std::string(buffer, nbytes_total);
     }
-    if (LDEBUG) cerr << __AFLOW_FUNC__ << " Finished reading response (" << loaded_bytes << " bytes)" << endl;
+    if (LDEBUG){
+      cerr << __AFLOW_FUNC__ << " Finished reading response (" << loaded_bytes << " bytes)" << endl;
+      cerr << __AFLOW_FUNC__ << " response:" << endl << "---response begin---" << endl << response << endl << "---response end---" << endl;
+    }
 
     if (nbytes_total == -1) {
       if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to read response from " << url.host << "( " << ip_address_str << ":" << url.port << ")" << endl;
@@ -387,7 +415,19 @@ namespace aurostd {
 
     // close the socket
     close(socket_file_descriptor);
+
     return true;
+  }
+
+  // ***************************************************************************
+  // Function foundFirewall
+  // ***************************************************************************
+  //CO20231211 - some institutions do not allow http queries, must be https
+  //check response to see if it was encountered
+  bool foundFirewall(const string& response_url){
+    if(response_url.find("blocked due to malicious activity")!=string::npos){return true;}
+    if(response_url.find("SSL-enabled server port")!=string::npos){return true;}
+    return false;
   }
 
   /// @brief get the content of a URL
@@ -414,6 +454,15 @@ namespace aurostd {
     while (status_code != 200 && number_of_tries < max_number_of_tries) {
       // read server response
       success = httpGetResponse(url, response);
+      //CO20240527 START
+      if(!success||foundFirewall(response)){ //CO20221209 - curl both leverages certificates and gives raw output
+        success=aurostd::url2stringCUrl(aurostd::httpJoinURL(url),response,LDEBUG);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " response from CUrl:" << endl << "---response begin---" << endl << response << endl << "---response end---" << endl;}
+        if(!success){
+          if (LDEBUG) cerr << __AFLOW_FUNC__ << " Failed to get response from CUrl" << endl;
+        }
+      }
+      //CO20240527 STOP
       number_of_tries += 1;
       if (success) {
         // parse the response to extract header and status code

@@ -27,6 +27,8 @@ namespace aurostd{
   int httpGetStatus(const std::string &host, const std::string &path, const std::string &query, std::string &output);
   int httpGetStatus(const std::string &host, const std::string &path, const std::string &query, std::string &output, std::map<std::string, std::string> &header);
 
+  bool foundFirewall(const string& response_url); //CO20231211
+
   std::string httpGet(const std::string &url);
   std::string httpGet(const std::string &url, int &status_code);
   std::string httpGet(const std::string &url, int &status_code, std::map<std::string, std::string> &header);
@@ -38,6 +40,7 @@ namespace aurostd{
   std::string httpPercentEncodingFull(std::string work_str);
 
   xURL httpParseURL(const std::string &url, const bool strict = false);
+  string httpJoinURL(const xURL& url);  //CO20221209 - get back URL
 }
 
 #endif //AFLOW_SRC_AUROSTD_XHTTP_H

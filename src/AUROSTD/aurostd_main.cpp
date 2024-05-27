@@ -1714,7 +1714,7 @@ namespace aurostd {
   double VersionString2Double(const string& version_str){ //SD20220331 
     vector<string> tokens;
     aurostd::string2tokens(version_str,tokens,".");
-    double version=0.0;;
+    double version=0.0;
     for (uint i=0;i<tokens.size();i++){version+=aurostd::string2utype<double>(tokens[i])*std::pow(10.0,-3.0*i);}
     return version;
   }
@@ -1854,6 +1854,14 @@ namespace aurostd {
       cerr << __AFLOW_FUNC__ << " vpids=" << aurostd::joinWDelimiter(vpids,",") << endl;
       cerr << __AFLOW_FUNC__ << " vpids.empty()=" << vpids.empty() << endl;
     }
+    if(LDEBUG){
+      if(aurostd::substring2bool(process,"vasp_std")){
+        string command_full="ps axo uid,pgid,pid,user,etime,pcpu,pmem,args | grep vasp_std";
+        cerr << __AFLOW_FUNC__ << " running command_full=\"" << command_full << "\"" << endl;
+        string output_full=aurostd::execute2string(command_full);
+        cerr << __AFLOW_FUNC__ << " ps/grep output_full:" << endl << output_full << endl;
+      }
+    }
     return vpids;
   }
 
@@ -1940,7 +1948,7 @@ namespace aurostd {
     else{string output_syscall="";vpids=ProcessPIDs(process,pgid,output_syscall,user_specific);}  //CO20221028
     if(vpids.empty()){return false;}
     string command="renice "+aurostd::utype2string(nvalue)+" "+aurostd::joinWDelimiter(vpids," ");
-    string err=aurostd::execute2string(command,stderr_fsio);
+    string err=aurostd::execute2string(command,stderr_fsio,true); //CO20221123 - true == no stdout
     return err.empty();
   }
   
@@ -2266,10 +2274,10 @@ namespace aurostd {
       if(GetCompressionExtension(CompressedFileName)==GetCompressionExtension(FileNameOUT)) {return TRUE;}
       return FALSE;
     }
-    if(substring2bool(CompressedFileName,".xz")) {CompressFile(FileNameOUT,"xz");return TRUE;}
-    if(substring2bool(CompressedFileName,".bz2")) {CompressFile(FileNameOUT,"bzip2");return TRUE;}
-    if(substring2bool(CompressedFileName,".gz")) {CompressFile(FileNameOUT,"gzip");return TRUE;}
-    if(substring2bool(CompressedFileName,".zip")) {CompressFile(FileNameOUT,"zip");return TRUE;}
+    if(substring2bool(CompressedFileName,".xz")) {CompressFile(FileNameOUT,"xz",true);return TRUE;} //CO20230524 - MatchCompressed ALWAYS removes_existing
+    if(substring2bool(CompressedFileName,".bz2")) {CompressFile(FileNameOUT,"bzip2",true);return TRUE;} //CO20230524 - MatchCompressed ALWAYS removes_existing
+    if(substring2bool(CompressedFileName,".gz")) {CompressFile(FileNameOUT,"gzip",true);return TRUE;} //CO20230524 - MatchCompressed ALWAYS removes_existing
+    if(substring2bool(CompressedFileName,".zip")) {CompressFile(FileNameOUT,"zip",true);return TRUE;} //CO20230524 - MatchCompressed ALWAYS removes_existing
     return FALSE;
   }
 
@@ -2418,15 +2426,17 @@ namespace aurostd {
     return FALSE;
   }
 
-  bool CompressFile(const string& _file,const string& command) {  // "" compliant SC20190401
+  bool CompressFile(const string& _file,const string& command,bool remove_existing) {  // "" compliant SC20190401  //CO20230524 - removing existing zip file if found
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
     string file(CleanFileName(_file));
-    //  cerr << "aurostd::CompressFile FileName=[" << FileName << "]  command=[" << command << "]" << endl;
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " [" << file << "]  command=[" << command << "]" << endl;}
     if(aurostd::substring2bool(command,"bzip2") || aurostd::substring2bool(command,"bz2")  || aurostd::substring2bool(command,".bz2")) {
       if(!aurostd::IsCommandAvailable("bzip2")) {
         cerr << "ERROR - aurostd::CompressFile: command \"bzip2\" is necessary !" << endl;
         return FALSE;
       }   
-      // [OBSOLETE]     if(FileExist(file+".bz2")) {aurostd::execute("rm -f \""+file+".bz2\"");}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " BZ2  FileName=[" << file << "]  command=[" << command << "]" << endl;}
+      if(remove_existing && FileExist(file+".bz2")) {aurostd::execute("rm -f \""+file+".bz2\"");}  //CO20230524 - DO NOT REMOVE without explanation, breaks aurostd::MatchCompressed()
       if(file.find(".bz2")==string::npos) aurostd::execute("bzip2 -9qf \""+file+"\"");
       return TRUE;
     }
@@ -2435,8 +2445,8 @@ namespace aurostd {
         cerr << "ERROR - aurostd::CompressFile: command \"xz\" is necessary !" << endl;
         return FALSE;
       }   
-      // [OBSOLETE]     if(FileExist(file+".xz")) {aurostd::execute("rm -f \""+file+".xz\"");}
-      //    cerr << "aurostd::CompressFile XZ  FileName=[" << FileName << "]  command=[" << command << "]" << endl;
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " XZ  FileName=[" << file << "]  command=[" << command << "]" << endl;}
+      if(remove_existing && FileExist(file+".xz")) {aurostd::execute("rm -f \""+file+".xz\"");}  //CO20230524 - DO NOT REMOVE without explanation, breaks aurostd::MatchCompressed()
       if(file.find(".xz")==string::npos) aurostd::execute("xz -9qf -q \""+file+"\""); // twice -q to avoid any verbosity
       return TRUE;
     }
@@ -2445,7 +2455,8 @@ namespace aurostd {
         cerr << "ERROR - aurostd::CompressFile: command \"gzip\" is necessary !" << endl;
         return FALSE;
       }   
-      // [OBSOLETE]     if(FileExist(file+".gz")) {aurostd::execute("rm -f \""+file+".gz\"");}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " GZIP  FileName=[" << file << "]  command=[" << command << "]" << endl;}
+      if(remove_existing && FileExist(file+".gz")) {aurostd::execute("rm -f \""+file+".gz\"");}  //CO20230524 - DO NOT REMOVE without explanation, breaks aurostd::MatchCompressed()
       if(file.find(".gz")==string::npos) aurostd::execute("gzip -9qf \""+file+"\"");
       return TRUE;
     }
@@ -2454,8 +2465,8 @@ namespace aurostd {
         cerr << "ERROR - aurostd::ZipFile: command \"zip\" is necessary !" << endl;
         return FALSE;
       }
-      // [OBSOLETE]     if(FileExist(file+".zip")) {cerr << file << ".zip" << endl;}
-      if(FileExist(file+".zip")) {aurostd::execute("rm -f \""+file+".zip\"");}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " ZIP  FileName=[" << file << "]  command=[" << command << "]" << endl;}
+      if(remove_existing && FileExist(file+".zip")) {aurostd::execute("rm -f \""+file+".zip\"");}  //CO20230524 - DO NOT REMOVE without explanation, breaks aurostd::MatchCompressed()
       if(file.find(".zip")==string::npos) aurostd::execute("zip -9qm \""+file+".zip\" \""+file+"\"");
       return TRUE;
     }
@@ -3455,7 +3466,7 @@ namespace aurostd {
   // ***************************************************************************
   // Execute & Report Streams/Strings/C_strings
   // ***************************************************************************
-  string execute2string(const string& _command,FSIO fsio) { //CO20200624 - added file system IO mode
+  string execute2string(const string& _command,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     bool LDEBUG=(FALSE || XHOST.DEBUG);
 
     // bool INIT_VERBOSE=TRUE;
@@ -3469,9 +3480,9 @@ namespace aurostd {
 
     stringstream strstream,cmdstream;
     string file=aurostd::TmpFileCreate("execute_report");
-    if(fsio==stdouterr_fsio){cmdstream << "bash -c \"" << command << " &> " << file << "\"";}  //CO20200624 //SD20220311 - force bash, &> does not work in sh; be careful with quotes within quotes, althought it seems to work
-    else if(fsio==stderr_fsio){cmdstream << command << " 2> " << file;} //CO20200624
-    else{cmdstream << command << " > " << file;} //CO20200624
+    if(fsio==stdouterr_fsio){cmdstream << "bash -c \"" << command << " &> " << file << "\"";}  //CO20200624 //SD20220311 - force bash, &> does not work in sh; be careful with quotes within quotes, although it seems to work
+    else if(fsio==stderr_fsio){cmdstream << command << " 2> " << file << (quiet?" 1> /dev/null":"");} //CO20200624
+    else{cmdstream << command << " > " << file << (quiet?" 2> /dev/null":"");} //CO20200624
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " cmdstream=\"" << cmdstream.str() << "\"" << endl;}
     system(cmdstream.str().c_str());
     // command="";
@@ -3488,36 +3499,36 @@ namespace aurostd {
     return strout;
   }
 
-  string execute2string(ostringstream &command,FSIO fsio) { //CO20200624 - added file system IO mode
+  string execute2string(ostringstream &command,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     string command_str=command.str();
     aurostd::StringstreamClean(command);
-    return execute2string(command_str,fsio);  //CO20200624
+    return execute2string(command_str,fsio,quiet);  //CO20200624
   }
 
-  string execute2string(stringstream &command,FSIO fsio) { //CO20200624 - added file system IO mode
+  string execute2string(stringstream &command,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     string command_str=command.str();
     aurostd::StringstreamClean(command);
-    return execute2string(command_str,fsio);  //CO20200624
+    return execute2string(command_str,fsio,quiet);  //CO20200624
   }
 
-  vector<string> execute2string(const vector<string>& vcommand,FSIO fsio) { //CO20200624 - added file system IO mode
+  vector<string> execute2string(const vector<string>& vcommand,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     vector<string> out;
     for(uint i=0;i<vcommand.size();i++)
-      out.push_back(execute2string(vcommand[i],fsio));  //CO20200624
+      out.push_back(execute2string(vcommand[i],fsio,quiet));  //CO20200624
     return out;
   }
 
-  deque<string> execute2string(const deque<string>& vcommand,FSIO fsio) { //CO20200624 - added file system IO mode
+  deque<string> execute2string(const deque<string>& vcommand,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     deque<string> out;
     for(uint i=0;i<vcommand.size();i++)
-      out.push_back(execute2string(vcommand[i],fsio));  //CO20200624
+      out.push_back(execute2string(vcommand[i],fsio,quiet));  //CO20200624
     return out;
   }
 
 #ifdef _stringcharstar_
-  string execute2string(char* command,FSIO fsio) { //CO20200624 - added file system IO mode
+  string execute2string(char* command,FSIO fsio,bool quiet) { //CO20200624 - added file system IO mode
     string command_str=string(command);
-    return execute2string(command_str,fsio);  //CO20200624
+    return execute2string(command_str,fsio,quiet);  //CO20200624
   }
 #endif
 
@@ -4747,8 +4758,156 @@ namespace aurostd {
     if (verbose) cerr << __AFLOW_FUNC__ << " Loading url=" << url << endl;
     int return_code = aurostd::httpGetStatus(url, stringIN);
     if (verbose) cerr << __AFLOW_FUNC__ << " " << url << " returned " << return_code <<endl;
-    if(stringIN.empty()) return false;
-    else return true;
+    return (!stringIN.empty());
+  }
+  bool url2stringWGet(const string& urlIN,string& stringIN,bool verbose) {  //CO20221209 - wget is more robust, can leverage certificates
+    if (verbose) cerr << __AFLOW_FUNC__ << " Loading url=" << urlIN << endl;
+    if(!aurostd::IsCommandAvailable("wget")) {
+      cerr << "ERROR - " << __AFLOW_FUNC__ << " command \"wget\" is necessary" << endl;
+      return FALSE;
+    }
+    string url=urlIN,_url=urlIN;
+#ifndef _MACOSX_
+    string command_pre="wget --quiet --no-cache -O /dev/stdout";
+#else
+    string command_pre="wget --quiet -O /dev/stdout";
+#endif
+    string command="";
+
+    //CO20231211 - patch http with database requests, avoid firewall issues
+    //do this early so you avoid too many busted queries
+    if(url.find("aflow.org")!=string::npos||
+        url.find("s4e.ai")!=string::npos||
+        TRUE){
+      aurostd::StringSubst(url,"http://","");
+      aurostd::StringSubst(url,"https://","");
+      aurostd::StringSubst(url,"//","/");
+      url="https://"+url;
+      if (verbose) cerr << __AFLOW_FUNC__ << " patching https: url=" << url << endl;
+    }
+    
+    //////////////////////////////////////////////////////////////////////////
+    //ROUND 1 - original url
+    _url=url;
+    command=command_pre+" '"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true);
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;}  //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+    
+    //////////////////////////////////////////////////////////////////////////
+    //ROUND 2 - treat AURL
+    _url=url;
+    aurostd::StringSubst(_url,":AFLOW","/AFLOW");
+    command=command_pre+" '"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;}  //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+    
+    
+    //////////////////////////////////////////////////////////////////////////
+    //ROUNDS 2+3 - try https vs. http
+    string scheme=""; //https vs. http
+    
+    _url=url;
+    aurostd::StringSubst(_url,"http://","");
+    aurostd::StringSubst(_url,"https://","");
+    aurostd::StringSubst(_url,"//","/");
+    scheme="https";
+    command=command_pre+" '"+scheme+"://"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    
+    _url=url;
+    aurostd::StringSubst(_url,"http://","");
+    aurostd::StringSubst(_url,"https://","");
+    aurostd::StringSubst(_url,"//","/");
+    scheme="http";
+    command=command_pre+" '"+scheme+"://"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+
+    return (!stringIN.empty() && !foundFirewall(stringIN)); //CO20231211 - adding foundFirewall()
+  }
+  bool url2stringCUrl(const string& urlIN,string& stringIN,bool verbose) {  //CO20221209 - curl both leverages certificates and gives raw output
+    if (verbose) cerr << __AFLOW_FUNC__ << " Loading url=" << urlIN << endl;
+    if(!aurostd::IsCommandAvailable("curl")) {
+      cerr << "ERROR - " << __AFLOW_FUNC__ << " command \"curl\" is necessary" << endl;
+      return FALSE;
+    }
+    string url=urlIN,_url=urlIN;
+    string command_pre="curl -ivs --raw";
+    string command="";
+    
+    //CO20231211 - patch http with database requests, avoid firewall issues
+    //do this early so you avoid too many busted queries
+    if(url.find("aflow.org")!=string::npos||
+        url.find("s4e.ai")!=string::npos||
+        TRUE){
+      aurostd::StringSubst(url,"http://","");
+      aurostd::StringSubst(url,"https://","");
+      aurostd::StringSubst(url,"//","/");
+      url="https://"+url;
+      if (verbose) cerr << __AFLOW_FUNC__ << " patching https: url=" << url << endl;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    //ROUND 1 - original url
+    _url=url;
+    command=command_pre+" '"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+
+    //////////////////////////////////////////////////////////////////////////
+    //ROUND 2 - treat AURL
+    _url=url;
+    aurostd::StringSubst(_url,":AFLOW","/AFLOW");
+    command=command_pre+" '"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+
+    //////////////////////////////////////////////////////////////////////////
+    //ROUNDS 2+3 - try https vs. http
+    string scheme=""; //https vs. http
+    
+    _url=url;
+    aurostd::StringSubst(_url,"http://","");
+    aurostd::StringSubst(_url,"https://","");
+    aurostd::StringSubst(_url,"//","/");
+    scheme="https";
+    command=command_pre+" '"+scheme+"://"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    
+    _url=url;
+    aurostd::StringSubst(_url,"http://","");
+    aurostd::StringSubst(_url,"https://","");
+    aurostd::StringSubst(_url,"//","/");
+    scheme="http";
+    command=command_pre+" '"+scheme+"://"+_url+"'";
+    if (verbose) cerr << __AFLOW_FUNC__ << " Command=" << command << endl;
+    stringIN=aurostd::execute2string(command,stdout_fsio,true); // _MACOSX_
+    if (verbose) cerr << __AFLOW_FUNC__ << " Response=" << stringIN << endl;
+    if(!stringIN.empty() && !foundFirewall(stringIN)){return true;} //CO20231211 - adding foundFirewall()
+    //////////////////////////////////////////////////////////////////////////
+
+    return (!stringIN.empty() && !foundFirewall(stringIN)); //CO20231211 - adding foundFirewall()
   }
 
   // ***************************************************************************
@@ -5624,10 +5783,10 @@ namespace aurostd {
     //kvpair2bool must match KEY exactly! skips the rest
     //substring2bool is good for aflow.in's which has no set delimiter style: [AFLOW_BIN_XZ] vs. [AFLOW_BIN=XZ] vs. [AFLOW_BIN]XZ vs. [AFLOW]BIN=XZ
     bool LDEBUG=FALSE;//TRUE;
-    if(LDEBUG) cerr << XPID << "aurostd::substring2bool(): BEGIN [substring=\"" << strsub1 << "\"] [RemoveWS=" << RemoveWS << "]" << endl;
+    if(LDEBUG) cerr << XPID << "aurostd::substring2bool(): BEGIN [input=\"" << strstream << "\"], [substring=\"" << strsub1 << "\"] [RemoveWS=" << RemoveWS << "]" << endl;
     string _strstream(strstream);
     if(RemoveWS==TRUE) _strstream=aurostd::RemoveWhiteSpaces(_strstream,'"');
-    if(LDEBUG) cerr << XPID << "aurostd::substring2bool(): [input=\"" << strstream << "\"], [substring=\"" << strsub1 << "\"]" << endl;
+    if(LDEBUG) cerr << XPID << "aurostd::substring2bool(): [input=\"" << _strstream << "\"], [substring=\"" << strsub1 << "\"]" << endl;
     if(_strstream.find(strsub1)==string::npos) return false;
     if(RemoveComments){ //SD20220403 - substring exists, but now check if it exists outside of comments 
       vector<string> tokens;
@@ -6108,15 +6267,42 @@ namespace aurostd {
   uint substring2stringInnerLoop(const string& _strline,bool& read,vector<string>& vlines,vector<string>& tokens,const string& strsub1,const string& strsub2,bool RemoveComments,bool trim_edges) { //CO20230502 - helper function for substring2strings()
     bool LDEBUG=false;
     string strline=_strline,strline2="",strline3="";
-    bool found_strsub1=false,found_strsub2=false;
+    bool found_strsub2=false;
     if(RemoveComments) {strline=aurostd::RemoveComments(strline);}
-    if(read==FALSE && strline.find(strsub1)!=string::npos) {
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline.find(strsub1)!=string::npos" << endl;}
       //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
-      while(strline.find(strsub1)!=string::npos){
+    while(!strline.empty()&&(read==TRUE||strline.find(strsub1)!=string::npos||strline.find(strsub2)!=string::npos)){
         if(LDEBUG){
           cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
-          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;}
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+        }
+      if(read==TRUE){
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " read==TRUE" << endl;}
+        found_strsub2=(strline.find(strsub2)!=string::npos);
+        strline2=strline;
+        strline="";
+        if(found_strsub2){
+          strline3=strline2.substr(0,strline2.find(strsub2));
+          strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
+          strline2=strline3;
+        }
+          if(LDEBUG){
+            cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+            cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+          }
+          vlines.push_back(strline2);
+        if(found_strsub2){
+          if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
+          tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
+          if(LDEBUG){
+            for(uint i=0;i<vlines.size();i++){cerr << __AFLOW_FUNC__ << " vlines[i=" << i << "]=" << vlines[i] << endl;}
+            for(uint i=0;i<tokens.size();i++){cerr << __AFLOW_FUNC__ << " tokens[i=" << i << "]=" << tokens[i] << endl;}
+          }
+          vlines.clear();
+          read=FALSE;
+        }
+      }
+      if(read==FALSE && strline.find(strsub1)!=string::npos){
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline.find(strsub1)!=string::npos" << endl;}
         strline2=strline.substr(strline.find(strsub1)+strsub1.length());
         strline="";
         if(LDEBUG){
@@ -6132,41 +6318,12 @@ namespace aurostd {
           strline3=strline2.substr(0,strline2.find(strsub2));
           strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
           strline2=strline3;
-          if(LDEBUG){
+        if(LDEBUG){
             cerr << __AFLOW_FUNC__ << " strline2.find(strsub2)!=string::npos" << endl;
-            cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
-            cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
-          }
-          vlines.push_back(strline2);
-          if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
-          tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
-          vlines.clear();
-        }
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;}
-      }
-    }
-    else if(read==TRUE && strline.find(strsub2)!=string::npos) {
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " strline.find(strsub2)!=string::npos)" << endl;}
-      //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
-      while(!strline.empty() || strline.find(strsub2)!=string::npos){
-        if(LDEBUG){
-          cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
-          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
-        }
-        found_strsub2=(strline.find(strsub2)!=string::npos);
-        strline2=strline;
-        strline="";
-        if(found_strsub2){
-          strline3=strline2.substr(0,strline2.find(strsub2));
-          strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
-          strline2=strline3;
-        }
-        if(LDEBUG){
           cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
           cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
         }
         vlines.push_back(strline2);
-        if(found_strsub2){
           if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
           tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
           if(LDEBUG){
@@ -6174,22 +6331,13 @@ namespace aurostd {
             for(uint i=0;i<tokens.size();i++){cerr << __AFLOW_FUNC__ << " tokens[i=" << i << "]=" << tokens[i] << endl;}
           }
           vlines.clear();
-          if(strline.empty()){read=FALSE;}
+          read=FALSE;
         }
-        if(!strline.empty()){
-          found_strsub1=(strline.find(strsub1)!=string::npos);
-          if(found_strsub1){
-            strline=strline.substr(strline.find(strsub1)+strsub1.length());
           }
-        }
         if(LDEBUG){
           cerr << __AFLOW_FUNC__ << " read=" << read << endl;
           cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;
         }
-      }
-    }
-    else if(read) {
-      vlines.push_back(strline);
     }
     return tokens.size();
   }

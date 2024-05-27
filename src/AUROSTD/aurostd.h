@@ -493,7 +493,7 @@ namespace aurostd {
   string GetCatCommand(const string& CompressedFileName); //CO20210315
   //CO END
   bool UncompressFile(const string& FileName,const string& command);  bool UncompressFile(const string& FileName); // with guess  
-  bool CompressFile(const string& FileName,const string& command=AUROSTD_ZIP_BIN); // with default
+  bool CompressFile(const string& FileName,const string& command=AUROSTD_ZIP_BIN,bool remove_existing=false); // with default //CO20230524 - remove_existing
   bool ZIP2ZIP(string dir,string from,string to,bool=TRUE,const string& = "");
   bool BZ2XZ(string dir,bool=TRUE,const string& = "");
   bool GZ2XZ(string dir,bool=TRUE,const string& = "");
@@ -581,13 +581,13 @@ namespace aurostd {
   bool execute(char* command);
 #endif
   // Execute and report
-  string execute2string(ostringstream& command,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
-  string execute2string(stringstream& command,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
-  string execute2string(const string& command,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
-  vector<string> execute2string(const vector<string>& vcommand,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
-  deque<string> execute2string(const deque<string>& dcommand,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
+  string execute2string(ostringstream& command,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
+  string execute2string(stringstream& command,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
+  string execute2string(const string& command,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
+  vector<string> execute2string(const vector<string>& vcommand,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
+  deque<string> execute2string(const deque<string>& dcommand,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
 #ifdef _stringcharstar_
-  string execute2string(char* command,FSIO fsio=stdout_fsio);  //CO20200624 - added file system IO mode
+  string execute2string(char* command,FSIO fsio=stdout_fsio,bool quiet=false);  //CO20200624 - added file system IO mode
 #endif
   string CleanCommand4Execute(const string& _command); //CO20200624
   template<class utype> utype execute2utype(ostringstream& command);
@@ -708,6 +708,8 @@ namespace aurostd {
   bool url2file(string url,string& fileIN,bool=FALSE)  __xprototype;   // bool = verbose
   bool eurl2string(const string& url,string& stringIN,bool verbose=FALSE);  //CO20200223
   bool url2string(const string& url,string& stringIN,bool=FALSE)  __xprototype;   // bool = verbose
+  bool url2stringWGet(const string& url,string& stringIN,bool=FALSE) __xprototype;  //CO20221209 - wget is more robust, can leverage certificates
+  bool url2stringCUrl(const string& url,string& stringIN,bool=FALSE) __xprototype;  //CO20221209 - curl both leverages certificates and gives raw output
   bool eurl2stringstream(const string& url,stringstream& stringstreamIN,bool=FALSE)  __xprototype;  // bool = verbose  //CO20200223
   bool url2stringstream(const string& url,stringstream& stringstreamIN,bool=FALSE)  __xprototype;  // bool = verbose
   bool eurl2vectorstring(const string& url,vector<string>& vlines,bool=FALSE)  __xprototype;  // bool = verbose  //CO20200223

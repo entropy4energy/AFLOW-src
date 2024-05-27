@@ -1,3 +1,8 @@
+3.2.15 - 2024/XX/XX
+        Location: https://github.com/entropy4energy/AFLOW-src/releases/tag/v3.2.15
+        -- fixed broken parser for APL Born effective charges (XX)
+        -- rearranged QHA code to enable calculation of thermodynamic properties if isEOS and isQHA (CO)
+        -- adding --load_entries_from_file to CHULL (CO)
 3.2.14 - 2023/10/25
         Location: http://materials.duke.edu/AFLOW/aflow.3.2.14.tar.xz
         -- patched aflow.in generation with INCAR_EXPLICIT_START_STOP (TB+RF)
@@ -76,11 +81,6 @@
         -- added KBIN::BIN2VASPVersion (SD)
         -- fixed KBIN::VASPVersionString2Double, aurostd::substring2bool, aurostd::kvpairfound (SD)
         -- added extract POSCAR from aflowin (SD)
-        -- improved AFLUX calls for --compare_database_entries and --compare2database (ME)
-        -- fixed aurostd::getxvec() bug where lcols_out and lrows_out defaulted to AFLOW_MAX_INT (AZ)
-        -- moved xmatrix2xvector functionality aurostd::getxvec() and use getxvec() in getmatInPlace (AZ)
-        -- added --itc flag for structure generation (CO+DX)
-        -- fixing --cif with pocc structure (DX+CO)
         (AFLOW: aconvasp.cpp, aconvasp_main.cpp, aflow.cpp, aflow.h, aflowlib_database.cpp, aflowlib_entry_loader.cpp, aflowlib.h, aflowlib_libraries.cpp, aflowlib_web_interface.cpp, aflowlib_web_outreach.cpp, aflowrc.cpp, apennsy.cpp, avasp.cpp, bader.cpp, cce.cpp, chull.cpp, compare_structure.cpp, compare_structure_function.cpp, compare_structure.h, contrib_cormac.cpp, data.cpp, defects.cpp, gfa.cpp, iaims.cpp, ialien.cpp, ifrozsl.cpp, init.cpp, ivasp.cpp, kaims.cpp, kalien.cpp, kbin.cpp, kvasp.cpp, lattice.cpp, Makefile, Makefile.aflow, makefile.cpp, matlab.cpp, modules.cpp, ovasp.cpp, pflow_funcs.cpp, pflow.h, pflow_print.cpp, plotter.cpp, pocc_apl.cpp, pocc.cpp, pocc.h, pocc_old.cpp, pocc_qha.cpp, pocc_thermo.cpp, pthreads.cpp, qsub.cpp, README_AFLOW_ACONVASP.TXT, README_AFLOW_AFLOWRC.TXT, README_AFLOW_CHULL.TXT, README_AFLOW_EXCEPTIONS.TXT, README_AFLOW_QHA_SCQHA_QHA3P.TXT, README_AFLOW.TXT, README_PROTO.TXT, surface.cpp, symmetry_spacegroup_functions.cpp, symmetry_spacegroup.h, symmetry_spacegroup_ITC_library.cpp, test.cpp, unit_test.cpp, wyckoff.cpp, xatom.cpp, xclasses.cpp, xelement.cpp, xproto.cpp, xthread.cpp)
         (ANRL: aflow_anrl.cpp, README_AFLOW_ANRL.TXT)
         (AEL: ael_elasticity.cpp, pocc_ael_agl.cpp)

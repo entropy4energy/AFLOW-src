@@ -503,7 +503,16 @@ namespace apl {
     uint line_count = 0;  //CO
     string KEY = ""; //ME20181226
     if (DEFAULT_APL_USE_LEPSILON) { //ME20181226
-      KEY = string("BORN EFFECTIVE CHARGES (in e, cummulative output)");//ME20181226
+      KEY = string("BORN EFFECTIVE CHARGES");//ME20181226
+    //XX20240507
+    // The content of the KEY changes with vasp versions
+    // if vasp_5.4.1, KEY = string("BORN EFFECTIVE CHARGES (in e, cummulative output)")
+    // if vasp_5.4.4, KEY = string("BORN EFFECTIVE CHARGES (including local field effects) (in e, cummulative output)")
+    // if vasp_6.3.1, KEY = string("BORN EFFECTIVE CHARGES (including local field effects) (in |e|, cummulative output)")
+    // if vasp_6.4.1, KEY = string("BORN EFFECTIVE CHARGES (including local field effects) (in |e|, cummulative output)")
+    // By screening all the vasp output (from 5.4.1 to 6.4.1), the unique string in the OUTCAR for reading born effective charge is "BORN EFFECTIVE CHARGES"
+    // Therefore, we use "BORN EFFECTIVE CHARGES" here.
+    // Please check here if the error "No information on Born effective charges in OUTCAR file." occur.
     } else { //ME20181226
       KEY = string("BORN EFFECTIVE CHARGES (including local field effects)"); //ME20181226
     } //ME20181226

@@ -591,10 +591,61 @@ namespace apl
     }
 
     try{
-      bool eos_static_data_available = false;
       bool eos_apl_data_available = false;
+      bool eos_static_data_available = false;
+      bool qhanp_data_available = false;
       bool gp_data_available = false;
 
+      //CO20230421 - rearranged the code so eos_static_data_available is set before it is checked
+      // In a QHA calculation, the EOS flag performs APL calculations for a set of volumes.
+      // This flag is used when one is interested in T-dependent properties.
+      if (isEOS && isQHA){
+        eos_apl_data_available = runAPL(xflags, aflags, kflags, QHA_EOS);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " eos_apl_data_available=" << eos_apl_data_available << endl;} //CO20230421
+          }
+
+      // ME20220427 - Do static last. There is so much phonon output that
+      // the NOTICE won't be easy to spot otherwise.
+      // QHA3P, QHANP and SCQHA require a set of static EOS calculations.
+      // But for a QHA calculation, the EOS flag is used to toggle these types of
+      // calculations.
+      if ((isQHA && isEOS) || isQHA3P || isSCQHA || isQHANP){
+        msg = "Checking if all required files from static DFT calculations exist.";
+        pflow::logger(QHA_ARUN_MODE, __AFLOW_FUNC__, msg, currentDirectory, *p_FileMESSAGE,
+            *p_oss, _LOGGER_MESSAGE_);
+        vector<vector<bool> > file_is_present(subdirectories_static.size(),
+            vector<bool>(4));
+
+        uint n_static_calcs = checkStaticCalculations(file_is_present);
+        // read data from a set of static DFT calculations only when all required
+        // output files are present.
+        // Post-processing that requires a set of static DFT calculations (QHA+EOS,
+        // QHA3P, QHANP and SCQHA) will happen only when all required data from this
+        // set was read successfully.
+        if (n_static_calcs == subdirectories_static.size()){
+          eos_static_data_available = readStaticCalculationsData();
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " eos_static_data_available=" << eos_static_data_available << endl;} //CO20230421
+        }
+        else{
+          // if there exists data for at least one completed static DFT calculation,
+          // print an error listing missing files/directories.
+          // Thus, errors are not printed if it is a first QHA run or QHA was run by
+          // mistake after the first run before the static DFT calculations were executed
+          if (n_static_calcs > 0) {
+            printMissingStaticFiles(file_is_present, subdirectories_static);
+          } else {
+            // ME20220427
+            // Add NOTICE when no static calculations have been performed, or QHA will
+            // finish as DONE without telling the user why no output has been produed.
+            string message = "Waiting for required STATIC calculations.";
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
+          }
+
+          createSubdirectoriesStaticRun(xflags, aflags, kflags, file_is_present);
+        }
+      }
+
+      //CO20230421 - rearranged the code so eos_static_data_available is set before it is checked
       // we need to clean THERMO file from previous calculations, since calculated data from
       // each QHA/EOS model is appended to the THERMO file and we do not want to mix
       // results of calculations with potentially different parameters
@@ -603,12 +654,10 @@ namespace apl
         aurostd::RemoveFile(currentDirectory+'/'+DEFAULT_QHA_FILE_PREFIX+DEFAULT_QHA_COEFF_FILE);
         aurostd::RemoveFile(currentDirectory+'/'+DEFAULT_QHA_FILE_PREFIX+DEFAULT_QHA_IMAG_FILE);
       }
-
+      
       // In a QHA calculation, the EOS flag performs APL calculations for a set of volumes.
       // This flag is used when one is interested in T-dependent properties.
       if (isEOS && isQHA){
-        eos_apl_data_available = runAPL(xflags, aflags, kflags, QHA_EOS);
-
         if (eos_apl_data_available && eos_static_data_available){
           if (includeElectronicContribution && doSommerfeldExpansion) calcDOSatEf();
           if (LDEBUG) writeFrequencies();
@@ -641,68 +690,33 @@ namespace apl
           }
         }
       }
-
-      // ME20220427 - Do static last. There is so much phonon output that
-      // the NOTICE won't be easy to spot otherwise.
-      // QHA3P, QHANP and SCQHA require a set of static EOS calculations.
-      // But for a QHA calculation, the EOS flag is used to toggle these types of
-      // calculations.
-      if ((isQHA && isEOS) || isQHA3P || isSCQHA || isQHANP){
-        msg = "Checking if all required files from static DFT calculations exist.";
-        pflow::logger(QHA_ARUN_MODE, __AFLOW_FUNC__, msg, currentDirectory, *p_FileMESSAGE,
-            *p_oss, _LOGGER_MESSAGE_);
-        vector<vector<bool> > file_is_present(subdirectories_static.size(),
-            vector<bool>(4));
-
-        uint n_static_calcs = checkStaticCalculations(file_is_present);
-        // read data from a set of static DFT calculations only when all required
-        // output files are present.
-        // Post-processing that requires a set of static DFT calculations (QHA+EOS,
-        // QHA3P, QHANP and SCQHA) will happen only when all required data from this
-        // set was read successfully.
-        if (n_static_calcs == subdirectories_static.size()){
-          eos_static_data_available = readStaticCalculationsData();
-        }
-        else{
-          // if there exists data for at least one completed static DFT calculation,
-          // print an error listing missing files/directories.
-          // Thus, errors are not printed if it is a first QHA run or QHA was run by
-          // mistake after the first run before the static DFT calculations were executed
-          if (n_static_calcs > 0) {
-            printMissingStaticFiles(file_is_present, subdirectories_static);
-          } else {
-            // ME20220427
-            // Add NOTICE when no static calculations have been performed, or QHA will
-            // finish as DONE without telling the user why no output has been produed.
-            string message = "Waiting for required STATIC calculations.";
-            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, currentDirectory, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
-          }
-
-          createSubdirectoriesStaticRun(xflags, aflags, kflags, file_is_present);
-        }
-      }
-
-      bool qhanp_data_available = false;
+      
       if (isQHANP){
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " isQHANP" << endl;} //CO20230421
         qhanp_data_available = runAPL(xflags, aflags, kflags, QHA_TE);
         if (qhanp_data_available){
           if (qha_options.flag("EOS_MODEL:SJ")){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " EOS_MODEL:SJ" << endl;}  //CO20230421
             writeThermalProperties(EOS_SJ, QHANP_CALC, currentDirectory);
           }
 
           if (qha_options.flag("EOS_MODEL:BM2")){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " EOS_MODEL:BM2" << endl;} //CO20230421
             writeThermalProperties(EOS_BIRCH_MURNAGHAN2, QHANP_CALC, currentDirectory);
           }
 
           if (qha_options.flag("EOS_MODEL:BM3")){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " EOS_MODEL:BM3" << endl;} //CO20230421
             writeThermalProperties(EOS_BIRCH_MURNAGHAN3, QHANP_CALC, currentDirectory);
           }
 
           if (qha_options.flag("EOS_MODEL:BM4")){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " EOS_MODEL:BM4" << endl;} //CO20230421
             writeThermalProperties(EOS_BIRCH_MURNAGHAN4, QHANP_CALC, currentDirectory);
           }
 
           if (qha_options.flag("EOS_MODEL:M")){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " EOS_MODEL:M" << endl;} //CO20230421
             writeThermalProperties(EOS_MURNAGHAN, QHANP_CALC, currentDirectory);
           }
         }
@@ -712,6 +726,7 @@ namespace apl
       // calculated via a finite difference numerical derivative.
       // For a QHA calculation, use the GP_FD flag to turn on this type of calculation.
       if (isGP_FD || isQHA3P || isSCQHA){
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " isGP_FD=" << isGP_FD << " isQHA3P=" << isQHA3P << " isSCQHA=" << isSCQHA << endl;} //CO20230421
         gp_data_available = runAPL(xflags, aflags, kflags, QHA_FD);
 
         if (gp_data_available){

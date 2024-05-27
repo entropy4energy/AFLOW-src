@@ -4089,6 +4089,43 @@ namespace chull {
         }
       }
     }
+    //CO20240502 START - adding option to read from file
+    if(m_cflags.flag("CHULL::LOAD_ENTRIES_FROM_FILE")){
+      string filename=m_cflags.getattachedscheme("CHULL::LOAD_ENTRIES_FROM_FILE");
+      vector<string> vdata;
+      aurostd::efile2vectorstring(filename,vdata);
+      aflowlib::_aflowlib_entry entry;
+      message << "Loading entries from file (filename=" << filename << ";size=" << vdata.size() << ")";pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss);
+      
+      //recycling from entryValid() section of code
+      bool remove_invalid=true;
+      string invalid_reason="";
+      char LOGGER_TYPE=_LOGGER_OPTION_;
+      bool silent=(true && LOGGER_TYPE==_LOGGER_OPTION_);
+      //ignore bad database
+      bool ignore_bad_database=(DEFAULT_CHULL_IGNORE_KNOWN_ILL_CONVERGED && !m_cflags.flag("CHULL::INCLUDE_ILL_CONVERGED"));
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " ignore_bad_database=" << ignore_bad_database << endl;}
+      //
+      
+      uint count_successful=0;
+      for(uint ilines=0;ilines<vdata.size();ilines++){
+        entry.Load(vdata[ilines],*p_oss);
+        if(remove_invalid && !entryValid(entry,invalid_reason,LOGGER_TYPE,ignore_bad_database)){
+          if(!invalid_reason.empty()){
+            message << "Neglecting [auid=" << entry.auid << ",aurl=" << entry.aurl << "]: " << invalid_reason;
+            pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss, LOGGER_TYPE, silent);
+          }
+        }
+        cp.initialize(velements,entry,*p_FileMESSAGE,*p_oss,m_formation_energy_hull);
+        points.push_back(cp);
+        count_successful++;
+        //save icsd entries
+        if(aurostd::substring2bool(entry.prototype,"_ICSD_")){m_icsd_entries.push_back(points.size()-1);}
+      }
+      message << "Loaded " << count_successful << " entries from file (filename=" << filename << ")";pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss);
+    }
+    //CO20240502 STOP - adding option to read from file
+    
     if(!points.size()){
       message << "No entries loaded";
       //simply always die here, we cannot grab dimensionality of hull without ANY points
@@ -4608,7 +4645,7 @@ namespace chull {
     //organize into coordgroups
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " organizing into coordgroups" << endl;}
     vector<uint> unique_entries;
-    string invalid_reason,canonical_auid;
+    string invalid_reason="",canonical_auid="";
     char LOGGER_TYPE=_LOGGER_OPTION_;
     bool silent=false;
     uint i_coord_group_sort;  //so it doesn't conflict with i_coord_group in for-loops

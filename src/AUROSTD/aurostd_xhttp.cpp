@@ -129,7 +129,7 @@ namespace aurostd {
   }
 
   string httpJoinURL(const xURL& url){  //CO20221209
-    return url.scheme+"://"+url.host+url.path+url.query;  //CO+WJ20231006 - removing strange characters in the path OR the query
+    return url.scheme+(url.scheme.empty()?"":"://")+url.host+url.path+url.query;  //CO+WJ20231006 - removing strange characters in the path OR the query
     //deal with port later... need a bool to tell if a port was there originally (:)
   }
 

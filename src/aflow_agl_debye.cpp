@@ -415,46 +415,43 @@ namespace KBIN {
     ostringstream aus;
     // uint num_relax = xvasp.NRELAX;
     uint num_relax = 2;
-    bool relax_complete = true;
     bool krun = false;
 
     aurostd::StringstreamClean(aus);
     aus << _AGLSTR_MESSAGE_ + "Number of requested relaxation runs = " << num_relax << endl;  
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
 
-    // First check if relaxation has already been performed
+    //CO20261006 START - a relaxation counts when its OUTCAR is complete (KBIN::VASP_RelaxationsComplete()); a CONTCAR alone
+    //is also left by a relaxation that failed. A run that stopped resumes at the first relaxation not complete, and relax2
+    //starts from the CONTCAR of relax1 (KBIN::VASP_Run() with two labels recycles it, as in the main relaxation loop);
+    //before, each relaxation rebuilt its inputs from AflowIn, so relax2 started again from the structure of relax1.
+    const uint ncomplete = KBIN::VASP_RelaxationsComplete(xvasp.Directory, "relax", num_relax);
     for (uint i = 1; i <= num_relax; i++) {
-      string filename = aurostd::CleanFileName(xvasp.Directory + "/CONTCAR.relax" + aurostd::utype2string<int>(i));  //CO20200624 - patching --run vs --run=1 bug
       aurostd::StringstreamClean(aus);
-      aus << _AGLSTR_MESSAGE_ + "Relaxation CONTCAR filename = " << filename << endl;  
+      aus << _AGLSTR_MESSAGE_ + "Relaxation " << i << (i <= ncomplete ? " has already completed" : " has not completed") << endl;
       aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-      if (aurostd::FileExist(filename) || aurostd::FileExist(filename + ".xz")) {
-        aurostd::StringstreamClean(aus);
-        aus << _AGLSTR_MESSAGE_ + "Relaxation " << i << " has already completed"  << endl;  
-        aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-      } else {
-        aurostd::StringstreamClean(aus);
-        aus << _AGLSTR_MESSAGE_ + "Relaxation " << i << " has not completed"  << endl;  
-        aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-        relax_complete = false;
-      }
     }
-    if (relax_complete) {
+    if (ncomplete == num_relax) {
       aurostd::StringstreamClean(aus);
-      aus << _AGLSTR_MESSAGE_ + "Relaxation has already completed"  << endl;  
+      aus << _AGLSTR_MESSAGE_ + "Relaxation has already completed"  << endl;
       aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
       return 0;
-    } else {
-      for (uint i = 1; i <= num_relax; i++) {
-        krun = VASP_Produce_and_Modify_INPUT(xvasp, AflowIn, FileMESSAGE, aflags, kflags, vflags);
-        krun = (krun && VASP_Write_INPUT(xvasp, vflags));
-        krun = VASP_Run(xvasp, aflags, kflags, vflags, "relax" + aurostd::utype2string<int>(i), true, FileMESSAGE);
-        XVASP_INCAR_SPIN_REMOVE_RELAX(xvasp, aflags, vflags, i, (i<num_relax), FileMESSAGE);  //CO20210315 - write_incar only if (i<num_relax), no static afterwards
-        if (i < num_relax) {
-          XVASP_KPOINTS_IBZKPT_UPDATE(xvasp, aflags, vflags, i, true, FileMESSAGE); //CO20210315 - always true because (i < num_relax)
-        }
+    }
+    krun = VASP_Produce_and_Modify_INPUT(xvasp, AflowIn, FileMESSAGE, aflags, kflags, vflags);
+    krun = (krun && VASP_Write_INPUT(xvasp, vflags));
+    if (krun && ncomplete > 0) {KBIN::VASP_ResumeRelaxations(xvasp, aflags, vflags, ncomplete, true, FileMESSAGE);}
+    for (uint i = ncomplete + 1; krun && i <= num_relax; i++) {
+      const string relax = "relax" + aurostd::utype2string<uint>(i);
+      if (i < num_relax) {
+        krun = VASP_Run(xvasp, aflags, kflags, vflags, relax, relax, true, FileMESSAGE);
+        XVASP_INCAR_SPIN_FIX_RELAX(xvasp, aflags, vflags, i, true, FileMESSAGE);  //CO20210315 - write_incar only if (i<num_relax), no static afterwards
+        XVASP_KPOINTS_IBZKPT_UPDATE(xvasp, aflags, vflags, i, true, FileMESSAGE); //CO20210315 - always true because (i < num_relax)
+      } else {
+        krun = VASP_Run(xvasp, aflags, kflags, vflags, relax, true, FileMESSAGE);
+        XVASP_INCAR_SPIN_FIX_RELAX(xvasp, aflags, vflags, i, false, FileMESSAGE);
       }
     }
+    //CO20261006 STOP
     if (krun) {
       return 0;
     } else {
@@ -542,24 +539,38 @@ namespace AGL_functions {
     // string FileLockName = "agl.LOCK";
     // string AflowInName = _AFLOWIN_;
     // string FileLockName = _AFLOWLOCK_;    
-    string AflowInName = "", FileLockName = "";
+    string AflowInName=_AFLOWIN_, FileLockName=_AFLOWLOCK_; //CO20240406
 
-    // string filedirname = aurostd::CleanFileName(directory) + "agl.LOCK";
-    if (aurostd::FileExist(aurostd::CleanFileName(directory) + "agl.LOCK")) {
-      FileLockName = "agl.LOCK";
-    } else if (aurostd::FileExist(aurostd::CleanFileName(directory) + "ael.LOCK")) {
-      FileLockName = "ael.LOCK";
-    } else {
-      FileLockName = _AFLOWLOCK_;
+    //CO20240406 START - fixing for different variants
+    vector<string> vaflowin_variants;
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWIN_VARIANTS_AELAGL,vaflowin_variants,",");
+    for(uint i=0;i<vaflowin_variants.size();i++){
+      if(aurostd::FileExist(aurostd::CleanFileName(directory+"/"+vaflowin_variants[i]))){AflowInName=vaflowin_variants[i];break;}
     }
+    
+    vector<string> vlock_variants;
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants,",");
+    for(uint i=0;i<vlock_variants.size();i++){
+      if(aurostd::FileExist(aurostd::CleanFileName(directory+"/"+vlock_variants[i]))){FileLockName=vlock_variants[i];break;}
+    }
+    //CO20240406 STOP - fixing for different variants
 
-    if (aurostd::FileExist(aurostd::CleanFileName(directory) + _AFLOWIN_AGL_DEFAULT_)) {
-      AflowInName = _AFLOWIN_AGL_DEFAULT_;
-    } else if (aurostd::FileExist(aurostd::CleanFileName(directory) + _AFLOWIN_AEL_DEFAULT_)) {
-      AflowInName = _AFLOWIN_AEL_DEFAULT_;
-    } else {
-      AflowInName = _AFLOWIN_;
-    }
+    //[CO20240406 - OBSOLETE]// string filedirname = aurostd::CleanFileName(directory) + "agl.LOCK";
+    //[CO20240406 - OBSOLETE]if (aurostd::FileExist(aurostd::CleanFileName(directory) + "agl.LOCK")) {
+    //[CO20240406 - OBSOLETE]  FileLockName = "agl.LOCK";
+    //[CO20240406 - OBSOLETE]} else if (aurostd::FileExist(aurostd::CleanFileName(directory) + "ael.LOCK")) {
+    //[CO20240406 - OBSOLETE]  FileLockName = "ael.LOCK";
+    //[CO20240406 - OBSOLETE]} else {
+    //[CO20240406 - OBSOLETE]  FileLockName = _AFLOWLOCK_;
+    //[CO20240406 - OBSOLETE]}
+
+    //[CO20240406 - OBSOLETE]if (aurostd::FileExist(aurostd::CleanFileName(directory) + _AFLOWIN_AGL_DEFAULT_)) {
+    //[CO20240406 - OBSOLETE]  AflowInName = _AFLOWIN_AGL_DEFAULT_;
+    //[CO20240406 - OBSOLETE]} else if (aurostd::FileExist(aurostd::CleanFileName(directory) + _AFLOWIN_AEL_DEFAULT_)) {
+    //[CO20240406 - OBSOLETE]  AflowInName = _AFLOWIN_AEL_DEFAULT_;
+    //[CO20240406 - OBSOLETE]} else {
+    //[CO20240406 - OBSOLETE]  AflowInName = _AFLOWIN_;
+    //[CO20240406 - OBSOLETE]}
 
     // Call AGL_xvasp_flags_populate to populate xvasp, aflags, kflags and vflags classes
     uint aglerror = AGL_functions::AGL_xvasp_flags_populate(xvasp, AflowIn, AflowInName, FileLockName, directory, aflags, kflags, vflags, FileMESSAGE);
@@ -2310,6 +2321,10 @@ namespace AGL_functions {
     aurostd::StringstreamClean(aus);
     aus << _AGLSTR_MESSAGE_ << "starting try loop to create strained structures and run GIBBS" << endl;  
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
+    
+    vector<string> vlock_variants_aelagl; //CO20240409
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,","); //CO20240409
+    string FileLockName=""; //CO20240409
 
     // Create set of strained structures, write _AFLOWIN_ files to directories, run VASP, collect results, and pass to GIBBS method
     // This "try" loop is adapted from that in AFLOW APL function DirectMethodPC::runVASPCalculations()
@@ -2403,6 +2418,12 @@ namespace AGL_functions {
           aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
           return 1;
         }
+        
+        for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){ //CO20240409
+          //CO20240409 - it seems vaspRuns[idVaspRun].Directory is an OBSOLETE setting, we check both anyway
+          if(aurostd::FileExist(aurostd::CleanFileName(vaspRuns[idVaspRun].Directory+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+          if(aurostd::FileExist(aurostd::CleanFileName(dirrunname.at(idVaspRun)+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+        } //CO20240409
 
         // If there are already LOCK or OUTCAR.static files in this directory, it means this directory was already generated and computed.
         // Therefore do not touch, but store this structure in the list, so that it can be used in the next part of code.
@@ -2413,10 +2434,13 @@ namespace AGL_functions {
             aurostd::FileExist( dirrunname.at(idVaspRun) + string("/OUTCAR.static") ) ||
             aurostd::EFileExist( dirrunname.at(idVaspRun) + string("/OUTCAR.static") ) ||
             ((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) &&
-             ((aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) ||
-              (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/LOCK")) ||
-              (aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) ||
-              (aurostd::FileExist( dirrunname.at(idVaspRun) + "/LOCK")))) ) continue;
+             (
+              (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+FileLockName)) || //CO20240409
+              //[CO20240409 - OBSOLETE](aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) ||
+              (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_)) ||
+              (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+FileLockName)) || //CO20240409
+              //[CO20240409 - OBSOLETE](aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) ||
+              (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_)))) ) continue;
 
         // Check if structure is on list of failed runs to be skipped
         // If so, then skip generation and continue to next structure

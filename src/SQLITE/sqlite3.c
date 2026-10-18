@@ -19,6 +19,7 @@
 */
 #define SQLITE_CORE 1
 #define SQLITE_AMALGAMATION 1
+#define SQLITE_ENABLE_JSON1 1 //WJ20230803 added to allow for vector filtering
 #ifndef SQLITE_PRIVATE
 # define SQLITE_PRIVATE static
 #endif

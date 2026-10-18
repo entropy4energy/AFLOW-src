@@ -16,12 +16,47 @@
 #define _AFLOWLIB_ENTRY_LOADER_CPP_
 
 #include "aflow.h"
+#include <algorithm> //CO20260930
 #include "aflowlib.h"
+#include "aflow_aflux.h" //WJ Include aflux for filtering functions
+
+static const char* const ENTRY_LOADER_COLLECTION_WEB="WEB"; //CO20260930
 
 #define _DEBUG_ENTRY_LOADER_ false
 
 
 namespace aflowlib {
+  //CO20261002 - entries per AFLUX page when paging(0) is sent as pages, and the most pages one query may take.
+  //The AFLUX server runs the whole query for every page and returns one slice; the CHAOS API will take
+  //pages of at most 500 (CO20261006), so a large query takes more requests.
+  static const uint AFLUX_PAGE_SIZE = AFLUX_PAGE_SIZE_DEFAULT; //CO20261006 - the CHAOS API answers pages of at most 500 (was 10000)
+  static const uint AFLUX_MAX_PAGES = 1000;
+  //CO20261004 - AUIDs or AURLs per AFLUX request: a list joins a batch while the batch and the next value
+  //(without the ':') are shorter than this, so the URL stays short (HE20221117)
+  static const size_t AFLUX_VALUE_LIST_MAX = 5000;
+
+  //CO20261004 START
+  /// @brief the terms of an AFLUX query at the outer level, decoded: "?a(1),b%282%2C3%29" -> {"a(1)", "b(2,3)"}
+  /// @param query AFLUX query, plain or percent-encoded, with or without the leading `?`
+  static std::vector<std::string> AFLUXQueryTerms(const std::string &query) {
+    std::string decoded = aflux::decodeURL(query);
+    if (!decoded.empty() && decoded[0] == '?') {decoded.erase(0, 1);}
+    return aflux::splitStringByOuterDelimeter(decoded, ',');
+  }
+
+  /// @brief the name of an AFLUX term without white space: " $paging( 0 )" -> "$paging"
+  static std::string AFLUXTermName(const std::string &term) {
+    return aurostd::RemoveWhiteSpaces(aflux::pairParamsFromFuncs({term})[0].first);
+  }
+
+  /// @brief does a query, as AFLUX's parser read it, ask for its whole result in one answer: paging(0) in format(aflow)
+  /// @param parsed AFLUX object after AFLUX::parseQuery()
+  /// @note the s4e.ai gate refuses paging(0); such a query is sent as pages (EntryLoader::getAFLUXPages()),
+  ///       joined line by line, which needs format(aflow) (one entry per line)
+  static bool AFLUXPagingAll(const aflux::AFLUX &parsed) {
+    return !parsed.m_default_paging && parsed.m_pagingParam_n == 0 && parsed.m_format == "aflow";
+  }
+  //CO20261004 STOP
 
   /// @class EntryLoader
   /// @brief unified interface to gather AFLOW lib entries from different sources
@@ -69,6 +104,16 @@ namespace aflowlib {
 
   /// @brief initialize the class (private)
   /// create shared pointer used to store the data views and read default values from flags
+  /// @brief the SQLite file the entry loader reads for a given --aflow_db= value
+  /// @param aflow_db_file value of --aflow_db= (XHOST.vflag_control "AFLOW_DB_FILE")
+  /// @return the file itself; DEFAULT_AFLOW_DB_FILE when it is empty or a folder (a JSONL folder is not an SQLite file)
+  /// @authors
+  /// @mod{CO,20261007,created}
+  std::string EntryLoader::sqliteFile(const std::string& aflow_db_file) {
+    if (aflow_db_file.empty() || aurostd::IsDirectory(aflow_db_file)) return DEFAULT_AFLOW_DB_FILE;
+    return aflow_db_file;
+  }
+
   void EntryLoader::init() {
     m_out_silent = true;
     m_out_debug = (XHOST.DEBUG || _DEBUG_ENTRY_LOADER_);
@@ -76,14 +121,29 @@ namespace aflowlib {
     m_xstructure_original = false;
     m_xstructure_final_file_name = {"CONTCAR.relax2", "CONTCAR.relax", "POSCAR.static", "POSCAR.bands", "CONTCAR.static", "CONTCAR.bands"};
 
-    m_sqlite_file = DEFAULT_AFLOW_DB_FILE;
+    m_sqlite_file = sqliteFile(XHOST.vflag_control.getattachedscheme("AFLOW_DB_FILE"));  //CO20261004 - --aflow_db= picks the database (defaults to DEFAULT_AFLOW_DB_FILE)
     m_sqlite_alloy_file = DEFAULT_ENTRY_LOADER_ALLOY_DB_FILE;
-    m_sqlite_collection = "RAW";
+    m_sqlite_collection = std::string(ENTRY_LOADER_COLLECTION_WEB); //CO20260930
 
-    m_aflux_server = DEFAULT_ENTRY_LOADER_AFLUX_SERVER;
-    m_aflux_path = DEFAULT_ENTRY_LOADER_AFLUX_PATH;
-    m_aflux_collection = "RAW";
-    m_aflux_directives = {{"format", "aflow"}, {"paging", "0"}};
+    m_auid_prefix = DEFAULT_ENTRY_LOADER_AUID_PREFIX;
+    m_aurl_path = DEFAULT_ENTRY_LOADER_AURL_PATH;
+
+    //WJ20231103 begin Create vector of servers and lists from string in rc
+    m_aflux_server_list = DEFAULT_ENTRY_LOADER_AFLUX_SERVER_LIST;
+    m_aflux_path_list = DEFAULT_ENTRY_LOADER_AFLUX_PATH_LIST;
+    aurostd::string2tokens(m_aflux_server_list, m_aflux_server_vector, ",");
+    aurostd::string2tokens(m_aflux_path_list, m_aflux_path_vector, ",");
+    if(m_aflux_server_vector.size()!=m_aflux_path_vector.size()){
+      m_logger_message << "Bad .aflow.rc specifications, DEFAULT_ENTRY_LOADER_AFLUX_SERVER_LIST.size() != DEFAULT_ENTRY_LOADER_AFLUX_PATH_LIST.size()";
+      outHardError(__AFLOW_FUNC__, __LINE__,_INDEX_MISMATCH_);
+      return;
+    }
+    //WJ end
+
+
+
+    m_aflux_collection = "WEB"; //WJ20240523 - Changed RAW to WEB
+    m_aflux_directives = {{"format", "aflow"}, {"paging", "0"}}; //WJ20231103 NOTE: Need to change paging parameter (AFLOW struggles to return all data with 0 paging (too many entries))
 
     m_restapi_server = DEFAULT_ENTRY_LOADER_RESTAPI_SERVER;
     m_restapi_path = DEFAULT_ENTRY_LOADER_RESTAPI_PATH;
@@ -156,7 +216,7 @@ namespace aflowlib {
   /// @note `aflow:d912e209c81aeb94`
   /// @note `auid:d912e209c81aeb94`
   /// @note `d912e209c81aeb94`
-  void EntryLoader::loadAUID(std::string AUID) {
+  void EntryLoader::loadAUID(std::string AUID) { 
     selectSource();
 
     m_logger_message << "Try loading: " << AUID;
@@ -170,14 +230,14 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::SQLITE: {
-        std::string where = "auid='\"" + AUID + "\"'";
+        std::string where = m_sqlite_db_ptr->idColumn() + "='\"" + AUID + "\"'";  //CO20261008 - chaos_id, or auid in a database built before
         loadSqliteWhere(where);
         break;
       }
 
       case Source::AFLUX: {
         std::map <std::string, std::string> matchbook{{"*",    ""},
-                                                      {"auid", "'" + AUID + "'"}};
+                                                      {"chaos_id", AFLUXValueList({AUID})}};  //CO20261008 - was auid
         loadAFLUXMatchbook(matchbook);
         break;
       }
@@ -224,33 +284,18 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::AFLUX: {
-        std::string AUID_combined = "";
-        bool first = true;
-        for (size_t i=0; i<clean_AUID.size(); i++){
-          if ((AUID_combined+ clean_AUID[i]).size()  < 5000) {
-            if (first) {
-              AUID_combined=clean_AUID[i];
-              first=false;
-            }
-            else AUID_combined+="':'" + clean_AUID[i];
-          }
-          else {
-            AUID_combined = "'" + AUID_combined + "'";
-            loadAFLUXMatchbook({{"*",    ""},
-                                {"auid", AUID_combined}});
-            AUID_combined = clean_AUID[i];
-          }
+        //CO20261004 - batches from AFLUXValueBatches(), were joined here by hand with a first flag
+        const std::vector<std::string> batches = AFLUXValueBatches(clean_AUID, AFLUX_VALUE_LIST_MAX);
+        for (size_t i = 0; i < batches.size(); i++) {
+          loadAFLUXMatchbook({{"*",    ""},
+                              {"chaos_id", batches[i]}});  //CO20261008 - was auid
         }
-
-        AUID_combined = "'" + AUID_combined + "'";
-        loadAFLUXMatchbook({{"*",    ""},
-                            {"auid", AUID_combined}});
         break;
       }
 
       case Source::SQLITE: {
         std::string where = aurostd::joinWDelimiter(clean_AUID, "\"','\"");
-        where = "auid IN ('\"" + where + "\"')";
+        where = m_sqlite_db_ptr->idColumn() + " IN ('\"" + where + "\"')";  //CO20261008 - chaos_id, or auid in a database built before
         loadSqliteWhere(where);
         break;
       }
@@ -258,10 +303,15 @@ namespace aflowlib {
       case Source::RESTAPI:
       case Source::RESTAPI_RAW: {
         std::vector <std::string> queries;
+        const std::string auid_prefix = m_auid_prefix + ":";
+        const size_t prefix_len = auid_prefix.size();
         for (std::vector<std::string>::const_iterator AUID_single = clean_AUID.begin(); AUID_single != clean_AUID.end(); AUID_single++) {
-          std::string rest_query = "AUID/aflow:";
-          for (uint part = 6; part <= 20; part+= 2) rest_query += AUID_single->substr(part, 2) + "/";
-          rest_query += "WEB/";
+          if (AUID_single->size() <= prefix_len) continue;
+          std::string rest_query = "AUID/" + auid_prefix;
+          for (size_t part = prefix_len; part + 1 < AUID_single->size(); part += 2) {
+            rest_query += AUID_single->substr(part, 2) + "/";
+          }
+          rest_query += m_restapi_collection + "/";
           queries.push_back(rest_query);
         }
         loadRestAPIQueries(queries);
@@ -271,9 +321,14 @@ namespace aflowlib {
       case Source::FILESYSTEM:
       case Source::FILESYSTEM_RAW: {
         std::vector <std::string> files;
+        const std::string auid_prefix = m_auid_prefix + ":";
+        const size_t prefix_len = auid_prefix.size();
         for (std::vector<std::string>::const_iterator AUID_single = clean_AUID.begin(); AUID_single != clean_AUID.end(); AUID_single++) {
-          std::string file_path = m_filesystem_path + "AUID/aflow:";
-          for (uint part = 6; part <= 20; part+= 2) file_path += AUID_single->substr(part, 2) + "/";
+          if (AUID_single->size() <= prefix_len) continue;
+          std::string file_path = m_filesystem_path + "AUID/" + auid_prefix;
+          for (size_t part = prefix_len; part + 1 < AUID_single->size(); part += 2) {
+            file_path += AUID_single->substr(part, 2) + "/";
+          }
           file_path += m_filesystem_collection + "/" + m_filesystem_outfile;
           files.push_back(file_path);
         }
@@ -291,7 +346,7 @@ namespace aflowlib {
   /// @authors
   /// @mod{HE,20220217,created}
   /// @note following AURLs would be equivalent:
-  /// @note `aflowlib.duke.edu:AFLOWDATA/LIB2_RAW/Ca_svCu_pv/138`
+  /// @note `s4e.ai:AFLOWDATA/LIB2_RAW/Ca_svCu_pv/138`
   /// @note `AFLOWDATA/LIB2_RAW/Ca_svCu_pv/138`
   /// @note `LIB2_RAW/Ca_svCu_pv/138`
   /// @note `WEB`, `RAW`, and `LIB` will be replaced by the selected collection
@@ -312,16 +367,19 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::SQLITE: {
-        std::string where = "aurl='\"" + AURL + "\"'";
-        where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
+        std::string where = "";
+        if (m_sqlite_db_ptr->pathColumn() == "chaos_path") {where = "chaos_path='\"" + AURL2ChaosPath(AURL) + "\"'";}  //CO20261008
+        else {
+          where = "aurl='\"" + AURL + "\"'";
+          where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
+        }
         loadSqliteWhere(where);
         break;
       }
 
       case Source::AFLUX: {
-        AURL = std::regex_replace(AURL, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
         std::map <std::string, std::string> matchbook{{"*",    ""},
-                                                      {"aurl", "'" + AURL + "'"}};
+                                                      {"chaos_path", AFLUXValueList({AURL2ChaosPath(AURL)})}};  //CO20261008 - was aurl
         loadAFLUXMatchbook(matchbook);
         break;
       }
@@ -368,36 +426,28 @@ namespace aflowlib {
     switch (m_current_source) {
 
       case Source::AFLUX: {
-        std::string AURL_combined = "";
-        bool first = true;
-        for (size_t i=0; i<clean_AURL.size(); i++){
-          if ((AURL_combined+ clean_AURL[i]).size()  < 5000) {
-            if (first) {
-              AURL_combined=clean_AURL[i];
-              first=false;
-            }
-            else AURL_combined+="':'" + clean_AURL[i];
-          }
-          else {
-            AURL_combined = "'" + AURL_combined + "'";
-            AURL_combined = std::regex_replace(AURL_combined, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
-            loadAFLUXMatchbook({{"*",    ""},
-                                {"aurl", AURL_combined}});
-            AURL_combined = clean_AURL[i];
-          }
+        //CO20261004 - batches from AFLUXValueBatches(), were joined here by hand with a first flag
+        std::vector<std::string> clean_paths;  //CO20261008 - chaos_path of each AURL
+        for (size_t i = 0; i < clean_AURL.size(); i++) clean_paths.push_back(AURL2ChaosPath(clean_AURL[i]));
+        const std::vector<std::string> batches = AFLUXValueBatches(clean_paths, AFLUX_VALUE_LIST_MAX);
+        for (size_t i = 0; i < batches.size(); i++) {
+          loadAFLUXMatchbook({{"*",    ""},
+                              {"chaos_path", batches[i]}});  //CO20261008 - was aurl
         }
-
-        AURL_combined = "'" + AURL_combined + "'";
-        AURL_combined = std::regex_replace(AURL_combined, aurostd::regex_aurl2file, "$1_" + m_aflux_collection + "/");
-        loadAFLUXMatchbook({{"*",    ""},
-                            {"aurl", AURL_combined}});
         break;
       }
 
       case Source::SQLITE: {
-        std::string where = aurostd::joinWDelimiter(clean_AURL, "\"','\"");
-        where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
-        where = "aurl IN ('\"" + where + "\"')";
+        std::string where = "";
+        if (m_sqlite_db_ptr->pathColumn() == "chaos_path") {  //CO20261008
+          std::vector<std::string> paths;
+          for (size_t i = 0; i < clean_AURL.size(); i++) paths.push_back(AURL2ChaosPath(clean_AURL[i]));
+          where = "chaos_path IN ('\"" + aurostd::joinWDelimiter(paths, "\"','\"") + "\"')";
+        } else {
+          where = aurostd::joinWDelimiter(clean_AURL, "\"','\"");
+          where = std::regex_replace(where, aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/");
+          where = "aurl IN ('\"" + where + "\"')";
+        }
         loadSqliteWhere(where);
         break;
       }
@@ -406,7 +456,7 @@ namespace aflowlib {
       case Source::RESTAPI_RAW: {
         std::vector <std::string> queries;
         for (std::vector<std::string>::const_iterator AURL_single = clean_AURL.begin(); AURL_single != clean_AURL.end(); AURL_single++) {
-          std::string rest_query = std::regex_replace(AURL_single->substr(28), aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/") + "/";
+          std::string rest_query = std::regex_replace(aflowlib::AURLPath(*AURL_single), aurostd::regex_aurl2file, "$1_" + m_sqlite_collection + "/") + "/";
           queries.push_back(rest_query);
         }
         loadRestAPIQueries(queries);
@@ -417,7 +467,7 @@ namespace aflowlib {
       case Source::FILESYSTEM_RAW: {
         std::vector <std::string> files;
         for (std::vector<std::string>::const_iterator AURL_single = clean_AURL.begin(); AURL_single != clean_AURL.end(); AURL_single++) {
-          std::string file_path = m_filesystem_path + AURL_single->substr(28) + "/" + m_filesystem_outfile;
+          std::string file_path = m_filesystem_path + aflowlib::AURLPath(*AURL_single) + "/" + m_filesystem_outfile;
           file_path = std::regex_replace(file_path, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
           files.push_back(file_path);
         }
@@ -455,7 +505,7 @@ namespace aflowlib {
   void EntryLoader::loadAlloy(const std::vector <std::string> &alloy, bool recursive) {
     selectSource();
     std::vector <std::string> alloy_clean;
-
+  
     // check that all parts of alloy are actually elements
     for (std::vector<std::string>::const_iterator element = alloy.begin(); element != alloy.end(); element++) {
       if (xelement::xelement::isElement(*element) == 0) {
@@ -510,7 +560,7 @@ namespace aflowlib {
       case Source::AFLUX: {
         std::string alloy_match = aurostd::joinWDelimiter(final_alloy_list, ":");
         std::map <std::string, std::string> matchbook{{"*",     ""},
-                                                      {"alloy", alloy_match}};
+                                                      {"alloy", alloy_match}}; 
         loadAFLUXMatchbook(matchbook);
         break;
       }
@@ -550,17 +600,56 @@ namespace aflowlib {
   /// @authors
   /// @mod{HE,20220422,created}
   /// @note use setSource() to change the current source to Source::SQLITE to ensure that the database is connected
-  void EntryLoader::loadSqliteWhere(const std::string &where) {
-//    std::vector <std::string> raw_lines = getRawSqliteWhere(where);
-    vector<vector<string>> content = m_sqlite_db_ptr->getRowsMultiTables(where);
-    vector<string> keys = m_sqlite_db_ptr->getColumnNames("auid_00");
+  void EntryLoader::loadSqliteWhere(const string& where){
+    vector<string> keywords = {};
+    string order_by = "";
+    return loadSqliteWhere(where, keywords, order_by);
+  }
 
+
+
+  void EntryLoader::loadSqliteWhere(const string &where, const vector<string>& keywords, const string& order_by) {
+    //WJ20230807 START
+    string ob = order_by;
+    if (ob == "") ob = m_sqlite_db_ptr->idColumn(); // MB20240711 Needs default ordering or non-AFLUX-OPEN queries will not gen data. //CO20261008 - chaos_id, or auid before
+    const vector<string> tables_db = m_sqlite_db_ptr->getTables();  //CO20261008 - was auid_00
+    vector<string> keys = tables_db.empty() ? vector<string>() : m_sqlite_db_ptr->getColumnNames(tables_db[0]);
+    string keywordString = "";
+    m_aflux_version = aflux::AFLUX().m_version; // MB20240814
+
+    // MB20240711
+    // [OBSOLETE] bool m_printNull = true;//KC20240309 - tmp fix - avoids seg fault when running entry_loader unit tests
+    // [OBSOLETE] if(m_printNull){ //WJ20230720 Changed to only return properties that were queried for
+    
+    if (keywords.size() > 0) { // Used for custom keyword query, default is *.
+      keys.clear();
+      for (uint i = 0; i < keywords.size(); i++){
+        keys.push_back(keywords[i]);
+      }
+
+      if(where.find("alloy") != string::npos){ // FIXME: queries without species might not work
+        keys.push_back("species");
+      }
+
+      keywordString += aurostd::joinWDelimiter(keys,", ");
+    } else { // default query
+      keywordString = "*";
+    }
+    
+    vector<vector<string>> content;
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    if(ob.size()){
+      content = m_sqlite_db_ptr->getRowsMultiTables(where, keywordString, ob); //WJ20230720 Added ability to change order of results
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " CONTENT " << content.size() << endl;}
+    } else{
+      content = m_sqlite_db_ptr->getRowsMultiTables(where);
+    }
+    //WJ20230807 STOP
     m_logger_message << content.size() << " entries found in DB for " << where;
     outDebug(__AFLOW_FUNC__);
 
     size_t start_size = m_entries_flat->size();
     loadVector(keys, content, where);
-
     m_logger_message << "Loaded " << m_entries_flat->size() - start_size << " new entries";
     outInfo(__AFLOW_FUNC__);
 
@@ -585,8 +674,26 @@ namespace aflowlib {
   /// @note a pair creates `<keyword>(<modifier>)`
   /// @note if modifier is empty just the keyword is used
   void EntryLoader::loadAFLUXMatchbook(const std::map <std::string, std::string> &matchbook) {
-    loadAFLUXQuery(buildAFLUXQuery(matchbook));
+      loadAFLUXQuery(buildAFLUXQuery(matchbook));
   }
+//WJ20231103 BEGIN - clean AFLUX query back to basic (no new operator "@")
+  string EntryLoader::cleanAFLUXquery(const string& query){
+      vector<string> parts = aflux::splitStringByOuterDelimeter(query, ',');
+      string cleanedQuery = "";
+      string rem = "";
+      for(uint i = 0; i < parts.size(); i++){
+        if(parts[i].find('@') != string::npos){
+          rem = parts[i].substr(parts[i].find('('));
+          rem = rem.substr(1, rem.size()-2);
+          parts[i].replace(parts[i].find(rem),rem.size(),"*");
+        }
+      }
+      cleanedQuery = aurostd::joinWDelimiter(parts,",");
+      return cleanedQuery;
+    } 
+  // WJ END
+
+  
 
   /// @brief load entries from a list of REST API queries
   /// @authors
@@ -716,12 +823,26 @@ namespace aflowlib {
       entry->el_source_type = getSourceString();
       entry->el_source = source;
       if (!entry->auid.empty() && (std::find(m_auid_list.begin(),m_auid_list.end(), entry->auid) == m_auid_list.end())) {
-        m_entries_flat->push_back(entry);
-        (*m_entries_layered_map)[entry->nspecies][entry->species].push_back(entry);
-        m_auid_list.emplace_back(entry->auid);
-        if (m_xstructure_original) addXstructure(*entry, true);
-        if (m_xstructure_relaxed) addXstructure(*entry);
+      //WJ20231103 BEGIN added filtering on atomic and tensor properties
+        if(applyCPPFiltersToSingleEntry(*entry)){
+          m_entries_flat->push_back(entry);
+            auto& vlayer=(*m_entries_layered_map)[entry->nspecies][entry->species_pp]; //CO20260930
+            vlayer.push_back(entry);
+            m_auid_list.emplace_back(entry->auid);
+            if (m_xstructure_original) addXstructure(*entry, true);
+            if (m_xstructure_relaxed) addXstructure(*entry);
+        }
       }
+      //WJ END
+    }
+  }
+
+  bool EntryLoader::applyCPPFiltersToSingleEntry(const aflowlib::_aflowlib_entry& entry){
+    // MB20240814 This may not distinguish between versions correctly but it is better than just checking for "s4e.ai"
+    if(m_aflux_version >= 200) { 
+      return aflux::atomicFilterSingleEntry(entry, m_aflux_atomic_filter_keywords, m_aflux_atomic_filter_params) && aflux::filterSpecialCPP(entry, m_aflux_special_filter_map);
+    } else{
+      return aflux::atomicFilterSingleEntry(entry, m_aflux_atomic_filter_keywords, m_aflux_atomic_filter_params) && aflux::tensorFilterSingleEntry(entry, m_aflux_tensor_filter_keywords, m_aflux_tensor_filter_params) && aflux::filterSpecialCPP(entry, m_aflux_special_filter_map);
     }
   }
 
@@ -741,12 +862,17 @@ namespace aflowlib {
       entry->el_source_type = getSourceString();
       entry->el_source = source;
       if (!entry->auid.empty() && (std::find(m_auid_list.begin(),m_auid_list.end(), entry->auid) == m_auid_list.end())) {
-        m_entries_flat->push_back(entry);
-        (*m_entries_layered_map)[entry->nspecies][entry->species].push_back(entry);
-        m_auid_list.emplace_back(entry->auid);
-        if (m_xstructure_original) addXstructure(*entry, true);
-        if (m_xstructure_relaxed) addXstructure(*entry);
+      //WJ20231103 BEGIN added filtering on atomic and tensor properties
+        if(applyCPPFiltersToSingleEntry(*entry)){
+          m_entries_flat->push_back(entry);
+            auto& vlayer=(*m_entries_layered_map)[entry->nspecies][entry->species_pp]; //CO20260930
+            vlayer.push_back(entry);
+            m_auid_list.emplace_back(entry->auid);
+            if (m_xstructure_original) addXstructure(*entry, true);
+            if (m_xstructure_relaxed) addXstructure(*entry);
+        }
       }
+      //WJ END
     }
   }
 
@@ -798,9 +924,12 @@ namespace aflowlib {
         break;
       }
 
-      case Source::AFLUX: {
-        if ("AFLUXtest" == aurostd::httpGet(m_aflux_server+"/test/?echo=AFLUXtest")) {
+      case Source::AFLUX: { //NOTE: WJ20231103: We should add a similar test page to s4e
+        m_current_source = Source::AFLUX; 
+        return true;
+        if ("AFLUXtest" == aurostd::httpGet(m_aflux_server+"/test/?echo=AFLUXtest")) { //WJ comented out test 
           m_current_source = Source::AFLUX;
+          cout << "TEST PASSED " << endl;
           return true;
         } else {
           m_logger_message << "AFLUX API could not be reached at " << m_aflux_server;
@@ -925,18 +1054,191 @@ namespace aflowlib {
   /// @mod{HE,20220216,created}
   /// @return list of query result strings
   /// @note #m_aflux_server and #m_aflux_path will be added
-  std::vector <std::string> EntryLoader::getRawAFLUXQuery(const std::string &query){
+  std::vector <std::string> EntryLoader::getRawAFLUXQuery(const std::string &orignal_query){
     std::string output = "";
     std::vector <std::string> raw_lines;
-    if (200 == aurostd::httpGetStatus(m_aflux_server, m_aflux_path, query, output)){
-      aurostd::string2vectorstring(output, raw_lines);
-    } else {
-      m_logger_message << "Failed to get AFLUX query ";
-      m_logger_message << "(" << m_aflux_server << " | " << m_aflux_path << " | " << query << ")";
-      outError(__AFLOW_FUNC__, __LINE__);
+    std::string query = orignal_query;
+    aflux::AFLUX trans;
+    trans.forceAflowFormat(query);
+    //WJ20231103 Begin
+    string cleanedQuery = cleanAFLUXquery(query) += ",composition(*)"; //WJ20231103 Must include composition in order to do atomic filtering later
+    vector<string> outVec;
+    
+    trans.parseQuery(query);
+    const bool page_all = AFLUXPagingAll(trans); //CO20261004 - paging(0) as AFLUX's parser read the query (AFLUXPageQuery() looked for it with two regexes)
+    m_aflux_atomic_filter_keywords = trans.m_atomicFilterKeywords;
+    m_aflux_atomic_filter_params = trans.m_atomicFilterParams;
+    m_aflux_tensor_filter_keywords = trans.m_tensorFilterKeywords;
+    m_aflux_tensor_filter_params = trans.m_tensorFilterParams;
+    m_aflux_special_filter_map = trans.m_specialFilterMap;
+
+    for (uint i = 0; i < m_aflux_server_vector.size(); i++){ //WJ20231103 Iterate through list of servers to query
+      m_aflux_server = m_aflux_server_vector[i];
+      m_aflux_path = m_aflux_path_vector[i];
+
+
+      // MB20240805 Checking Aflux version is more formal than check if server is s4e.ai
+      aflux::AFLUX::Version ver = trans.checkAFLUXVersion(m_aflux_server, m_aflux_path);
+      m_aflux_version = ver;
+
+      //CO20261002 START - one fetch path for both versions; paging(0) is sent as pages (AFLUXPageQuery) //CO20261004 - when page_all
+      std::string send_query;
+      switch (ver) {
+        case(aflux::AFLUX::Version::v200): send_query = query; break; //WJ20231103 No need to clean query when querying latest ver
+        case(aflux::AFLUX::Version::v100): send_query = cleanedQuery; break; // Older version of AFLUX
+        default:
+          m_logger_message << "Unknown AFLUX version: ";
+          m_logger_message << trans.m_version << " ";
+          m_logger_message << "(" << m_aflux_server << " | " << m_aflux_path << " | " << query << ")";
+          outError(__AFLOW_FUNC__, __LINE__);
+          continue;
+      }
+      int status = -1;
+      if (getAFLUXPages(send_query, page_all, raw_lines, status)) { //CO20261004 - page_all
+        outVec.insert(outVec.begin(), raw_lines.begin(), raw_lines.end()); //WJ append to total list
+      } else {
+        m_logger_message << "Failed to get AFLUX query ";
+        m_logger_message << "(" << m_aflux_server << " | " << m_aflux_path << " | " << query << ")";
+        if (status < 0) m_logger_message << " - no complete answer (network error, or cut off in transit)";
+        else m_logger_message << " - HTTP status " << status;
+        const std::string hint = aurostd::httpChaosApiKeyHint(m_aflux_server, status);
+        if (!hint.empty()) m_logger_message << " - " << hint;
+        outError(__AFLOW_FUNC__, __LINE__);
+      }
+      //CO20261002 STOP
     }
-    return raw_lines;
+    return outVec;
   }
+
+  //CO20261002 START
+  /// @brief run an AFLUX query on #m_aflux_server / #m_aflux_path, page by page when it asks for paging(0)
+  /// @param query AFLUX query (plain or percent-encoded, with the leading `?`)
+  /// @param page_all the query asks for paging(0) in format(aflow), as AFLUX's parser reads it (AFLUXPagingAll()) //CO20261004
+  /// @param lines result lines (one entry per line in format(aflow))
+  /// @param status HTTP status of the last request
+  /// @return `true` when every request answered 200
+  /// @note paging(0) returns the whole result set in one answer; the s4e.ai gate refuses it, so it
+  ///       is sent as paging(1,k), paging(2,k), ... until a page has fewer than k entries. Pages
+  ///       follow the server's order (by auid for alloy queries), which is the same in every request.
+  ///       A page cut off in transit is a failed request (curl's exit status, Content-Length and the
+  ///       last chunk are checked for s4e.ai), so a short page is the last page.
+  bool EntryLoader::getAFLUXPages(const std::string &query, bool page_all, std::vector<std::string> &lines, int &status) {
+    lines.clear();
+    std::string output;
+    const uint page_size = AFLUX_PAGE_SIZE;
+    if (!page_all || AFLUXPageQuery(query, 1, page_size).empty()) { // bounded query: one request //CO20261004 - the caller decides (page_all)
+      status = aurostd::httpGetStatus(m_aflux_server, m_aflux_path, query, output);
+      if (status != 200) return false;
+      aurostd::string2vectorstring(output, lines);
+      return true;
+    }
+    std::string first_line_previous;
+    for (uint page = 1; page <= AFLUX_MAX_PAGES; page++) {
+      status = aurostd::httpGetStatus(m_aflux_server, m_aflux_path, AFLUXPageQuery(query, page, page_size), output);
+      if (status != 200) return false;
+      std::vector<std::string> page_lines, raw;
+      aurostd::string2vectorstring(output, raw);
+      for (size_t l = 0; l < raw.size(); l++) {
+        if (!aurostd::RemoveWhiteSpaces(raw[l]).empty()) page_lines.push_back(raw[l]);
+      }
+      if (page_lines.empty()) return true;
+      if (page > 1 && page_lines[0] == first_line_previous) { // the server ignored paging: keep one copy
+        m_logger_message << "AFLUX server ignored paging(" << page << "," << page_size << ")";
+        outError(__AFLOW_FUNC__, __LINE__);
+        return true;
+      }
+      first_line_previous = page_lines[0];
+      lines.insert(lines.end(), page_lines.begin(), page_lines.end());
+      if (page_lines.size() < page_size) return true;
+    }
+    m_logger_message << "AFLUX query stopped after " << AFLUX_MAX_PAGES << " pages of " << page_size;
+    outError(__AFLOW_FUNC__, __LINE__);
+    status = -1;
+    return false;
+  }
+
+  /// @brief AUIDs or AURLs as one AFLUX value: joined with ':' (AFLUX's OR), without quotes
+  /// @param values AUIDs ("s4e:0171c43afba95d07") or AURLs ("s4e.ai:AFLOWDATA/LIB3_WEB/...")
+  /// @return the value to put between the parentheses of auid(...) or aurl(...)
+  /// @note s4e.ai's AFLUX engine (aflow_aflux.cpp) does not read quoted values: it splits a value
+  ///       at every ':', then joins "s4e" with the AUID and "s4e.ai" with the AURL path again
+  ///       (AFLUX::correctSQLforAUIDs()). A quoted value ('s4e:...', as the earlier AFLUX servers
+  ///       took it) kept its quotes in the SQL and matched nothing. An AURL with a ':' after the
+  ///       host (POCC or LIB1 run names) is still split there; the engine has no way to escape it.
+  std::string AFLUXValueList(const std::vector<std::string> &values) { //CO20261003
+    return aurostd::joinWDelimiter(values, ":");
+  }
+
+  //CO20261004 START
+  /// @brief AUIDs or AURLs in batches, each batch one AFLUX value from AFLUXValueList()
+  /// @param values AUIDs or AURLs
+  /// @param max_length a value joins the current batch while the batch and the value together
+  ///        (without the ':') are shorter than this
+  /// @return one value per batch, in order; none for an empty list
+  /// @note one helper for loadAUID() and loadAURL() (with #AFLUX_VALUE_LIST_MAX); a value too long on
+  ///       its own gets a batch of its own. The loops this replaces sent an empty batch for an empty
+  ///       list or a first value that was too long, which made the query auid or aurl without a value
+  std::vector<std::string> AFLUXValueBatches(const std::vector<std::string> &values, size_t max_length) {
+    std::vector<std::string> batches, batch;
+    size_t batch_length = 0;  // length of AFLUXValueList(batch)
+    for (size_t i = 0; i < values.size(); i++) {
+      if (!batch.empty() && batch_length + values[i].size() >= max_length) {
+        batches.push_back(AFLUXValueList(batch));
+        batch.clear();
+      }
+      batch_length = (batch.empty() ? 0 : batch_length + 1) + values[i].size();
+      batch.push_back(values[i]);
+    }
+    if (!batch.empty()) {batches.push_back(AFLUXValueList(batch));}
+    return batches;
+  }
+  //CO20261004 STOP
+
+  /// @brief the query for one page of an AFLUX query: its paging term set to paging(page,page_size)
+  /// @param query AFLUX query, plain or percent-encoded, with or without the leading `?`
+  /// @param page page number (from 1)
+  /// @param page_size entries per page
+  /// @return "?" and the query, percent-encoded as buildAFLUXQuery() encodes it, or "" when the query
+  ///         has no paging term
+  /// @note CO20261004 - the terms are decoded (aflux::decodeURL), split (aflux::splitStringByOuterDelimeter),
+  ///       joined (aurostd::joinWDelimiter) and encoded again (aurostd::httpPercentEncodingFull), so plain and
+  ///       encoded queries take one path (there were two regexes, one per form); whether a query is to be paged
+  ///       is decided by AFLUX's parser (AFLUXPagingAll()), not here
+  std::string AFLUXPageQuery(const std::string &query, uint page, uint page_size) {
+    std::vector<std::string> terms = AFLUXQueryTerms(query);
+    bool found = false;
+    for (size_t i = 0; i < terms.size(); i++) {
+      const std::string name = AFLUXTermName(terms[i]);
+      if (aurostd::RemoveCharacterFromTheFront(name, '$') != "paging") {continue;}
+      terms[i] = name + "(" + aurostd::utype2string<uint>(page) + "," + aurostd::utype2string<uint>(page_size) + ")";  // a '$' stays
+      found = true;
+    }
+    if (!found) {return "";}
+    return "?" + aurostd::httpPercentEncodingFull(aurostd::joinWDelimiter(terms, ","));
+  }
+
+  /// @brief does an AFLUX query ask for its whole result in one answer: paging(0) in format(aflow)
+  /// @param query AFLUX query, plain or percent-encoded, with or without the leading `?`
+  /// @return `true` when it should be sent as pages (EntryLoader::getAFLUXPages())
+  /// @note for a query AFLUX's parser has not read yet (AFLUXCall()); only its paging and format terms go to
+  ///       the parser, which does not know every keyword a server knows and would stop at one
+  bool AFLUXPagingAll(const std::string &query) { //CO20261004
+    try {
+      std::vector<std::string> directives;
+      const std::vector<std::string> terms = AFLUXQueryTerms(query);
+      for (size_t i = 0; i < terms.size(); i++) {
+        const std::string name = aurostd::RemoveCharacterFromTheFront(AFLUXTermName(terms[i]), '$');
+        if (name == "paging" || name == "format") {directives.push_back(terms[i]);}
+      }
+      if (directives.empty()) {return false;}
+      aflux::AFLUX parsed;
+      parsed.parseQuery("?" + aurostd::joinWDelimiter(directives, ","));
+      return AFLUXPagingAll(parsed);
+    }
+    catch (aurostd::xerror &) {return false;}   // an unknown format: sent as it is, the server answers
+    catch (std::exception &) {return false;}    // a broken percent sign (decodeURL)
+  }
+  //CO20261002 STOP
 
   /// @brief query the REST API
   /// @param query REST API query
@@ -997,14 +1299,35 @@ namespace aflowlib {
   /// @return xstructure
   /// @note does not add the structure to entry.vstr
   bool EntryLoader::loadXstructureFile(const aflowlib::_aflowlib_entry &entry, xstructure &new_structure, std::vector <std::string> possible_files) {
-    std::string base_url = m_restapi_server + m_restapi_path + entry.aurl.substr(28) + "/";
+    std::string base_url = m_restapi_server + m_restapi_path + aflowlib::AURLPath(entry.aurl) + "/";
     std::string base_folder;
+    
+    // MB20240711 START Add S4E File loading path for XStructure Unit Tests
+    std::string aurl = entry.aurl;
+    std::string org = aurl.substr(0, aurl.find(':'));
+
+    std::string proto_end = aurl.substr(aurl.rfind('.')+1); 
+    uint proto_len = proto_end.size();
+
+    std::deque<string> tokens;
+    aurostd::string2tokens(aurl, tokens, "/");
+    std::string decoration_path = *(tokens.end() - 2);
+    std::string proto_path = *(tokens.end() - 1);
+
     bool direct_fs = entry.el_source_type.substr(0, 10) == "FILESYSTEM"; // catch FILESYSTEM and FILESYSTEM_RAW
-    if (direct_fs){
-      base_folder = entry.el_source.substr(0, entry.el_source.size()-m_filesystem_outfile.size());
-    } else {
-      base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
-      base_folder = std::regex_replace(base_folder, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
+
+    if (org == "s4e.ai") { // S4E FILESYS
+      base_folder = m_filesystem_path;
+      base_folder += "LIB" + aurostd::utype2string<uint>(proto_len);
+      base_folder += "/LIB/" + decoration_path + "/" + proto_path;
+      // MB20240711 STOP
+    } else { // AFLOWDATA layout (any other host)
+      if (direct_fs){
+        base_folder = entry.el_source.substr(0, entry.el_source.size()-m_filesystem_outfile.size()); // KC 20240503 - loading Xtstructure unit test fails here. Looks like we structure our filesystem differently than aflowOrg
+      } else {
+        base_folder = m_filesystem_path + aflowlib::AURLPath(entry.aurl) + "/";
+        base_folder = std::regex_replace(base_folder, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
+      } 
     }
     std::string poscar;
     if (entry.catalog =="LIB0" && !m_filesystem_available && entry.aurl.substr(entry.aurl.size() - 2)=="/0"){
@@ -1049,10 +1372,10 @@ namespace aflowlib {
     if (direct_fs){
       base_folder = entry.el_source.substr(0, entry.el_source.size()-m_filesystem_outfile.size());
     } else {
-      base_folder = m_filesystem_path + entry.aurl.substr(28) + "/";
+      base_folder = m_filesystem_path + aflowlib::AURLPath(entry.aurl) + "/";
       base_folder = std::regex_replace(base_folder, aurostd::regex_aurl2file, "$1/" + m_filesystem_collection + "/");
     }
-    std::string base_url = m_restapi_server + m_restapi_path + entry.aurl.substr(28) + "/";
+    std::string base_url = m_restapi_server + m_restapi_path + aflowlib::AURLPath(entry.aurl) + "/";
     std::string aflowin_content;
 
     if (m_filesystem_available || direct_fs) {
@@ -1268,7 +1591,7 @@ namespace aflowlib {
     auid_list.clear();
     std::string where = aurostd::joinWDelimiter(alloy_list, "','");
     where = "alloy IN ('" + where + "')";
-    auid_list = m_sqlite_alloy_db_ptr->getValuesMultiTable("auid", where);
+    auid_list = m_sqlite_alloy_db_ptr->getValuesMultiTable(m_sqlite_alloy_db_ptr->idColumn(), where);  //CO20261008 - chaos_id, or auid before
   }
 
   /// @brief load AFLOW lib entries for a given alloy directly from the filesystem (source FILESYSTEM_RAW)
@@ -1475,11 +1798,24 @@ namespace aflowlib {
   /// @mod{HE,20220216,created}
   /// @note the AUID is cleaned in place
   bool EntryLoader::cleanAUID(std::string & AUID) {
-    if (AUID.find('\"')!=std::string::npos) aurostd::StringSubst(AUID, "\"", "");
-    if (AUID.substr(0, 5) == "auid:") AUID="aflow:" + AUID.substr(5);
-    else if (AUID.substr(0, 6) != "aflow:") AUID="aflow:" + AUID;
-    if (aurostd::_ishex(AUID.substr(6)) && AUID.size()==22) return true;
-    else return false;
+    aurostd::RemoveCharacterInPlace(AUID, '"'); //CO20260930 - strip quotes //CO20261004
+
+    std::string prefix = m_auid_prefix;
+    std::string id = AUID;
+    if (id.substr(0, 5) == "auid:") {
+      id = id.substr(5);
+    } else {
+      size_t prefix_pos = id.find(':');
+      if (prefix_pos != std::string::npos) {
+        prefix = id.substr(0, prefix_pos);
+        id = id.substr(prefix_pos + 1);
+      }
+    }
+
+    if (!aurostd::_ishex(id) || id.size() != 16) return false;
+
+    AUID = prefix + ":" + id;
+    return true;
   }
 
   /// @brief map different AURL styles to a default
@@ -1490,16 +1826,21 @@ namespace aflowlib {
   /// @note AURL is not validated
   /// @note the AURL is cleaned in place
   bool EntryLoader::cleanAURL(std::string & AURL) {
+    string path = m_aurl_path + ":";
     if (AURL.substr(0, 5) == "aurl:")  AURL = AURL.substr(5);
-    if (AURL.substr(0, 28)== "aflowlib.duke.edu:AFLOWDATA/") return true;
+    // Normalize explicit host paths (e.g., s4e.ai:AFLOWDATA/...)
+    //CO20261004 - AURLStripHost removes any host, was find(":AFLOWDATA/") by hand; the AFLOWDATA branch below
+    //adds #m_aurl_path back (the separate check for path+"AFLOWDATA/" could not be reached: the find caught it first)
+    AURL = aflowlib::AURLStripHost(AURL);
     if (AURL.substr(0, 9) == "AFLOWDATA") {
-      AURL = "aflowlib.duke.edu:" + AURL;
+      AURL = path + AURL;
       return true;
     }
     if ((AURL.substr(0,3) == "LIB" || AURL.substr(0,4) == "ICSD")) {
-      AURL = "aflowlib.duke.edu:AFLOWDATA/" + AURL;
+      AURL = path + "AFLOWDATA/" + AURL;
       return true;
     }
+    cout << "FAILED " << AURL << endl;
     return false;
   }
 
@@ -1519,7 +1860,7 @@ namespace aflowlib {
         if (!it->second.empty()) query += "(" + it->second + ")";
       }
     }
-    query.erase(0,1);
+    query.erase(0,1); 
     return "?" + aurostd::httpPercentEncodingFull(query);
   }
 

@@ -2256,7 +2256,8 @@ namespace aurostd {  // namespace aurostd
       xmatrix<utype> b(a.rows,a.cols);
       //  cerr << "DET CALL size="<<size<< endl;
       utype adet=det(a);
-      if(adet==(utype) 0)  {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"singular matrix",_INPUT_ILLEGAL_);}
+      if(adet==(utype) 0)  {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"zero matrix",_INPUT_ILLEGAL_);}
+      //[CO20250724 - breaks a unit test]if(abs(adet)<(utype) _ZERO_TOL_)  {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"singular matrix (det="+aurostd::utype2string(adet)+")",_INPUT_ILLEGAL_);}  //CO+ST20250724 - some internal algorithms go into infinite loops without it; LIB2_WEB/ClPb_d/AB2_oP6_31_a_2a-001.BA
       if(size==1) {b[1][1]=(utype)1/a[1][1]; return b;}
       if(size==2) { //CO20191201
         b[1][1]=a[2][2]/adet;b[1][2]=-a[1][2]/adet;
@@ -4760,7 +4761,7 @@ namespace aurostd {
       if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
       utype gcd=0,x=0,y=0;
-      GCD(a,b,gcd,x,y);
+      if(a!=(utype)0 || b!=(utype)0){GCD(a,b,gcd,x,y);}  //CO20261005 - gcd(0,0) is undefined in GCD(); the identity below applies
       if(LDEBUG){cerr << __AFLOW_FUNC__ << " gcd(" << a << "," << b << ")=" << gcd << ", x=" << x << ", y=" << y << endl;}
       //ehermite is 2x2
       if(ehermite.rows!=2 || ehermite.cols!=2){xmatrix<utype> ehermite_tmp(2,2);ehermite=ehermite_tmp;}
@@ -4779,449 +4780,133 @@ namespace aurostd {
       if(LDEBUG){cerr << __AFLOW_FUNC__ << " END" << endl;}
     }
   template<class utype>
-    void getSmithNormalForm(const xmatrix<utype>& A_in,xmatrix<utype>& U_out,xmatrix<utype>& V_out,xmatrix<utype>& S_out,double tol){  //CO+YL20191201
-      //implementation is inspired by that found here: http://pydoc.net/GBpy/0.1.1/GBpy.tools/
-      //original license: GNU-GPL Style.
-      //Smith normal form of an integer matrix.
-      //[U,S,V] = smith(A) returns integer matrices U, S, and V such that
-      //S = U*A*V (rotated from A=U*S*V')
-      //S is diagonal and nonnegative, S(i,i) divides S(i+1,i+1) for all i,
-      //det U =+-1, and det V =+-1.
-      //This function is in some ways analogous to SVD.
-      //This looks much like an SVD algorithm that first bidiagonalizes
-      //A by Givens rotations and then chases zeros, except for
-      //the construction of the 2 by 2 elementary transformation.
-      //we work with doubles inside, return int matrices later
-
+    void getSmithNormalForm(const xmatrix<utype>& A_in,xmatrix<utype>& U_out,xmatrix<utype>& V_out,xmatrix<utype>& S_out,double tol){  //CO+YL20191201 //CO20261005 - integer pivoting
+      //Smith normal form of an integer matrix:
+      //S=U*A*V with U and V unimodular (det +-1), S diagonal and nonnegative, S(i,i) divides S(i+1,i+1).
+      //CO20261005 - integer arithmetic throughout, as in the SmithNormalForm routine of symlib
+      //(github.com/msg-byu/symlib, rational_mathematics.f90; J. Phys. Commun. 3, 065009 (2019)),
+      //extended to m x n: pivot on the smallest nonzero entry, clear its
+      //row and column with nearest-integer quotients, and add a row the pivot does not divide, until the pivot divides
+      //the rest. It replaces a floating-point port of a Matlab routine (CO+YL20191201) that threw on 981 of the 2961
+      //HNF matrices of determinant 1 to 16, mostly gcd(0,0) in getEHermite().
+      //The entries are 128-bit integers in [-(2^127-1),2^127-1] (every 64-bit input fits, unsigned included, and the
+      //entries of U and V can grow well past the input during the elimination); every step is checked for overflow,
+      //and the result must fit utype: unsigned types throw when U or V has a negative entry. S always fits when the
+      //input does (up to 2^63 for a long long 1x1 matrix), but U and V of general matrices with large entries can
+      //outgrow 64 bits (5% of random 3x3 matrices with entries up to 1000); it then throws rather than truncate.
+      static_assert(std::numeric_limits<utype>::is_integer,"aurostd::getSmithNormalForm() needs an integer matrix type");
       bool LDEBUG=(FALSE || XHOST.DEBUG);
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
-
+      (void)tol;  //exact integer arithmetic
       if(LDEBUG){cerr << __AFLOW_FUNC__ << " A=" << endl;cerr << A_in << endl;}
-
-      xmatrix<double> S=aurostd::xmatrixutype2double(A_in);S.shift(1,1); //algorithm depends on lrows==lcols==1
-
-      int m=S.rows,n=S.cols;
-      int min_mn=std::min(m,n);
-      xmatrix<double> U=eye<double>(m),V=eye<double>(n);
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " bidiagonalizing S with elementary Hermite transforms" << endl;}
-
-      xmatrix<double> E(2,2);
-      xmatrix<double> mXtwo_in(m,2),mXtwo_out(m,2),nXtwo_in(n,2),nXtwo_out(n,2),twoXn_in(2,n),twoXn_out(2,n);
-      int j=0,i=0,jj=0;
-      for(j=S.lcols;j<=min_mn;j++){
-        //Zero column j below the diagonal.
-        for(i=j+1;i<=m;i++){
-          if(!iszero(S[i][j],tol)){
-            //Construct an elementary Hermite transformation E
-            //to zero S(i,j) by combining rows i and j.
-            getEHermite(S[j][j],S[i][j],E);
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " getEHermite(S[j=" << j <<"][j=" << j << "]="<< S[j][j] <<",S[i=" << i << "][j=" << j << "]=" << S[i][j] << ")=" << endl;cerr << E << endl;}
-
-            //Apply the transform to S
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-            //build S([j i],:)
-            for(jj=twoXn_in.lcols;jj<=twoXn_in.ucols;jj++){
-              twoXn_in[twoXn_in.lrows][jj]=S[j][jj];
-              twoXn_in[twoXn_in.urows][jj]=S[i][jj];  //urows=lrows+1, ucols=lcols+1
+      const int m=A_in.rows,n=A_in.cols;
+      typedef __int128 wint;
+      typedef unsigned __int128 uwint;
+      const uwint wmax=(((uwint)1)<<127)-1;  //symmetric range: negation, division and remainder never overflow
+      std::vector<std::vector<wint> > S(m,std::vector<wint>(n,0)),U(m,std::vector<wint>(m,0)),V(n,std::vector<wint>(n,0));
+      int i=0,j=0,t=0;
+      for(i=0;i<m;i++){
+        for(j=0;j<n;j++){S[i][j]=(wint)A_in[A_in.lrows+i][A_in.lcols+j];}  //exact for every integer type up to 64 bits
+      }
+      for(i=0;i<m;i++){U[i][i]=1;}
+      for(j=0;j<n;j++){V[j][j]=1;}
+      auto overflow=[](){throw aurostd::xerror(__AFLOW_FILE__,"aurostd::getSmithNormalForm():","integer overflow",_VALUE_RANGE_);};
+      auto magnitude=[](wint a) -> uwint {return (a<0 ? (uwint)0-(uwint)a : (uwint)a);};
+      auto mul=[&overflow,&magnitude](wint a,wint b) -> wint {  //a*b //CO20261017 - wmax is a constant, used without a capture
+        if(a==0 || b==0){return 0;}
+        const uwint ma=magnitude(a),mb=magnitude(b);
+        if(ma>wmax/mb){overflow();}
+        const wint p=(wint)(ma*mb);
+        return ((a<0)!=(b<0)) ? -p : p;
+      };
+      auto add=[&overflow](wint a,wint b) -> wint {  //a+b
+        if((b>0 && a>(wint)wmax-b) || (b<0 && a<-(wint)wmax-b)){overflow();}
+        return a+b;
+      };
+      auto mulsub=[&add,&mul](wint a,wint q,wint b) -> wint {return add(a,-mul(q,b));};  //a-q*b
+      auto quotient=[&magnitude](wint a,wint b) -> wint {wint q=a/b,rem=a%b;if(2*magnitude(rem)>magnitude(b)){q+=(((rem<0)==(b<0))?1:-1);} return q;};  //nearest integer, remainder at most |b|/2
+      //row i -= q*row k (S and U); column j -= q*column k (S and V)
+      auto rowSub=[&](int ri,int rk,wint q){for(int jj=0;jj<n;jj++){S[ri][jj]=mulsub(S[ri][jj],q,S[rk][jj]);} for(int jj=0;jj<m;jj++){U[ri][jj]=mulsub(U[ri][jj],q,U[rk][jj]);}};
+      auto colSub=[&](int cj,int ck,wint q){for(int ii=0;ii<m;ii++){S[ii][cj]=mulsub(S[ii][cj],q,S[ii][ck]);} for(int ii=0;ii<n;ii++){V[ii][cj]=mulsub(V[ii][cj],q,V[ii][ck]);}};
+      const int r=std::min(m,n);
+      bool rest_zero=false;
+      for(t=0;t<r && !rest_zero;t++){
+        while(true){
+          //pivot: smallest nonzero entry of S(t:,t:), first in row-major order
+          int ipiv=-1,jpiv=-1;
+          uwint best=0;
+          for(i=t;i<m;i++){
+            for(j=t;j<n;j++){
+              if(S[i][j]!=0 && (ipiv<0 || magnitude(S[i][j])<best)){ipiv=i;jpiv=j;best=magnitude(S[i][j]);}
             }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S([j=" << j << " i=" << i << "],:)=" << endl;cerr << twoXn_in << endl;}
-            twoXn_out=E*twoXn_in; //2x2 x 2x3 = 2x3
-            //store twoXn_out into S([j i],:)
-            for(jj=twoXn_out.lcols;jj<=twoXn_out.ucols;jj++){
-              S[j][jj]=twoXn_out[twoXn_in.lrows][jj];
-              S[i][jj]=twoXn_out[twoXn_in.urows][jj];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-            //Apply the transform to U
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(pre)=" << endl;cerr << U << endl;}
-            //build U(:,[j i])
-            for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-              mXtwo_in[jj][mXtwo_in.lcols]=U[jj][j];
-              mXtwo_in[jj][mXtwo_in.ucols]=U[jj][i];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(:,[j=" << j << " i=" << i << "])=" << endl;cerr << mXtwo_in << endl;}
-            mXtwo_out=mXtwo_in/E;
-            //store mXtwo_out into U(:,[j i])
-            for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-              U[jj][j]=mXtwo_out[jj][mXtwo_out.lcols];
-              U[jj][i]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(post)=" << endl;cerr << U << endl;}
           }
+          if(ipiv<0){rest_zero=true;break;}  //S(t:,t:) is zero
+          if(ipiv!=t){std::swap(S[ipiv],S[t]);std::swap(U[ipiv],U[t]);}
+          if(jpiv!=t){
+            for(i=0;i<m;i++){std::swap(S[i][jpiv],S[i][t]);}
+            for(i=0;i<n;i++){std::swap(V[i][jpiv],V[i][t]);}
+          }
+          //clear column t below and row t right of the pivot; remainders are smaller than the pivot
+          bool clear=true;
+          for(i=t+1;i<m;i++){if(S[i][t]!=0){rowSub(i,t,quotient(S[i][t],S[t][t]));if(S[i][t]!=0){clear=false;}}}
+          for(j=t+1;j<n;j++){if(S[t][j]!=0){colSub(j,t,quotient(S[t][j],S[t][t]));if(S[t][j]!=0){clear=false;}}}
+          if(!clear){continue;}  //pivot again on a smaller entry
+          //the pivot must divide the rest
+          int bi=-1;
+          for(i=t+1;i<m && bi<0;i++){for(j=t+1;j<n;j++){if(S[i][j]%S[t][t]!=0){bi=i;break;}}}
+          if(bi<0){break;}
+          for(j=0;j<n;j++){S[t][j]=add(S[t][j],S[bi][j]);}  //bring the entry into row t, next pass leaves a smaller remainder
+          for(j=0;j<m;j++){U[t][j]=add(U[t][j],U[bi][j]);}
         }
-        //Zero row j after the superdiagonal.
-        for(i=j+2;i<=n;i++){
-          if(!iszero(S[j][i],tol)){
-            //Construct an elementary Hermite transformation E
-            //to zero S(j,i) by combining columns j+1 and i.
-            getEHermite(S[j][j+1],S[j][i],E);
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " getEHermite(S[j=" << j <<"][j+1=" << j+1 << "]="<< S[j][j+1] <<",S[j=" << j << "][i=" << i << "]=" << S[j][i] << ")=" << endl;cerr << E << endl;}
+        if(!rest_zero && S[t][t]<0){
+          for(j=0;j<n;j++){S[t][j]=-S[t][j];}
+          for(j=0;j<m;j++){U[t][j]=-U[t][j];}
+        }
+      }
 
-            //Apply the transform to S
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-            //build S(:,[j+1 i])
-            for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-              mXtwo_in[jj][mXtwo_in.lcols]=S[jj][j+1];
-              mXtwo_in[jj][mXtwo_in.ucols]=S[jj][i];  //urows=lrows+1, ucols=lcols+1
+      //test of stupidity: S=U*A*V modulo two primes near 2^62 (the products of 128-bit entries do not fit 128 bits)
+      const unsigned long long int vprimes[2]={2305843009213693951ULL,4611686018427387847ULL};
+      for(int ip=0;ip<2;ip++){
+        const wint p=(wint)vprimes[ip];
+        auto modp=[p](wint a) -> uwint {wint res=a%p;if(res<0){res+=p;} return (uwint)res;};
+        for(i=0;i<m;i++){
+          for(j=0;j<n;j++){
+            uwint sum=0;
+            for(int k=0;k<m;k++){
+              uwint av=0;
+              for(int l=0;l<n;l++){av=(av+modp((wint)A_in[A_in.lrows+k][A_in.lcols+l])*modp(V[l][j]))%(uwint)p;}
+              sum=(sum+modp(U[i][k])*av)%(uwint)p;
             }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(:,[j+1=" << j+1 << " i=" << i << "])=" << endl;cerr << mXtwo_in << endl;}
-            mXtwo_out=mXtwo_in*trasp(E);
-            //store mXtwo_out into S(:,[j+1 i])
-            for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-              S[jj][j+1]=mXtwo_out[jj][mXtwo_out.lcols];
-              S[jj][i]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-            //Apply the transform to V
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(pre)=" << endl;cerr << V << endl;}
-            //build V(:,[j+1 i])
-            for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-              nXtwo_in[jj][nXtwo_in.lcols]=V[jj][j+1];
-              nXtwo_in[jj][nXtwo_in.ucols]=V[jj][i];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(:,[j+1=" << j+1 << " i=" << i << "])=" << endl;cerr << nXtwo_in << endl;}
-            nXtwo_out=nXtwo_in/E;
-            //store nXtwo_out into V(:,[j+1 i])
-            for(jj=nXtwo_out.lrows;jj<=nXtwo_out.urows;jj++){
-              V[jj][j+1]=nXtwo_out[jj][nXtwo_out.lcols];
-              V[jj][i]=nXtwo_out[jj][nXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-            }
-            if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(post)=" << endl;cerr << V << endl;}
+            if(sum!=modp(S[i][j])){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"SNF decomposition failed (S!=U*A*V)",_RUNTIME_ERROR_);}
           }
         }
       }
 
-      //if results differ slightly from matlab, check _GCD() and enable matlab implementation for gcd(1,1)
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S << endl;
-      }
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " S is now upper bidiagonal, eliminating superdiagonal non-zeros" << endl;}
-
-      xvector<double> D=S.getdiag(1);
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " D=" << D << endl;}
-
-      int k=0;
-      double q=0.0;
-      while(!iszero(D,tol)){
-        //Start chasing bulge at first nonzero superdiagonal element.
-        k=-1;
-        for(i=D.lrows;i<=D.urows;i++){
-          if(!iszero(D[i],tol)){k=i;break;}
-        }
-        //be careful, k refers to index of D, not S
-
-        //To guarantee reduction in S(k,k), first make S(k,k) positive
-        //and make S(k,k+1) nonnegative and less than S(k,k).
-        if(std::signbit(S[k][k])){
-          for(i=S.lcols;i<=S.ucols;i++){S[k][i]=-S[k][i];}
-          for(i=U.lrows;i<=U.urows;i++){U[i][k]=-U[i][k];}
-        }
-        q=std::floor(S[k][k+1]/S[k][k]);
-        E[1][1]=1;E[1][2]=0;
-        E[2][1]=-q;E[2][2]=1;
-
-        //Apply the transform to S
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-        //build S(:,[k k+1])
-        for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-          mXtwo_in[jj][mXtwo_in.lcols]=S[jj][k];
-          mXtwo_in[jj][mXtwo_in.ucols]=S[jj][k+1];  //urows=lrows+1, ucols=lcols+1
-        }
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(:,[k=" << k << " k+1=" << k+1 << "])=" << endl;cerr << mXtwo_in << endl;}
-        mXtwo_out=mXtwo_in*trasp(E);
-        //store mXtwo_out into S(:,[k k+1])
-        for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-          S[jj][k]=mXtwo_out[jj][mXtwo_out.lcols];
-          S[jj][k+1]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-        }
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-        //Apply the transform to V
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(pre)=" << endl;cerr << V << endl;}
-        //build V(:,[k k+1])
-        for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-          nXtwo_in[jj][nXtwo_in.lcols]=V[jj][k];
-          nXtwo_in[jj][nXtwo_in.ucols]=V[jj][k+1];  //urows=lrows+1, ucols=lcols+1
-        }
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(:,[k=" << k << " k+1=" << k+1 << "])=" << endl;cerr << nXtwo_in << endl;}
-        nXtwo_out=nXtwo_in/E;
-        //store nXtwo_out into V(:,[k k+1])
-        for(jj=nXtwo_out.lrows;jj<=nXtwo_out.urows;jj++){
-          V[jj][k]=nXtwo_out[jj][nXtwo_out.lcols];
-          V[jj][k+1]=nXtwo_out[jj][nXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-        }
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(post)=" << endl;cerr << V << endl;}
-
-        if(!iszero(S[k][k+1],tol)){
-          //Zero the first nonzero superdiagonal element
-          //using columns k and k+1, to start the bulge at S(k+1,k).
-          getEHermite(S[k][k],S[k][k+1],E);
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " getEHermite(S[k=" << k <<"][k=" << k << "]="<< S[k][k] <<",S[k=" << k << "][k+1=" << k+1 << "]=" << S[k][k+1] << ")=" << endl;cerr << E << endl;}
-
-          //Apply the transform to S
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-          //build S(:,[k k+1])
-          for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-            mXtwo_in[jj][mXtwo_in.lcols]=S[jj][k];
-            mXtwo_in[jj][mXtwo_in.ucols]=S[jj][k+1];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(:,[k=" << k << " k+1=" << k+1 << "])=" << endl;cerr << mXtwo_in << endl;}
-          mXtwo_out=mXtwo_in*trasp(E);
-          //store mXtwo_out into S(:,[k k+1])
-          for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-            S[jj][k]=mXtwo_out[jj][mXtwo_out.lcols];
-            S[jj][k+1]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-          //Apply the transform to V
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(pre)=" << endl;cerr << V << endl;}
-          //build V(:,[k k+1])
-          for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-            nXtwo_in[jj][nXtwo_in.lcols]=V[jj][k];
-            nXtwo_in[jj][nXtwo_in.ucols]=V[jj][k+1];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(:,[k=" << k << " k+1=" << k+1 << "])=" << endl;cerr << nXtwo_in << endl;}
-          nXtwo_out=nXtwo_in/E;
-          //store nXtwo_out into V(:,[k k+1])
-          for(jj=nXtwo_out.lrows;jj<=nXtwo_out.urows;jj++){
-            V[jj][k]=nXtwo_out[jj][nXtwo_out.lcols];
-            V[jj][k+1]=nXtwo_out[jj][nXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(post)=" << endl;cerr << V << endl;}
-
-          for(j=S.lcols;j<=min_mn;j++){
-            if(j+1<=m){
-              //Zero S(j+1,j) using rows j and j+1.
-              getEHermite(S[j][j],S[j+1][j],E);
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " getEHermite(S[j=" << j <<"][j=" << j << "]="<< S[j][j] <<",S[j+1=" << j+1 << "][j=" << j << "]=" << S[j+1][j] << ")=" << endl;cerr << E << endl;}
-
-              //Apply the transform to S
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-              //build S([j j+1],:)
-              for(jj=twoXn_in.lcols;jj<=twoXn_in.ucols;jj++){
-                twoXn_in[twoXn_in.lrows][jj]=S[j][jj];
-                twoXn_in[twoXn_in.urows][jj]=S[j+1][jj];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S([j=" << j << " j+1=" << j+1 << "],:)=" << endl;cerr << twoXn_in << endl;}
-              twoXn_out=E*twoXn_in; //2x2 x 2x3 = 2x3
-              //store twoXn_out into S([j j+1],:)
-              for(jj=twoXn_out.lcols;jj<=twoXn_out.ucols;jj++){
-                S[j][jj]=twoXn_out[twoXn_in.lrows][jj];
-                S[j+1][jj]=twoXn_out[twoXn_in.urows][jj];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-              //Apply the transform to U
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(pre)=" << endl;cerr << U << endl;}
-              //build U(:,[j j+1])
-              for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-                mXtwo_in[jj][mXtwo_in.lcols]=U[jj][j];
-                mXtwo_in[jj][mXtwo_in.ucols]=U[jj][j+1];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(:,[j=" << j << " j+1=" << j+1 << "])=" << endl;cerr << mXtwo_in << endl;}
-              mXtwo_out=mXtwo_in/E;
-              //store mXtwo_out into U(:,[j j+1])
-              for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-                U[jj][j]=mXtwo_out[jj][mXtwo_out.lcols];
-                U[jj][j+1]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(post)=" << endl;cerr << U << endl;}
+      //convert, as the input type
+      auto convert=[](const std::vector<std::vector<wint> >& M,int rows,int cols,xmatrix<utype>& out){
+        const wint vmin=(wint)std::numeric_limits<utype>::min(),vmax=(wint)std::numeric_limits<utype>::max();
+        out=xmatrix<utype>(rows,cols);
+        for(int ii=0;ii<rows;ii++){
+          for(int jj=0;jj<cols;jj++){
+            if(M[ii][jj]<vmin || M[ii][jj]>vmax){
+              string message="result does not fit the matrix type";
+              if(vmin==0 && M[ii][jj]<0){message+=" (negative entry of U or V; use a signed type)";}
+              throw aurostd::xerror(__AFLOW_FILE__,"aurostd::getSmithNormalForm():",message,_VALUE_RANGE_);
             }
-            if(j+2<=n){
-              //Zero S(j,j+2) using columns j+1 and j+2.
-              getEHermite(S[j][j+1],S[j][j+2],E);
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " getEHermite(S[j=" << j <<"][j+1=" << j+1 << "]="<< S[j][j+1] <<",S[j=" << j << "][j+2=" << j+2 << "]=" << S[j][j+2] << ")=" << endl;cerr << E << endl;}
-
-              //Apply the transform to S
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-              //build S(:,[j+1 j+2])
-              for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-                mXtwo_in[jj][mXtwo_in.lcols]=S[jj][j+1];
-                mXtwo_in[jj][mXtwo_in.ucols]=S[jj][j+2];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(:,[j+1=" << j+1 << " j+2=" << j+2 << "])=" << endl;cerr << mXtwo_in << endl;}
-              mXtwo_out=mXtwo_in*trasp(E);
-              //store mXtwo_out into S(:,[j+1 j+2])
-              for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-                S[jj][j+1]=mXtwo_out[jj][mXtwo_out.lcols];
-                S[jj][j+2]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-              //Apply the transform to V
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(pre)=" << endl;cerr << V << endl;}
-              //build V(:,[j+1 j+2])
-              for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-                nXtwo_in[jj][nXtwo_in.lcols]=V[jj][j+1];
-                nXtwo_in[jj][nXtwo_in.ucols]=V[jj][j+2];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(:,[j+1=" << j+1 << " j+2=" << j+2 << "])=" << endl;cerr << nXtwo_in << endl;}
-              nXtwo_out=nXtwo_in/E;
-              //store nXtwo_out into V(:,[j+1 j+2])
-              for(jj=nXtwo_out.lrows;jj<=nXtwo_out.urows;jj++){
-                V[jj][j+1]=nXtwo_out[jj][nXtwo_out.lcols];
-                V[jj][j+2]=nXtwo_out[jj][nXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-              }
-              if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(post)=" << endl;cerr << V << endl;}
-            }
+            out[out.lrows+ii][out.lcols+jj]=(utype)M[ii][jj];
           }
         }
-        D=S.getdiag(1);
-      }
-
-      //if results differ slightly from matlab, check _GCD() and enable matlab implementation for gcd(1,1)
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S << endl;
-      }
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " S is now diagonal, make it non-negative" << endl;}
-
-      for(j=S.lcols;j<=min_mn;j++){
-        if(std::signbit(S[j][j])){
-          for(i=S.lcols;i<=S.ucols;i++){S[j][i]=-S[j][i];}
-          for(i=U.lrows;i<=U.urows;i++){U[i][j]=-U[i][j];}
-        }
-      }
-
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S << endl;
-      }
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " squeezing factors to lower right to enforce divisibility condition" << endl;}
-
-      double a=0.0,b=0.0,gcd=0.0,x=0.0,y=0.0;
-      xmatrix<double> F(E),twoXtwo_in(2,2),twoXtwo_out(2,2);
-      for(i=S.lcols;i<=min_mn;i++){
-        for(j=i+1;j<=min_mn;j++){
-          //Replace S(i,i), S(j,j) by their gcd and lcm respectively.
-          a=S[i][i];
-          b=S[j][j];
-          GCD(a,b,gcd,x,y);
-
-          if(LDEBUG){
-            cerr << __AFLOW_FUNC__ << " a=" << a << endl;
-            cerr << __AFLOW_FUNC__ << " b=" << b << endl;
-            cerr << __AFLOW_FUNC__ << " gcd=" << gcd << endl;
-            cerr << __AFLOW_FUNC__ << " x=" << x << endl;
-            cerr << __AFLOW_FUNC__ << " y=" << y << endl;
-          }
-
-          E[1][1]=1.0;E[1][2]=y;
-          E[2][1]=-b/gcd;E[2][2]=a*x/gcd;
-
-          F[1][1]=x;F[1][2]=1.0;
-          F[2][1]=-b*y/gcd;F[2][2]=a/gcd;
-
-          if(LDEBUG){
-            cerr << __AFLOW_FUNC__ << " E=" << endl;cerr << E << endl;
-            cerr << __AFLOW_FUNC__ << " F=" << endl;cerr << F << endl;
-          }
-
-          //Apply the transform to S
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(pre)=" << endl;cerr << S << endl;}
-          //build S([i j],[i j])
-          twoXtwo_in[twoXtwo_in.lrows][twoXtwo_in.lcols]=S[i][i];twoXtwo_in[twoXtwo_in.lrows][twoXtwo_in.ucols]=S[i][j];  //urows=lrows+1, ucols=lcols+1
-          twoXtwo_in[twoXtwo_in.urows][twoXtwo_in.lcols]=S[j][i];twoXtwo_in[twoXtwo_in.urows][twoXtwo_in.ucols]=S[j][j];  //urows=lrows+1, ucols=lcols+1
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S([i=" << i << " j=" << j << "],[i=" << i << " j=" << j << "])=" << endl;cerr << twoXtwo_in << endl;}
-          twoXtwo_out=E*twoXtwo_in*trasp(F);
-          //store twoXtwo_out into S([i j],[i j])
-          S[i][i]=twoXtwo_out[twoXtwo_out.lrows][twoXtwo_out.lcols];S[i][j]=twoXtwo_out[twoXtwo_out.lrows][twoXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          S[j][i]=twoXtwo_out[twoXtwo_out.urows][twoXtwo_out.lcols];S[j][j]=twoXtwo_out[twoXtwo_out.urows][twoXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " S(post)=" << endl;cerr << S << endl;}
-
-          //Apply the transform to U
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(pre)=" << endl;cerr << U << endl;}
-          //build U(:,[i j])
-          for(jj=mXtwo_in.lrows;jj<=mXtwo_in.urows;jj++){
-            mXtwo_in[jj][mXtwo_in.lcols]=U[jj][i];
-            mXtwo_in[jj][mXtwo_in.ucols]=U[jj][j];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(:,[i=" << i << " j=" << j << "])=" << endl;cerr << mXtwo_in << endl;}
-          mXtwo_out=mXtwo_in/E;
-          //store mXtwo_out into U(:,[i j])
-          for(jj=mXtwo_out.lrows;jj<=mXtwo_out.urows;jj++){
-            U[jj][i]=mXtwo_out[jj][mXtwo_out.lcols];
-            U[jj][j]=mXtwo_out[jj][mXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " U(post)=" << endl;cerr << U << endl;}
-
-          //Apply the transform to V
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(pre)=" << endl;cerr << V << endl;}
-          //build V(:,[i j])
-          for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-            nXtwo_in[jj][nXtwo_in.lcols]=V[jj][i];
-            nXtwo_in[jj][nXtwo_in.ucols]=V[jj][j];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(:,[i=" << i << " j=" << j << "])=" << endl;cerr << nXtwo_in << endl;}
-          nXtwo_out=nXtwo_in/F;
-          //store nXtwo_out into V(:,[i j])
-          for(jj=nXtwo_in.lrows;jj<=nXtwo_in.urows;jj++){
-            V[jj][i]=nXtwo_out[jj][nXtwo_out.lcols];
-            V[jj][j]=nXtwo_out[jj][nXtwo_out.ucols];  //urows=lrows+1, ucols=lcols+1
-          }
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " V(post)=" << endl;cerr << V << endl;}
-        }
-      }
-
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S << endl;
-      }
-
-      //CONVERT TO INTEGERS FIRST!
-      //inverse of an integer matrix is an integer matrix IFF det(M)= 1/-1 (true for V and U as above)
-      //algorithm is MUCH more stable this way
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " converting to xmatrix<int>" << endl;}
-      U_out=xmatrixdouble2utype<utype>(U);
-      V_out=xmatrixdouble2utype<utype>(V);
-      S_out=xmatrixdouble2utype<utype>(S);
-      //if results differ slightly from matlab, check _GCD() and enable matlab implementation for gcd(1,1)
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U_out << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V_out << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S_out << endl;
-      }
-
-      //the routine should give SNF such that A=U*S*V'
-      //we will rotate after this if the Matlab output is desired
-      if(!aurostd::isequal(A_in,U_out*S_out*trasp(V_out),(utype)tol)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"SNF decomposition failed",_RUNTIME_ERROR_);}
-
-      //operations below here for Matlab-like output
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " transposing V to match Matlab" << endl;}
-      traspInPlace(V_out);  //such that A=U*S*V  and not A=U*S*V'
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V_out << endl;}
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " inverting V and U to match Matlab" << endl;}
-      V_out=inverse(V_out);U_out=inverse(U_out);  //to be identical to matlab's smithForm we need V -> inv(V) U-> inv(U)
-      //if results differ slightly from matlab, check _GCD() and enable matlab implementation for gcd(1,1)
-      if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U_out << endl;
-        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V_out << endl;
-        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S_out << endl;
-      }
-
-      //shift everything to match A_in
+      };
+      convert(U,m,m,U_out);
+      convert(V,n,n,V_out);
+      convert(S,m,n,S_out);
       U_out.shift(A_in.lrows,A_in.lcols);
       V_out.shift(A_in.lrows,A_in.lcols);
       S_out.shift(A_in.lrows,A_in.lcols);
-
-      //Matlab gives SNF such that S=U*A*V
-      if(!aurostd::isequal(S_out,U_out*A_in*V_out,(utype)tol)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"SNF decomposition failed AFTER Matlab transformations",_RUNTIME_ERROR_);}
-
-      if(LDEBUG){cerr << __AFLOW_FUNC__ << " END" << endl;}
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " U=" <<endl;cerr << U_out << endl;
+        cerr << __AFLOW_FUNC__ << " V=" <<endl;cerr << V_out << endl;
+        cerr << __AFLOW_FUNC__ << " S=" <<endl;cerr << S_out << endl;
+      }
     }
 }
 

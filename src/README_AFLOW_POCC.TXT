@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                           materials.duke.edu/AFLOW/README_AFLOW_POCC.TXT
-****************************************************************************************************
 One example of the high-throughput first-principle calculations for partial occupied
 structure (mostly written by Kesong Yang).
 
@@ -181,6 +179,125 @@ uncomment the line "[AFLOW_APL]CALC"
 the APL postprocessing step is not necessary.
 
 5.4) Run aflow in the POCC directory with the aflow_apl.in file.
+
+6) Sampling the supercells (CO20261006)
+
+A parent with too many decorations to compute them all can be sampled. The keys go below [AFLOW_POCC]CALC; with
+--aflow_proto, the options in brackets write them.
+
+[AFLOW_POCC]SAMPLE_NUMBER=N (--pocc_sample_number=N)
+The first round draws 100*N decorations at random from every site configuration of every superlattice, or takes all of
+them when there are fewer. The seed is DEFAULT_POCC_SAMPLE_SEED in .aflow.rc, so a run gives the same draw every time.
+The enumerator (section 7) groups the drawn decorations into unique supercells, each with the number of draws in it
+as degeneracy.
+The second round keeps N of the unique supercells at random, or all of them when there are no more than N.
+
+[AFLOW_POCC]SAMPLE_HASH=HnCm (--pocc_sample_hash=HnCm)
+Computes the one decoration that ARUN.POCC_*_HnCm names. With SAMPLE_NUMBER it joins the first round, and the second
+round is skipped.
+
+[AFLOW_POCC]SAMPLE_RATE=r1:r2 (--pocc_sample_rate=r1:r2)
+The first round takes the fraction r1 of the site configurations, the same ones in every superlattice, from a full
+enumeration; the second keeps the fraction r2 of the unique supercells. SAMPLE_NUMBER overrides it.
+
+[AFLOW_POCC]SKIP_SITE_CONFIGURATIONS (--pocc_skip_site_configurations)
+Does not write aflow.pocc.site_configurations.out, the list of all site configurations. Runs with SAMPLE_NUMBER or
+SAMPLE_HASH never write it.
+
+7) Enumerators
+
+POCC lists every decoration of every superlattice of index n and groups the equivalent ones.
+The group sizes are the degeneracies of the unique supercells.
+Two enumerators do the grouping.
+
+UFF: decorations of the same superlattice with equal UFF energies (within DEFAULT_UFF_ENERGY_TOLERANCE)
+form one group. Two different supercells with the same UFF energy end up in one group.
+
+ENUM (default): each group is the set of decorations that are the same structure, from the orbits of the permutation group
+of the supercell (Phys. Rev. B 77, 224115 (2008) and Phys. Rev. B 80,
+014120 (2009)).
+The Smith normal form of the HNF matrix maps the sites onto Z_s1 x Z_s2 x Z_s3, so the translations act by addition.
+The factor group operations of the parent that keep the superlattice permute the sites as well.
+The parent symmetry comes from the PARTCAR with each site colored by the species counts it takes in the supercells
+(sites with occupations 0.5/0.5 and 0.4/0.6 both give 2:2 at n=4 and are not told apart), keeping only the
+operations that map the structure configurations onto each other.
+Superlattices are reduced by the point group of those operations.
+The list starts with the superlattices POCC reduces by the lattice point group, so their H indices stay the same,
+and continues with any superlattice that only the smaller point group separates (for example, the two chiral
+sqrt(5) x sqrt(5) cells of a parent with point group 4/m on a tetragonal lattice).
+A superperiodic decoration (one that repeats with a smaller cell than its supercell) also appears under operations
+that change the superlattice, on the same HNF matrix and on others; those decorations join its group, so a group can
+hold decorations of several HNF matrices (the representative is the smallest H, then C, and the degeneracies still
+add up to the decorations). The published algorithm drops superperiodic decorations; POCC keeps them.
+Sampling (section 6) gives ENUM the decorations of the first round of UFF, and ENUM groups those that are the same
+structure, so the two enumerators differ only in the grouping.
+The degeneracy of a sampled group is the number of drawn decorations in it, as with UFF, so the weights remain a
+sample of the ensemble: a large group is drawn more often already and is not weighted by its size a second time.
+The second round and POCC_SAMPLE_HASH work as with UFF.
+--pocc_count_unique counts the groups without UFF energies (--pocc_count_unique_fast applies to UFF only).
+
+COMPARE: runs UFF and ENUM, lists the UFF groups that hold more than one supercell, the supercells UFF splits on
+one HNF matrix, and the superperiodic supercells found on several HNF matrices (UFF groups each HNF matrix
+separately), and keeps the ENUM result. It needs every decoration, so it refuses sampling.
+
+Select the enumerator with
+  aflow.in:      [AFLOW_POCC]ENUMERATOR=ENUM
+  command line:  aflow --pocc_count_unique --pocc_enumerator=compare < PARTCAR
+  .aflow.rc:     DEFAULT_POCC_ENUMERATOR="ENUM"
+The command line takes precedence over aflow.in, and aflow.in over .aflow.rc.
+DEFAULT_POCC_ENUMERATOR replaces DEFAULT_POCC_STRUCTURE_GENERATION_ALGO, which is no longer read: every .aflow.rc
+written since 2020 sets that key to UFF, and AFLOW now ignores it, so existing installations get ENUM without
+editing their .aflow.rc. To keep UFF as the default, set DEFAULT_POCC_ENUMERATOR="UFF".
+
+A new POCC aflow.in records the enumerator it is written with (--pocc_enumerator= with --aflow_proto, else the
+.aflow.rc default) as [AFLOW_POCC]ENUMERATOR=, so the parent keeps its supercell list if the default changes.
+An aflow.in without the key was written while UFF made every supercell list, and runs with UFF (CO20261009).
+The two lists name their supercells alike (ARUN.POCC_<i>_H<h>C<c>) but number and group them differently, so a
+parent should not change enumerator after its supercells are written.
+
+8) Correlation functions (CO20261006)
+
+Post-processing (aflow --lib2raw included) writes the cluster correlation functions of the supercells to
+aflow.pocc.out, for either enumerator.
+The clusters are the pairs of partially occupied sites out to DEFAULT_POCC_CORRELATION_PAIR_SHELLS distinct distances
+(6) and the triplets whose edges all lie within DEFAULT_POCC_CORRELATION_TRIPLET_SHELLS distances (2), grouped by the
+symmetry of the parent.
+A site with M species carries the point functions of CALPHAD 33, 266 (2009): gamma_0=1, and
+gamma_j(s)=-cos(2 pi ceil(j/2) s/M) for odd j, -sin(2 pi floor(j/2) s/M) for even j, with s=0..M-1 in the order of
+the species (vacancy first, then the PARTCAR order).
+The correlation p1(1,1) is the average of gamma_1 gamma_1 over every cluster p1 in the supercell; for a binary it is
+the average product of the spins (-1 for the first species, +1 for the second).
+Each supercell is located on the parent lattice through its HNF matrix and decoration (read from its POSCAR title),
+so no distance tolerance enters.
+
+Temperature-independent lines:
+  enumerator=                                    UFF or ENUM
+  correlation_site_<i>=                          species of site i in point-function order, with concentrations
+  correlation_cluster_<name>=                    pair or triplet, its sites, distance shell, size and multiplicity
+  correlation_functions=                         names of the functions, in the order of the values below
+  correlation_random=                            the random alloy at those concentrations
+  warren_cowley_pairs=                           names of the Warren-Cowley parameters, in the order of their values
+  correlation_supercell_<NN>=                    each supercell
+  correlation_deviation_supercell_<NN>=          mean absolute difference from the random alloy
+  warren_cowley_supercell_<NN>=                  each supercell
+  correlation_infinite_temperature=              degeneracy-weighted average
+  correlation_deviation_infinite_temperature=
+  warren_cowley_infinite_temperature=
+At each temperature:
+  correlation_ensemble=                          probability-weighted average
+  correlation_deviation_ensemble=
+  warren_cowley_ensemble=
+
+Warren-Cowley parameters: alpha_st=1-P(s,t)/(c_s c_t) for each pair cluster, where P(s,t) is the probability of species s
+on its first point and t on its second, and c_s, c_t are the marginals of P (the composition of the supercell or of the
+ensemble). alpha is 0 in the random alloy, negative for pairs found more often than at random. When both points lie on one
+site, or on sites the symmetry of the parent exchanges, P is symmetrized and each unordered pair is listed once
+(p1(Mg-Ni)); otherwise s is on the first site of the cluster (as listed in correlation_cluster_<name>) and t on the
+second, and every ordered pair is listed. A species missing from a supercell gives nan.
+
+The infinite-temperature ensemble differs from the random alloy in a finite supercell: fixed counts make two sites
+of a cell anticorrelated (-1/(n-1) at equal concentrations), and a neighbor that is a periodic image of the site
+itself contributes +1. For rocksalt Mg0.5Ni0.5O at n=8, the fourth shell gives +0.23 instead of 0.
 
 ****************************************************************************************************
 *                                                                                                  *

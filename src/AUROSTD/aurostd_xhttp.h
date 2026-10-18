@@ -40,7 +40,22 @@ namespace aurostd{
   std::string httpPercentEncodingFull(std::string work_str);
 
   xURL httpParseURL(const std::string &url, const bool strict = false);
-  string httpJoinURL(const xURL& url);  //CO20221209 - get back URL
+  string httpJoinURL(const xURL& url);  //CO20221209 - get back URL //CO20261004 - declared again, used by httpS4EUrl() and the unit test chaos_key
+
+  //CO20261002 - s4e.ai over https only, with the CHAOS API key ($CHAOS_API_KEY or ~/.s4e/chaos_api_key)
+  bool httpIsS4EHost(const std::string &host);
+  bool httpS4EServesPath(const xURL &url); //CO20261006 - s4e.ai has no AFLOWLIB folders (/AFLOWDATA/...)
+  bool httpS4EPathRefused(const xURL &url); //CO20261006
+  std::string httpS4EUrl(const xURL &url);
+  std::string httpChaosApiKeyFileName();
+  std::string httpChaosApiKeyFile(const std::string &home);
+  std::string httpChaosApiKey(const std::string &key_file = "");
+  std::string httpChaosApiKeyResolve(const std::string &env_value, const std::string &key_file);
+  bool httpChaosApiKeyUsable(const std::string &key);
+  std::vector<std::string> httpCUrlArgs(const std::string &url, bool with_key);
+  bool httpCUrlRun(const std::vector<std::string> &args, const std::string &input, std::string &output, int &exit_code);
+  std::string httpChaosApiKeyHint(const std::string &host, int status);
+  int httpParseResponse(std::string response, std::string &output, std::map<std::string, std::string> &header, bool strict = false);
 }
 
 #endif //AFLOW_SRC_AUROSTD_XHTTP_H

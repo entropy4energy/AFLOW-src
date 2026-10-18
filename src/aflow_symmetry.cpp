@@ -28,6 +28,7 @@ using aurostd::isequal;
 
 //DX+CO START
 #include "aflow_symmetry_spacegroup.h"
+#include <atomic>  //CO20260930
 //DX+CO END
 
 #define  _NO_SCALE_LATTICE_PGROUP_
@@ -290,12 +291,15 @@ namespace SYM {
 // Set the default tolerance; based on minimum interatomic distance
 namespace SYM { 
   double defaultTolerance(const xstructure& xstr){
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
     double min_dist = xstr.dist_nn_min; //CO20180409
     if(min_dist == AUROSTD_NAN || min_dist == AUROSTD_MAX_DOUBLE){min_dist=SYM::minimumDistance(xstr);} //CO20180409 //DX20210615 - add AUROSTD_MAX_DOUBLE
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " min_dist=" << min_dist << endl;}
     //if(xstr.dist_nn_min == AUROSTD_NAN){xstr.MinDist();}  //CO20180409
     //min_dist = xstr.dist_nn_min; //CO20180409
     double tolerance = min_dist/100.0;
     //double tolerance = min_dist/10.0;
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " tolerance=" << tolerance << endl;}
     return tolerance;
   }
 } //namespace SYM
@@ -4446,7 +4450,7 @@ namespace SYM {
     // same sets of lengths and angles as the original lattice unit cell vectors.
     //[CO20190520 - testing setUf and setUc]_sym_op test; //delete me
     //[CO20190520 - testing setUf and setUc]bool isequal; //delete me
-    uint ii=0,jj=0,kk=0;
+    uint ii=0,kk=0; //[CO20230626 - clang warning not used]jj=0,
     for(uint i=0;i<grid_clattice.size();i++){
       for(ii=1;ii<=3;ii++) temp_clattice(1,ii)=(*grid_clattice[i])(ii);
       for(ii=1;ii<=3;ii++) temp_flattice(1,ii)=(*grid_flattice[i])(ii);
@@ -4460,7 +4464,7 @@ namespace SYM {
             temp_clatticevol=abs(det(temp_clattice));
             if(abs(temp_clatticevol-latticevol)<=_eps_vol_ && temp_clatticevol > 0.0) {  // check volume !!! FAST !
               temp_clatticedata=_Getabc_angles(temp_clattice,DEGREES);
-              jj++;//if(!mod(jj,100000)) cerr << temp_clatticedata << endl;
+              //[CO20230626 - clang warning not used]jj++;//if(!mod(jj,100000)) cerr << temp_clatticedata << endl;
               // compare the temp_clattice... and lattice... to see if they are the same lattice
               // that is do the lattice vectors have the same lengths and the same angles
               if(abs(clatticedata[1]-temp_clatticedata[1]) < _eps_)                // check lattices
@@ -4886,7 +4890,7 @@ int PointGroup_HITS(xstructure &a,double _eps_) {
       }
     }
   }
-  uint ii=0,jj=0;
+  uint ii=0; //[CO20230626 - clang warning not used],jj=0;
   for(uint i=0;i<grid_clattice.size();i++) {
     for(ii=1;ii<=3;ii++) temp_clattice(1,ii)=(*grid_clattice[i])(ii);
     for(ii=1;ii<=3;ii++) temp_flattice(1,ii)=(*grid_flattice[i])(ii);
@@ -4900,7 +4904,7 @@ int PointGroup_HITS(xstructure &a,double _eps_) {
           temp_clatticevol=abs(det(temp_clattice));
           if(abs(temp_clatticevol-latticevol)<=_eps_vol_) {
             temp_clatticedata=_Getabc_angles(temp_clattice,DEGREES);
-            jj++;
+            //[CO20230626 - clang warning not used]jj++;
             if(abs(clatticedata[1]-temp_clatticedata[1]) < _eps_abc_)
               if(abs(clatticedata[2]-temp_clatticedata[2]) < _eps_abc_)
                 if(abs(clatticedata[3]-temp_clatticedata[3]) < _eps_abc_)
@@ -5221,6 +5225,50 @@ namespace SYM {
     return getFullSymBasis(a.atoms,a.lattice,a.c2f,a.f2c,symOp,map_types,skew,tolerance,basis_atoms_map,basis_types_map);
   }
   //atoms, c2f, f2c and _sym_op
+  //CO20260930 START - exact speedups of the symmetry search
+  // ---------------------------------------------------------------------------
+  // WHY: lib2raw spent 6-20 hours per phonon child (250-atom NaF supercells, atoms displaced by about the tight
+  // tolerance): getFullSymBasis() compared every transformed atom with every remaining atom (N^2 distance tests per
+  // candidate operation, each allocating temporaries), on 1000-atom conventional cells, for 24,000 candidate
+  // operations per pass. The changes below give exactly the same results under AFLOW's own tolerance rules; see
+  // the unit tests symmetry_exact_* in aflow_unit_test.cpp and AFLOW_SYMMETRY_SPEED_20260930.md.
+  // The code as it was ("reference paths") stays reachable for comparisons: --sym_reference on the command line
+  // (all threads), or setReferencePathsThisThread() in tests.
+  static std::atomic<bool> sym_reference_paths(false);
+  static thread_local int sym_reference_paths_thread = -1;  // -1: follow the global setting; 0: off; 1: on
+  void setReferencePaths(bool on) { sym_reference_paths.store(on); }
+  void setReferencePathsThisThread(int on) { sym_reference_paths_thread = on; }
+  bool useReferencePaths() {
+    if (sym_reference_paths_thread >= 0) { return (sym_reference_paths_thread == 1); }
+    return sym_reference_paths.load(std::memory_order_relaxed);
+  }
+  // How often the new code met the cases where it could differ from the reference (this thread). Only the unit
+  // tests read these, to check that they reach those cases; the counts never change a result.
+  static thread_local ExactPathCounts exact_path_counts;
+  ExactPathCounts& exactPathCounts() { return exact_path_counts; }
+
+  // fractionalDistanceNoSkew(): the value FPOSMatch(fpos1,fpos2,lattice,f2c,skew=false,tol) compares with tol,
+  // i.e. modulus(CPOSDistFromFPOS(fpos1,fpos2,lattice,f2c,false)), computed with the same IEEE operations in the
+  // same order (fpos1-fpos2; BringInCellInPlace(.,0.0,0.5,-0.5) per component as minimizeDistanceFractionalMethod();
+  // c(i)+=f2c(i,j)*d(j) from 0 as xmatrix*xvector; c+=abs(x*x) then sqrt as modulus()), without temporaries.
+  // Unit test symmetry_exact_distance checks bitwise equality; if a compiler setting (e.g. FMA contraction) ever
+  // changes one side, that test fails and no code may use this function in place of FPOSMatch().
+  // CO20261004: getFullSymBasis() no longer calls it; its cell list hands the candidates to MapAtomWithBasis(), so
+  // the distance is FPOSMatch()'s own. It is kept, with its test, as the candidate for a path without temporaries
+  // inside FPOSMatch(), which is used far beyond the symmetry search and so was not changed here.
+  double fractionalDistanceNoSkew(const xvector<double>& fpos1,const xvector<double>& fpos2,const xmatrix<double>& f2c) {
+    double d1=fpos1[1]-fpos2[1], d2=fpos1[2]-fpos2[2], d3=fpos1[3]-fpos2[3];
+    BringInCellInPlace(d1,0.0,0.5,-0.5); BringInCellInPlace(d2,0.0,0.5,-0.5); BringInCellInPlace(d3,0.0,0.5,-0.5);
+    double c1=0.0, c2=0.0, c3=0.0;
+    c1+=f2c[1][1]*d1; c1+=f2c[1][2]*d2; c1+=f2c[1][3]*d3;
+    c2+=f2c[2][1]*d1; c2+=f2c[2][2]*d2; c2+=f2c[2][3]*d3;
+    c3+=f2c[3][1]*d1; c3+=f2c[3][2]*d2; c3+=f2c[3][3]*d3;
+    double m=0.0;
+    m+=std::abs(c1*c1); m+=std::abs(c2*c2); m+=std::abs(c3*c3);
+    return std::sqrt(m);
+  }
+  //CO20260930 END
+
   bool getFullSymBasis(const deque<_atom>& atoms,const xmatrix<double>& lattice,const xmatrix<double>& c2f, const xmatrix<double>& f2c, _sym_op& symOp,bool map_types,bool skew,double tolerance,vector<int>& basis_atoms_map,vector<int>& basis_types_map){  //MAIN FUNCTION //CO20190520 - removed pointers for bools and doubles, added const where possible
     bool LDEBUG=(FALSE || XHOST.DEBUG);
 
@@ -5240,6 +5288,93 @@ namespace SYM {
     for(uint k=0;k<atoms.size();k++){index_to_check.push_back(k);}
     basis_atoms_map.clear();
     basis_types_map.clear();
+
+    //CO20260930 START - the same mapping with a cell list
+    // Exact: an atom can pass the test below only if, on each fractional axis i, its circular distance to the image
+    // is at most r_i = tolerance*|row i of inverse(f2c)|, since d_frac = inverse(f2c)*d_cart for the fractional and
+    // the Cartesian (skew) test alike. Atoms are binned along each axis in bins at least r_i wide (1e-6 relative
+    // margin), so every atom that can match lies in the 27 bins around the image. MapAtomWithBasis() gets the unmapped
+    // atoms of those bins in ascending order and returns the first that passes its test, the smallest unmapped atom
+    // index that passes (CO20261004): index_to_check starts ascending and only loses entries, so that is exactly the
+    // atom MapAtomWithBasis() returns first in the scan below. ApplyAtomValidate() is called for the
+    // same atoms in the same order, and the maps are filled the same way, also when the answer is FALSE.
+    // Used only when lattice is exactly trasp(f2c) (true for every caller), for 16 atoms or more, with finite
+    // positions within 64 cells of the origin and a finite operation; not with --skew_test, which logs (and can
+    // throw) per pair tested, so the reference runs there and the log stays the same.
+    if(!useReferencePaths() && !XHOST.SKEW_TEST && atoms.size()>=16){
+      bool grid_ok=true;
+      for(int i=1;i<=3&&grid_ok;i++){ for(int j=1;j<=3&&grid_ok;j++){ if(!(lattice[i][j]==f2c[j][i])){ grid_ok=false; } } }
+      for(int i=1;i<=3&&grid_ok;i++){
+        if(!std::isfinite(symOp.ftau[i])){ grid_ok=false; }
+        for(int j=1;j<=3;j++){ if(!std::isfinite(symOp.Uf[i][j]) || !std::isfinite(symOp.Uc[i][j])){ grid_ok=false; } }
+      }
+      for(uint q=0;q<atoms.size()&&grid_ok;q++){  // positions within 64 cells: the bin of x-floor(x) is then exact to ~1e-14
+        for(int i=1;i<=3;i++){ if(!std::isfinite(atoms[q].fpos[i]) || !std::isfinite(atoms[q].cpos[i]) || std::abs(atoms[q].fpos[i])>64.0){ grid_ok=false; } }
+      }
+      int nb[4]={0,1,1,1};
+      const uint natoms=atoms.size();
+      if(grid_ok){
+        const xmatrix<double> f2c_inv=aurostd::inverse(f2c);
+        const int nbmax=(int)std::ceil(std::cbrt((double)natoms))+1;  // about one atom per bin
+        for(int i=1;i<=3;i++){
+          const double r=tolerance*std::sqrt(f2c_inv[i][1]*f2c_inv[i][1]+f2c_inv[i][2]*f2c_inv[i][2]+f2c_inv[i][3]*f2c_inv[i][3])*(1.0+1e-6);
+          if(!(r>0.0) || !std::isfinite(r)){ grid_ok=false; break; }
+          int n=(r>=1.0/3.0)?1:(int)std::min(std::floor(1.0/r),(double)nbmax);  // bin width 1/n >= r; wider bins stay exact
+          if(n<3){ n=1; }                                                       // fewer than 3 bins: one bin on this axis
+          nb[i]=n;
+        }
+      }
+      if(grid_ok){
+        auto binof=[](double x,int n){ double f=x-std::floor(x); int b=(int)(f*n); if(b<0){b=0;} if(b>=n){b=n-1;} return b; };
+        vector<vector<uint> > bins((size_t)nb[1]*nb[2]*nb[3]);
+        for(uint q=0;q<natoms;q++){
+          bins[((size_t)binof(atoms[q].fpos[1],nb[1])*nb[2]+binof(atoms[q].fpos[2],nb[2]))*nb[3]+binof(atoms[q].fpos[3],nb[3])].push_back(q);
+        }
+        vector<char> used(natoms,0);
+        deque<uint> candidates;  //CO20261004 - the unmapped atoms in the 27 bins around one image
+        exact_path_counts.grid_calls++;
+        for(uint k=0;k<natoms;k++){
+          if(!ApplyAtomValidate(atoms[k],tmp,symOp,lattice,c2f,f2c,skew,true,false,tolerance)){ //incell, but no roff
+            symOp.basis_map_calculated=basis_map_calculated_orig;
+            return FALSE;
+          }
+          //CO20261004 - the candidates, in ascending order, go to MapAtomWithBasis(), which the linear scan below calls
+          // too: with fast=true it returns the first candidate that passes its test, the lowest unmapped index. This
+          // replaces a copy of that test (with fractionalDistanceNoSkew() in the plain case) that kept the lowest index
+          // by hand.
+          const int c1=binof(tmp.fpos[1],nb[1]), c2=binof(tmp.fpos[2],nb[2]), c3=binof(tmp.fpos[3],nb[3]);
+          candidates.clear();
+          for(int d1=(nb[1]>1?-1:0);d1<=(nb[1]>1?1:0);d1++){
+            const int b1=((c1+d1)%nb[1]+nb[1])%nb[1];
+            for(int d2=(nb[2]>1?-1:0);d2<=(nb[2]>1?1:0);d2++){
+              const int b2=((c2+d2)%nb[2]+nb[2])%nb[2];
+              for(int d3=(nb[3]>1?-1:0);d3<=(nb[3]>1?1:0);d3++){
+                const int b3=((c3+d3)%nb[3]+nb[3])%nb[3];
+                const vector<uint>& cell=bins[((size_t)b1*nb[2]+b2)*nb[3]+b3];
+                for(size_t c=0;c<cell.size();c++){ if(!used[cell[c]]){ candidates.push_back(cell[c]); } }
+              }
+            }
+          }
+          std::sort(candidates.begin(),candidates.end());
+          uint mapped_index=0;
+          if(!MapAtomWithBasis(atoms,tmp,map_types,candidates,lattice,f2c,skew,tolerance,mapped_index,true)){
+            symOp.basis_map_calculated=basis_map_calculated_orig;
+            return FALSE;
+          }
+          const uint best=candidates[mapped_index];
+          if(binof(atoms[best].fpos[1],nb[1])!=c1 || binof(atoms[best].fpos[2],nb[2])!=c2 || binof(atoms[best].fpos[3],nb[3])!=c3){
+            exact_path_counts.grid_neighbor_bin_matches++;  // matched in a neighboring bin: the bin width matters
+          }
+          used[best]=1;
+          basis_atoms_map.push_back(best);
+          basis_types_map.push_back(atoms[best].type);
+          count++;
+        }
+        symOp.basis_map_calculated=basis_map_calculated_orig;
+        return (count && count==natoms) ? TRUE : FALSE;
+      }
+    }
+    //CO20260930 END
 
     // ===== Check if applying the symmetry element along with internal translation maps to another atom ===== //
     for(uint k=0;k<atoms.size();k++){
@@ -7592,7 +7727,7 @@ namespace SYM {
       *grid_flattice_ptr=Adt(i);
       grid_flattice.push_back(grid_flattice_ptr);  // TRICK so I get the identity first
     }
-    uint ii,jj,kk;
+    uint ii,kk; //[CO20230626 - clang warning not used],jj
     for(int i=-dims[1];i<=dims[1];i++) {
       for(int j=-dims[2];j<=dims[2];j++) {
         for(int k=-dims[3];k<=dims[3];k++) {
@@ -7615,7 +7750,7 @@ namespace SYM {
     }
     // for each set of three lattice points within the sphere see which one has the
     // same sets of lengths and angles as the original lattice unit cell vectors.
-    ii=0;jj=0;kk=0;
+    ii=0;kk=0; //[CO20230626 - clang warning not used];jj=0
     for(uint i=0;i<grid_clattice.size();i++) {
       for(ii=1;ii<=3;ii++) temp_clattice(1,ii)=(*grid_clattice[i])(ii);
       for(ii=1;ii<=3;ii++) temp_flattice(1,ii)=(*grid_flattice[i])(ii);
@@ -7629,7 +7764,7 @@ namespace SYM {
             temp_clatticevol=abs(det(temp_clattice));
             if(abs(temp_clatticevol-latticevol)<=_eps_vol_) {  // check volume !!! FAST !
               temp_clatticedata=_Getabc_angles(temp_clattice,DEGREES);
-              jj++;//if(!mod(jj,100000)) cerr << temp_clatticedata << endl;
+              //[CO20230626 - clang warning not used]jj++;//if(!mod(jj,100000)) cerr << temp_clatticedata << endl;
               // compare the temp_clattice... and lattice... to see if they are the same lattice
               // that is do the lattice vectors have the same lengths and the same angles
               if(abs(clatticedata[1]-temp_clatticedata[1]) < _eps_abc_)                // check lattices
@@ -8949,6 +9084,7 @@ bool KBIN_StepSymmetryPerform_20161205(xstructure& a,string AflowIn,ofstream &Fi
     // calculate the lattice type/variation
     message << "Calculating the lattice information (type, variation, etc.). This may take some time, please be patient."; //DX20210703
     pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, FileMESSAGE, oss, _LOGGER_MESSAGE_); //DX20210703
+    if(0){a.sym_eps_calculated=false;a.sym_eps=AUROSTD_NAN;}  //CO20240519 - testing
     a.GetRealLatticeType(); //CO+DX20210616 - needed for AEL/AGL
     message << "Finished calculating the lattice information."; //DX20210703
     pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, FileMESSAGE, oss, _LOGGER_MESSAGE_); //DX20210703

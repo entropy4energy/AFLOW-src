@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                     materials.duke.edu/AFLOW/README_AFLOW_AFLOWRC.TXT
-****************************************************************************************************
 
 AFLOWRC README:
 
@@ -60,20 +58,35 @@ DEFAULT_ENTRY_LOADER_ALLOY_DB_FILE
   type: string
   default: "~/.aflow/aflowlib_alloy.db"
 
-DEFAULT_ENTRY_LOADER_AFLUX_SERVER
-  description: server that provides the AFLUX API
+DEFAULT_ENTRY_LOADER_AFLUX_SERVER_LIST
+  description: comma-separated list of servers that provide the AFLUX API (one per entry of DEFAULT_ENTRY_LOADER_AFLUX_PATH_LIST)
   type: string
-  default: "aflowlib.duke.edu"
+  default: "s4e.ai"
+  note: the entry loader queries every server in the list and merges the answers. The list that
+        earlier versions wrote by default, s4e.ai followed by the legacy AFLOWLIB server, is read as
+        the current default, so CHAOS results are not mixed with legacy ones; any other list is used
+        as written.
 
-DEFAULT_ENTRY_LOADER_AFLUX_PATH
-  description: base path including AFLUX API version
+DEFAULT_ENTRY_LOADER_AFLUX_PATH_LIST
+  description: comma-separated list of AFLUX API base paths (one per entry of DEFAULT_ENTRY_LOADER_AFLUX_SERVER_LIST)
   type: string
-  default: "/API/aflux/v1.0/"
+  default: "/API/chaos/"
+  note: the CHAOS API on s4e.ai answers queries only with a CHAOS API key (a LOOP API key of an
+        account approved for CHAOS, https://s4e.ai/chaos). aflow reads it from the environment
+        variable CHAOS_API_KEY, else from the first line of ~/.s4e/chaos_api_key (keep that file
+        readable only by you: chmod 600). The key is sent only to s4e.ai, only over https, as the
+        X-API-Key header (curl, which must be installed, reads it from its standard input). Queries
+        with paging(0) are sent as pages of 10000 entries, since the API does not accept paging(0).
+
+DEFAULT_ENTRY_LOADER_AURL_PATH
+  description: host prefix of the AURLs (host:AFLOWDATA/...)
+  type: string
+  default: "s4e.ai"
 
 DEFAULT_ENTRY_LOADER_RESTAPI_SERVER
   description: server that provides the AFLOW RESTAPI
   type: string
-  default: "aflowlib.duke.edu"
+  default: "s4e.ai"
 
 DEFAULT_ENTRY_LOADER_RESTAPI_PATH
   description: AFLOW RESTAPI base path
@@ -101,7 +114,7 @@ DEFAULT_AFLOW_DB_STATS_FILE
 DEFAULT_AFLOW_DB_DATA_PATH
   description: The location of the AFLOW database JSON files.
   type: string
-  default: "/common/AFLOW/LIBS/"
+  default: "/common/AFLOW/JLS/XALL/"
 
 DEFAULT_AFLOW_DB_LOCK_FILE
   description: The location of the AFLOW database lock file.
@@ -795,6 +808,26 @@ DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2
   type: bool
   default: 0
 
+DEFAULT_VASP_FORCE_OPTION_RECYCLE_SPIN
+  description: Sets the MAGMOM of relax2 to the spins resolved in relax1.
+  type: bool
+  default: 0
+
+DEFAULT_VASP_FORCE_OPTION_MAGMOM_MULTIPLIER
+  description: Multiplies the MAGMOM values by this value. VASP prefers bigger initial moments.
+  type: double
+  default: 1.5
+
+DEFAULT_VASP_FORCE_OPTION_MAGMOM_HIGH
+  description: Sets the MAGMOM for the MAGMOM=HIGH setting. The spins of all atoms are set this value initially.
+  type: double
+  default: 5
+
+DEFAULT_VASP_FORCE_OPTION_MAGMOM_LOW
+  description: Sets the MAGMOM for the MAGMOM=LOW setting. The spins of all atoms are set this value initially.
+  type: double
+  default: 1
+
 DEFAULT_VASP_FORCE_OPTION_BADER
   description: Adapts INCAR for VASP to retrieve core charge (AECCARx) for Bader partial charge calculation. Turning this setting on will write these files out for any calculation type (RELAX, STATIC, STATIC_BANDS, etc.).
   type: bool
@@ -836,7 +869,7 @@ AFLOW_LIBRARY AFLOW_PROJECT
 DEFAULT_AFLOW_LIBRARY_DIRECTORIES
   description: Path(s) to search for the library of materials calculations.
   type: string
-  default: "/common/AFLOW/LIBS/,/home/aflow/common/AFLOW/LIBS/,/fslhome/glh43/src/,/usr/local/bin/,/fslhome/fslcollab8/group/bin/,/home/auro/work/AFLOW3/,~/common/AFLOW/LIBS/,./,/nics/a/proj/aflow/common/AFLOW/LIBS/,/home/users/aflow/common/AFLOW/LIBS,/home/junkai/PROTO_DATABASE/,/projects/kyang-group/common/LIBS,/somewhere/"
+  default: "/common/AFLOW/JLS/XALL/,/home/aflow/common/AFLOW/JLS/XALL/,~/common/AFLOW/JLS/XALL/,/nics/a/proj/aflow/common/AFLOW/JLS/XALL/,/home/users/aflow/common/AFLOW/JLS/XALL,/projects/kyang-group/common/JLS/XALL,/common/AFLOW/LIBS/,/home/aflow/common/AFLOW/LIBS/,/fslhome/glh43/src/,/usr/local/bin/,/fslhome/fslcollab8/group/bin/,/home/auro/work/AFLOW3/,~/common/AFLOW/LIBS/,./,/nics/a/proj/aflow/common/AFLOW/LIBS/,/home/users/aflow/common/AFLOW/LIBS,/home/junkai/PROTO_DATABASE/,/projects/kyang-group/common/LIBS,/somewhere/"
 
 DEFAULT_AFLOW_PROJECTS_DIRECTORIES
   description: Path(s) of the various library projects.
@@ -1192,6 +1225,11 @@ DEFAULT_UFF_CLUSTER RADIUS
   type: double
   default: 10 Angstroms
 
+DEFAULT_POCC_ENUMERATOR
+  description: How POCC finds the unique supercells and their degeneracies. It replaces DEFAULT_POCC_STRUCTURE_GENERATION_ALGO, which every .aflow.rc written since 2020 sets to UFF and which is no longer read. UFF bins the decorations of each superlattice by their UFF energies. ENUM takes the orbits of the supercell permutation groups, with the symmetry of the parent colored by the species counts of each site, and reduces the superlattices by the crystal point group. COMPARE runs both, reports where they differ, and keeps the ENUM result. Overridden by [AFLOW_POCC]ENUMERATOR= in aflow.in and by --pocc_enumerator= on the command line. A new POCC aflow.in records the value it was written with; an aflow.in without [AFLOW_POCC]ENUMERATOR runs with UFF.
+  type: string
+  default: ENUM
+
 DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON
   description: Default option for performing robust structure comparison (AFLOW-XtalMatch) IN ADDITION TO UFF energy analysis.
   type: bool
@@ -1201,6 +1239,16 @@ DEFAULT_POCC_WRITE_OUT_ALL_DERIVATIVE_STRUCTURES
   description: Default option for writing out all derivative structures to file (named POCC_ALL_DERIVATIVE_STRUCTURES_FILE).
   type: bool
   default: 1
+
+DEFAULT_POCC_CORRELATION_PAIR_SHELLS
+  description: Pairs of partially occupied sites out to this many distinct distances enter the cluster correlation functions that POCC post-processing writes to aflow.pocc.out. 0 writes none.
+  type: int
+  default: 6
+
+DEFAULT_POCC_CORRELATION_TRIPLET_SHELLS
+  description: Triplets of partially occupied sites whose three edges all lie within this many distinct distances enter the cluster correlation functions. 0 writes none.
+  type: int
+  default: 2
 
 POCC_FILE_PREFIX
   description: Prefix for files written by POCC module.
@@ -2066,6 +2114,21 @@ MPI_COMMAND_MACHINE002
 
 MPI_BINARY_DIR_MACHINE002
   description: MPI executable directory for --machine=machine002.
+  type: string
+  default: "~/bin/"
+
+MPI_OPTIONS_MACHINE103
+  description: MPI options for --machine=machine103 (generic template; name the machine with --machine_name).
+  type: string
+  default: "ulimit -s unlimited "
+
+MPI_COMMAND_MACHINE103
+  description: MPI command for --machine=machine103; the number of cores follows it.
+  type: string
+  default: "mpirun -n"
+
+MPI_BINARY_DIR_MACHINE103
+  description: MPI executable directory for --machine=machine103.
   type: string
   default: "~/bin/"
 

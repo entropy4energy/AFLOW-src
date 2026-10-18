@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                            materials.duke.edu/AFLOW/README_AFLOW_APL.TXT
-****************************************************************************************************
 
 Phonon calculations with deformations written by Marco Esters, Michal Jahnatek, Andriy Smolyanyuk,
 Corey Oses, Pinku Nath, Jose J. Plata, Stefano Curtarolo.
@@ -1048,7 +1046,7 @@ To use AAPL, the following needs to be added to the aflow.in file:
 This overrides all other APL CALC options. An AAPL calculation requires three separate AFLOW runs:
 
     1. In the first run, the distortions for the anharmonic IFCs (and harmonic IFCs, if not
-       already present) are created. If the option REALX is set to ON, APL will relax the structure
+       already present) are created. If the option RELAX is set to ON, APL will relax the structure
        before creating the distortions.
 
     2. The DFT calculations are performed. However, due to the large number of DFT calculations, it

@@ -38,6 +38,7 @@ _XHOST::_XHOST() {  // constructor PUBLIC
   MPI=FALSE;
   GENERATE_AFLOWIN_ONLY=FALSE;  //CT20180719
   POSTPROCESS=FALSE;  //CO20200624
+  AVOID_LIB2LIB=FALSE;  //CO20250712
   ARUN_POSTPROCESS=FALSE;  //CT20181212
   AVOID_RUNNING_VASP=FALSE;  //CO20200624
   PSEUDOPOTENTIAL_GENERATOR=FALSE; //SC20200327
@@ -160,6 +161,7 @@ void _XHOST::copy(const _XHOST& b) { // copy PRIVATE
   MPI=b.MPI;
   GENERATE_AFLOWIN_ONLY=b.GENERATE_AFLOWIN_ONLY;  //CT20180719
   POSTPROCESS=b.POSTPROCESS;  //CO20200624
+  AVOID_LIB2LIB=b.AVOID_LIB2LIB;  //CO20250712
   ARUN_POSTPROCESS=b.ARUN_POSTPROCESS;  //CT20181212
   AVOID_RUNNING_VASP=b.AVOID_RUNNING_VASP;  //CO20200624
   PSEUDOPOTENTIAL_GENERATOR=b.PSEUDOPOTENTIAL_GENERATOR; //SC20200327
@@ -312,7 +314,7 @@ std::string _XHOST::command(const string& command) {
       return vcmd.at(i);
     }// found before.. only == otherwise cat gets confused with bzcat
   }
-  //next check if we can find the command in PATH or somewher else common //CO20180705
+  //next check if we can find the command in PATH or somewhere else common //CO20180705
   if(aurostd::IsCommandAvailableModify(_command)) {
     pthread_mutex_lock(&mutex_XAFLOW_XHOST);
     // pthread_mutex_unlock(&mutex_XAFLOW_XHOST);
@@ -369,6 +371,7 @@ _aflags::_aflags() {
   AFLOW_FORCE_RUN                       = FALSE;
   AFLOW_PERFORM_DIRECTORY               = FALSE;
   AFLOW_PERFORM_FILE                    = FALSE;
+  AFLOW_PERFORM_FILE_MIX                = FALSE;  //CO20260101
   AFLOW_PERFORM_ORDER_SORT              = FALSE;
   AFLOW_PERFORM_ORDER_REVERSE           = FALSE;
   AFLOW_PERFORM_ORDER_RANDOM            = FALSE;
@@ -421,6 +424,7 @@ void _aflags::copy(const _aflags& b) {
   AFLOW_FORCE_RUN                       = b.AFLOW_FORCE_RUN;
   AFLOW_PERFORM_DIRECTORY               = b.AFLOW_PERFORM_DIRECTORY;
   AFLOW_PERFORM_FILE                    = b.AFLOW_PERFORM_FILE;
+  AFLOW_PERFORM_FILE_MIX                = b.AFLOW_PERFORM_FILE_MIX; //CO20260101
   AFLOW_PERFORM_ORDER_SORT              = b.AFLOW_PERFORM_ORDER_SORT;
   AFLOW_PERFORM_ORDER_REVERSE           = b.AFLOW_PERFORM_ORDER_REVERSE;
   AFLOW_PERFORM_ORDER_RANDOM            = b.AFLOW_PERFORM_ORDER_RANDOM;
@@ -515,6 +519,7 @@ _kflags::_kflags() {
   KBIN_MPI_NCPUS                                   = 0;
   KBIN_MPI_NCPUS_STRING                            = ""; //ME20181216
   KBIN_MPI_NCPUS_ORIG                              = 0; //CO20210804
+  KBIN_MPI_HOSTLIST_OFFSETS                        = 0; //CO20231201
   KBIN_MPI_START                                   = "";
   KBIN_MPI_STOP                                    = "";
   KBIN_MPI_COMMAND                                 = "";
@@ -559,11 +564,17 @@ _kflags::_kflags() {
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_WRITE                             = FALSE;
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_RADIUS                            = 0.0;
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_DRADIUS                           = 0.0;
+  KBIN_CCE_CORRECTABLE                             = FALSE; //CO20221024
   KBIN_POCC                                        = FALSE;
   KBIN_POCC_CALCULATION                            = FALSE;
   KBIN_POCC_TEMPERATURE_STRING                     = "";  //CO20191110
   KBIN_POCC_ARUNS2SKIP_STRING                      = "";  //CO20200624
   KBIN_POCC_EXCLUDE_UNSTABLE                       = FALSE;  //ME20210927
+  KBIN_POCC_SAMPLE_NUMBER_STRING                   = "";  //TL20260204
+  KBIN_POCC_SAMPLE_RATE_STRING                     = "";  //TL20260205
+  KBIN_POCC_SAMPLE_HASH_STRING                     = "";  //TL20260303
+  KBIN_POCC_SKIP_SITE_CONFIGURATIONS               = FALSE;  //TL20260310
+  KBIN_POCC_ENUMERATOR_STRING                      = "";  //CO20261005
   KBIN_FROZSL                                      = FALSE;
   KBIN_FROZSL_DOWNLOAD                             = FALSE;
   KBIN_FROZSL_FILE                                 = FALSE;
@@ -626,6 +637,7 @@ void _kflags::copy(const _kflags& b) {
   KBIN_MPI_NCPUS                                   = b.KBIN_MPI_NCPUS;
   KBIN_MPI_NCPUS_STRING                            = b.KBIN_MPI_NCPUS_STRING;	//ME20181216
   KBIN_MPI_NCPUS_ORIG                              = b.KBIN_MPI_NCPUS_ORIG; //CO20210804
+  KBIN_MPI_HOSTLIST_OFFSETS                        = b.KBIN_MPI_HOSTLIST_OFFSETS; //CO20231201
   KBIN_MPI_START                                   = b.KBIN_MPI_START;
   KBIN_MPI_STOP                                    = b.KBIN_MPI_STOP;
   KBIN_MPI_COMMAND                                 = b.KBIN_MPI_COMMAND;
@@ -670,11 +682,17 @@ void _kflags::copy(const _kflags& b) {
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_WRITE                             = b.KBIN_NEIGHBORS_WRITE;
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_RADIUS                            = b.KBIN_NEIGHBORS_RADIUS;
   //DX20210122 [OBSOLETE] KBIN_NEIGHBORS_DRADIUS                           = b.KBIN_NEIGHBORS_DRADIUS;
+  KBIN_CCE_CORRECTABLE                             = b.KBIN_CCE_CORRECTABLE;  //CO20221024
   KBIN_POCC                                        = b.KBIN_POCC;
   KBIN_POCC_CALCULATION                            = b.KBIN_POCC_CALCULATION; //CO20191110
   KBIN_POCC_TEMPERATURE_STRING                     = b.KBIN_POCC_TEMPERATURE_STRING; //CO20191110
   KBIN_POCC_ARUNS2SKIP_STRING                      = b.KBIN_POCC_ARUNS2SKIP_STRING; //CO20200627
   KBIN_POCC_EXCLUDE_UNSTABLE                       = b.KBIN_POCC_EXCLUDE_UNSTABLE;  //ME20210927
+  KBIN_POCC_SAMPLE_NUMBER_STRING                   = b.KBIN_POCC_SAMPLE_NUMBER_STRING;  //TL20260204
+  KBIN_POCC_SAMPLE_RATE_STRING                     = b.KBIN_POCC_SAMPLE_RATE_STRING;    //TL20260205
+  KBIN_POCC_SAMPLE_HASH_STRING                     = b.KBIN_POCC_SAMPLE_HASH_STRING;    //TL20260303
+  KBIN_POCC_SKIP_SITE_CONFIGURATIONS               = b.KBIN_POCC_SKIP_SITE_CONFIGURATIONS; //TL20260310
+  KBIN_POCC_ENUMERATOR_STRING                      = b.KBIN_POCC_ENUMERATOR_STRING;  //CO20261005
   KBIN_FROZSL                                      = b.KBIN_FROZSL;
   KBIN_FROZSL_DOWNLOAD                             = b.KBIN_FROZSL_DOWNLOAD;
   KBIN_FROZSL_FILE                                 = b.KBIN_FROZSL_FILE;
@@ -826,12 +844,17 @@ void _vflags::free() {
   KBIN_VASP_FORCE_OPTION_SPIN.option                             = DEFAULT_VASP_FORCE_OPTION_SPIN;  // SPIN 
   KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1                     = DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1;  // SPIN_REMOVE_RELAX_1
   KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2                     = DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2;  // SPIN_REMOVE_RELAX_2
+  KBIN_VASP_FORCE_OPTION_RECYCLE_SPIN                            = DEFAULT_VASP_FORCE_OPTION_RECYCLE_SPIN;  // RECYCLE_SPIN //CO20230826
   KBIN_VASP_FORCE_OPTION_BADER.clear();                          // BADER
   KBIN_VASP_FORCE_OPTION_BADER.option                            = DEFAULT_VASP_FORCE_OPTION_BADER;  // BADER
   KBIN_VASP_FORCE_OPTION_ELF.clear();                            // ELF
   KBIN_VASP_FORCE_OPTION_ELF.option                              = DEFAULT_VASP_FORCE_OPTION_ELF;  // ELF
-  KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM.clear();                    // AUTO_MAGMOM
-  KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM.option                      = DEFAULT_VASP_FORCE_OPTION_AUTO_MAGMOM; // AUTO_MAGMOM
+  //[CO20250829 - OBSOLETE]KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM.clear();                    // AUTO_MAGMOM
+  //[CO20250829 - OBSOLETE]KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM.option                      = DEFAULT_VASP_FORCE_OPTION_AUTO_MAGMOM; // AUTO_MAGMOM
+  KBIN_VASP_FORCE_OPTION_MAGMOM.clear();                         // MAGMOM  //CO20230826
+  KBIN_VASP_FORCE_OPTION_MAGMOM.push("");                        //CO20230826
+  KBIN_VASP_FORCE_OPTION_MAGMOM_MULT.clear();                    // MAGMOM_MULT  //CO20230826
+  KBIN_VASP_FORCE_OPTION_MAGMOM_MULT.push("");                   //CO20230826
   KBIN_VASP_FORCE_OPTION_SYM.clear();                            // SYM
   KBIN_VASP_FORCE_OPTION_SYM.option                              = DEFAULT_VASP_FORCE_OPTION_SYM; // SYM
   KBIN_VASP_FORCE_OPTION_WAVECAR.clear();                        // WAVECAR
@@ -1019,9 +1042,12 @@ void _vflags::copy(const _vflags& b) {
   KBIN_VASP_FORCE_OPTION_SPIN                                    = b.KBIN_VASP_FORCE_OPTION_SPIN; // SPIN
   KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1                     = b.KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1;
   KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2                     = b.KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2; 
+  KBIN_VASP_FORCE_OPTION_RECYCLE_SPIN                            = b.KBIN_VASP_FORCE_OPTION_RECYCLE_SPIN;  //CO20230826
   KBIN_VASP_FORCE_OPTION_BADER                                   = b.KBIN_VASP_FORCE_OPTION_BADER; // BADER
   KBIN_VASP_FORCE_OPTION_ELF                                     = b.KBIN_VASP_FORCE_OPTION_ELF; // ELF
-  KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM                             = b.KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM; // AUTO_MAGMOM
+  //[CO20250829 - OBSOLETE]KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM                             = b.KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM; // AUTO_MAGMOM
+  KBIN_VASP_FORCE_OPTION_MAGMOM                                  = b.KBIN_VASP_FORCE_OPTION_MAGMOM; // MAGMOM //CO20230826
+  KBIN_VASP_FORCE_OPTION_MAGMOM_MULT                             = b.KBIN_VASP_FORCE_OPTION_MAGMOM_MULT; // MAGMOM_MULT //CO20230826
   KBIN_VASP_FORCE_OPTION_SYM                                     = b.KBIN_VASP_FORCE_OPTION_SYM; // SYM
   KBIN_VASP_FORCE_OPTION_WAVECAR                                 = b.KBIN_VASP_FORCE_OPTION_WAVECAR; // WAVECAR
   KBIN_VASP_FORCE_OPTION_CHGCAR                                  = b.KBIN_VASP_FORCE_OPTION_CHGCAR; // CHGCAR
@@ -1262,10 +1288,13 @@ _xvasp::_xvasp() {
   aopts.flag("FLAG::AVASP_SPIN",DEFAULT_VASP_FORCE_OPTION_SPIN);                                 // DEFAULT VALUES
   aopts.flag("FLAG::AVASP_SPIN_REMOVE_RELAX_1",DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1);   // DEFAULT VALUES
   aopts.flag("FLAG::AVASP_SPIN_REMOVE_RELAX_2",DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2);   // DEFAULT VALUES
+  aopts.flag("FLAG::AVASP_RECYCLE_SPIN",DEFAULT_VASP_FORCE_OPTION_RECYCLE_SPIN);                 // DEFAULT VALUES  //CO20230826
   aopts.flag("FLAG::AVASP_BADER",DEFAULT_VASP_FORCE_OPTION_BADER);                               // DEFAULT VALUES
   aopts.flag("FLAG::AVASP_ELF",DEFAULT_VASP_FORCE_OPTION_ELF);                                   // DEFAULT VALUES
   aopts.flag("FLAG::AVASP_LSCOUPLING",DEFAULT_VASP_FORCE_OPTION_LSCOUPLING);                     // DEFAULT VALUES
-  aopts.flag("FLAG::AVASP_AUTO_MAGMOM",DEFAULT_VASP_FORCE_OPTION_AUTO_MAGMOM);                   // DEFAULT VALUES
+  //[CO20250829 - OBSOLETE]aopts.flag("FLAG::AVASP_AUTO_MAGMOM",DEFAULT_VASP_FORCE_OPTION_AUTO_MAGMOM);                   // DEFAULT VALUES
+  aopts.flag("FLAG::AVASP_MAGMOM",FALSE);                                                        // DEFAULT VALUES  //CO20230826
+  aopts.flag("FLAG::AVASP_MAGMOM_MULT",FALSE);                                                   // DEFAULT VALUES  //CO20230826
   aopts.flag("FLAG::AVASP_SYM",DEFAULT_VASP_FORCE_OPTION_SYM);                   // DEFAULT VALUES //ME20181226
   aopts.flag("FLAG::AVASP_RELAX_FORCES",FALSE);          // DEFAULT VALUES
   aopts.flag("FLAG::AVASP_KPPRA",FALSE);                 // DEFAULT VALUES

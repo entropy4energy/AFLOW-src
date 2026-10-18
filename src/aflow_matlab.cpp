@@ -214,7 +214,7 @@ bool KBIN_MATLAB_Extract(string AflowIn,ifstream &FileAFLOWIN,ofstream &FileMESS
       Krun=FALSE;
       return Krun;
     }
-    if(!kflags.AFLOW_MATLAB_FILE_COMMAND && (kflags.AFLOW_MATLAB_FILE_FILE || !kflags.AFLOW_MATLAB_FILE_FILE)) {
+    if(!kflags.AFLOW_MATLAB_FILE_COMMAND) { //CO20261017 - was && (FILE || !FILE), always true
       if(kflags.AFLOW_MATLAB_FILE_FILE) {
         file=aurostd::substring2string(AflowIn,"[AFLOW_MATLAB_FILE]FILE=",1,TRUE);
         aus << "00000  MESSAGE aflow.m   generation from file=" << file << endl;
@@ -315,7 +315,7 @@ _kflags KBIN_MATLAB_Get_Matlabflags_from_AflowIN(string &AflowIn) {
 bool KBIN_MATLAB_Directory(ofstream &FileMESSAGE,_aflags &aflags,_kflags &kflags) { // AFLOW_FUNCTION_IMPLEMENTATION
   string subS,subS1,subS2;
   ostringstream aus;
-  string::iterator pos;
+  //[CO20230626 - clang warning not used]string::iterator pos;
   bool Krun=TRUE;
 
   ifstream FileAFLOWIN;
@@ -355,7 +355,7 @@ bool KBIN_MATLAB_Directory(ofstream &FileMESSAGE,_aflags &aflags,_kflags &kflags
       aus << "XXXXX  MAKING DIRECTORY = " << aflags.Directory << "  " << Message(__AFLOW_FILE__,aflags) << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
       string str="mkdir "+aflags.Directory;
-      system(str.c_str());
+      aurostd::execute(str.c_str());  //CO20250406
     }
     // ***************************************************************************
     // READY TO RUN

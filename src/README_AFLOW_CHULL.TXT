@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                       materials.duke.edu/AFLOW/README_AFLOW_CHULL.TXT
-****************************************************************************************************
 
 AFLOW-CHULL README:
 
@@ -69,6 +67,12 @@ LIST OF AFLOW-CHULL COMMANDS:
           on nietzsche, aflowlib, or habana).
       [--load_entries_entry_output|--loadentriesentryoutput|--leo] : Get full output for
           all entries loaded from the AFLOW API.
+      [--deed_source=auto|json|db|raw] : Select the DEED input source.
+          Aliases: --deedsource=auto|json|db|raw and --deed-source=auto|json|db|raw. Auto mode evaluates processed_data.json, the AFLOW
+          database configured by DEFAULT_AFLOW_DB_FILE in ~/.aflow.rc, and RAW entries, then retains
+          the source with the most valid compositions. Ties retain JSON, then SQLite, then RAW. The
+          log records every evaluated location and count plus the final selected input. Candidate
+          lists contain values only from the selected source.
       [--neglect=|--ban=aflow:bb0d45ab555bc208,aflow:fb9eaa58604ce774] :
           Ban specific entries from the convex hull calculation, done by AUID.
       [--see_neglect|--seeneglect|--sn] : Show why entries were neglected.
@@ -105,6 +109,10 @@ LIST OF AFLOW-CHULL COMMANDS:
           of N+1 enthalpy gain for ground state structures is skipped (can be time consuming).
       [--include_skewed_hulls|--include_skewed|--ish] : Process hull despite skewed endpoints (abs(ground state endpoint energy) < 15 meV).
       [--include_unreliable_hulls|--include_unreliable|--iuh] : Process hull despite poor statistics (binary hull count < 200).
+      [--include_pocc|--includepocc] : Let POCC entries define the hull. By default, POCC supercells
+          (ARUN.POCC_*) and POCC parents are left out of the hull: a supercell is one tile of a
+          disordered ensemble and a parent is the ensemble average, so neither is an ordered phase.
+          The database derived properties measure them against the hull of ordered structures.
       [--include_outliers|--io] : Include any detected outliers (output/warning is still shown).
       [--strict_outlier_analysis|--soa] : Terminate hull analysis if binary hull statistics not satisfied.
       [--force] : Force output despite warnings.
@@ -126,6 +134,14 @@ LIST OF AFLOW-CHULL COMMANDS:
           hull illustration color scheme to be lighter.
       [--large_font|--largefont|--large|--lf] : Latex/PDF output mode only. Prints a "larger" font size 
           for convex hull illustration.
+      [--print_deed|--print-deed] : Enable the DEED ternary page. When valid ternary DEED
+          data exist, AFLOW creates deed_plot_config.json only if missing and never overwrites
+          an existing config. The companion deed_plot_config.README.txt is refreshed to describe
+          the effective settings. AFLOW also writes
+          aflow_<alloy>_deed.json with the selected value and candidates for each composition.
+          Compositions and structure markers are rendered even when no stable ternary hull facet
+          exists; only real hull facets are overlaid. Without --print-deed, CHULL preserves the
+          original table schema and produces no DEED-specific plot or data files.
       [--png_resolution=|--pngresolution=|--pngr=300] : Set PNG resolution (-density in convert).
       [--plot_iso_max_latent_heat|--plot_isomax|--iso_max|--isomax] : Plot iso-max-latent-heat lines for ground state structures.
           See dx.doi.org/10.1063/1.4902865.

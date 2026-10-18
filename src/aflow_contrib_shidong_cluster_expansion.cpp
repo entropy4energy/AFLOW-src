@@ -198,7 +198,7 @@ double cecluster::ClusterDistance() {
 vector<int> AllCombination41(int num, int total_num, int index) {
   // Knuth's algorithm R
 
-  int c[num+1];
+  vector<int> c(num+1); //CO20261017 - vector, not a variable-length array (a C++ extension)
 
   for(int i=0; i<num; i++) {
     c[i] = i;
@@ -268,7 +268,7 @@ R5:
 vector<int> AllCombination42(int num, int total_num, vector<int> & str_in) {
   // Knuth's algorithm R
 
-  int c[num+1];
+  vector<int> c(num+1); //CO20261017 - vector, not a variable-length array (a C++ extension)
 
   //for(int i=0; i<num; i++) {
   //    c[i] = i;
@@ -2102,7 +2102,7 @@ vector<double> cestructure::GetCorrelation(vector<int> & index_list) {
 
   string s;
 
-  double cors[index_list.size()]; // correlations of clusters in index_list
+  vector<double> cors(index_list.size()); // correlations of clusters in index_list //CO20261017 - vector, not a variable-length array (a C++ extension)
 
   // get the configuration and the equivalent configurations by
   // shifting of origin in primitive unit cell

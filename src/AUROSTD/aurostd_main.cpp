@@ -299,12 +299,18 @@ namespace aurostd {
   //   void _aurostd_initialize_aswap(xcomplex<long double>& x,xcomplex<long double>& y) {aswap(x,y);}
 #endif
 
+  // CO20260913 - value-initialize instead of casting the literal 0.  These are
+  // templates instantiated for utype=std::string as well as for numeric types
+  // (see _aurostd_initialize_max/min/sum/reset/clear just below each one), and
+  // (std::string) 0 constructs a std::string from a NULL const char*, which is
+  // undefined behavior, not an empty string.  clang reports it as -Wnonnull.
+  // utype() is 0 for every arithmetic type and "" for std::string.
   // ***************************************************************************
   // Function max of a vector/deque
   // ***************************************************************************
   //SC
   template<class utype> utype max(const vector<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
+    if(vec.size()==0) return utype();
     utype out=vec.at(0);
     for(uint i=0;i<vec.size();i++) if(vec[i]>=out) out=vec[i];
     return out;
@@ -321,7 +327,7 @@ namespace aurostd {
   long double _aurostd_initialize_max(const vector<long double> vec) { return max(vec);}
 
   template<class utype> utype max(const deque<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
+    if(vec.size()==0) return utype();
     utype out=vec.at(0);
     for(uint i=0;i<vec.size();i++) if(vec[i]>=out) out=vec[i];
     return out;
@@ -341,8 +347,8 @@ namespace aurostd {
   // Function max of a vector<vector<>>
   // ***************************************************************************
   template<class utype> utype max(const vector<vector<utype> > mat) {
-    if(mat.size()==0) return (utype) 0;
-    if(mat.at(0).size()==0) return (utype) 0;
+    if(mat.size()==0) return utype();
+    if(mat.at(0).size()==0) return utype();
     utype out=mat.at(0).at(0);
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
@@ -365,7 +371,7 @@ namespace aurostd {
   // ***************************************************************************
   //SC
   template<class utype> utype min(const vector<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
+    if(vec.size()==0) return utype();
     utype out=vec.at(0);
     for(uint i=0;i<vec.size();i++) if(vec[i]<=out) out=vec[i];
     return out;
@@ -383,7 +389,7 @@ namespace aurostd {
 
   //SC
   template<class utype> utype min(const deque<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
+    if(vec.size()==0) return utype();
     utype out=vec.at(0);
     for(uint i=0;i<vec.size();i++) if(vec[i]<=out) out=vec[i];
     return out;
@@ -403,8 +409,8 @@ namespace aurostd {
   // Function min of a vector<vector<>>
   // ***************************************************************************
   template<class utype> utype min(const vector<vector<utype> > mat) {
-    if(mat.size()==0) return (utype) 0;
-    if(mat.at(0).size()==0) return (utype) 0;
+    if(mat.size()==0) return utype();
+    if(mat.at(0).size()==0) return utype();
     utype out=mat.at(0).at(0);
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
@@ -426,8 +432,8 @@ namespace aurostd {
   // Function sum of a vector/deque
   // ***************************************************************************
   template<class utype> utype sum(const vector<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
-    utype out=0;
+    if(vec.size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<vec.size();i++) out+=vec[i];
     return out;
   }
@@ -443,8 +449,8 @@ namespace aurostd {
   long double _aurostd_initialize_sum(const vector<long double> vec) { return sum(vec);}
 
   template<class utype> utype sum(const deque<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
-    utype out=0;
+    if(vec.size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<vec.size();i++) out+=vec[i];
     return out;
   }
@@ -463,9 +469,9 @@ namespace aurostd {
   // Function sum of a vector<vector<>>
   // ***************************************************************************
   template<class utype> utype sum(const vector<vector<utype> > mat) {
-    if(mat.size()==0) return (utype) 0;
-    if(mat.at(0).size()==0) return (utype) 0;
-    utype out=0;
+    if(mat.size()==0) return utype();
+    if(mat.at(0).size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
         out+=mat[i][j];
@@ -486,8 +492,8 @@ namespace aurostd {
   // Function mean of a vector/deque
   // ***************************************************************************
   template<class utype> utype mean(const vector<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
-    utype out=0;
+    if(vec.size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<vec.size();i++) out+=vec[i];
     return (utype) out/((utype) vec.size());
   }
@@ -502,8 +508,8 @@ namespace aurostd {
   long double _aurostd_initialize_mean(const vector<long double> vec) { return mean(vec);}
 
   template<class utype> utype mean(const deque<utype> vec) {
-    if(vec.size()==0) return (utype) 0;
-    utype out=0;
+    if(vec.size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<vec.size();i++) out+=vec[i];
     return (utype) out/((utype) vec.size());
   }
@@ -521,9 +527,9 @@ namespace aurostd {
   // Function mean of a vector<vector<>>
   // ***************************************************************************
   template<class utype> utype mean(const vector<vector<utype> > mat) {
-    if(mat.size()==0) return (utype) 0;
-    if(mat.at(0).size()==0) return (utype) 0;
-    utype out=0;
+    if(mat.size()==0) return utype();
+    if(mat.at(0).size()==0) return utype();
+    utype out=utype();
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
         out+=mat[i][j];
@@ -543,7 +549,7 @@ namespace aurostd {
   // Function reset of a vector/deque
   // ***************************************************************************
   template<class utype> vector<utype> reset(vector<utype>& vec) {
-    for(uint i=0;i<vec.size();i++) vec[i]=(utype) 0;
+    for(uint i=0;i<vec.size();i++) vec[i]=utype();
     return vec;
   }
   // overload to force compiling
@@ -558,7 +564,7 @@ namespace aurostd {
   vector<long double>  _aurostd_initialize_reset(vector<long double>& vec) { return reset(vec);}
 
   template<class utype> deque<utype> reset(deque<utype>& vec) {
-    for(uint i=0;i<vec.size();i++) vec[i]=(utype) 0;
+    for(uint i=0;i<vec.size();i++) vec[i]=utype();
     return vec;
   }
   // overload to force compiling
@@ -578,7 +584,7 @@ namespace aurostd {
   template<class utype> vector<vector<utype> > reset(vector<vector<utype> > mat) {
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
-        mat[i][j]=(utype) 0;
+        mat[i][j]=utype();
     return mat;
   }
   // overload to force compiling
@@ -596,7 +602,7 @@ namespace aurostd {
   // Function clear of a vector/deque
   // ***************************************************************************
   template<class utype> vector<utype> clear(vector<utype>& vec) {
-    for(uint i=0;i<vec.size();i++) vec[i]=(utype) 0;
+    for(uint i=0;i<vec.size();i++) vec[i]=utype();
     return vec;
   }
   // overload to force compiling
@@ -611,7 +617,7 @@ namespace aurostd {
   vector<long double>  _aurostd_initialize_clear(vector<long double>& vec) { return clear(vec);}
 
   template<class utype> deque<utype> clear(deque<utype>& vec) {
-    for(uint i=0;i<vec.size();i++) vec[i]=(utype) 0;
+    for(uint i=0;i<vec.size();i++) vec[i]=utype();
     return vec;
   }
   // overload to force compiling
@@ -631,7 +637,7 @@ namespace aurostd {
   template<class utype> vector<vector<utype> > clear(vector<vector<utype> > mat) {
     for(uint i=0;i<mat.size();i++)
       for(uint j=0;j<mat[i].size();j++)
-        mat[i][j]=(utype) 0;
+        mat[i][j]=utype();
     return mat;
   }
   // overload to force compiling
@@ -1323,14 +1329,21 @@ namespace aurostd {
     return ss;
   }
 
+  // ST20250418 Whitespace predicates to avoid instantiating lambdas repeatedly
+  bool IsSpaceOrTab(char c) { return c == ' ' or c == '\t'; }
+  bool IsSpaceOrTabOrNewline(char c) {return c == ' ' or c == '\t' or c == '\n';}
+
   // ***************************************************************************
   // Function RemoveWhiteSpacesFromTheBack
   // ***************************************************************************
   // Removes all white spaces (spaces, tabs) from a string. Morgan / Curtarolo
-  string RemoveWhiteSpacesFromTheBack(const string& s) {
+  string RemoveWhiteSpacesFromTheBack(const string& s, bool remove_newline) {
     if(s.size()==0) return s;  // nothing to do
     string ss=s;
-    while(ss[ss.size()-1]==' ' || ss[ss.size()-1]=='\t') {
+    // ST20250418 Remove newlines too if given option
+    std::function<bool(char)> predicate = remove_newline ? IsSpaceOrTabOrNewline : IsSpaceOrTab;
+
+    while(predicate(ss[ss.size()-1])) {
       ss.erase(ss.size()-1,1);
       if(ss.size()==0) return ss;  // nothing to do
     }
@@ -1341,10 +1354,15 @@ namespace aurostd {
   // Function RemoveWhiteSpacesFromTheFront
   // ***************************************************************************
   // Removes all white spaces (spaces, tabs) from a string. Oses
-  string RemoveWhiteSpacesFromTheFront(const string& s) {
+  string RemoveWhiteSpacesFromTheFront(const string& s, bool remove_newline) {
     if(s.size()==0) return s;  // nothing to do
-    string ss=s;
-    while(ss[0]==' ' || ss[ss.size()-1]=='\t') {
+    string ss = s;
+    // ST20250418 Remove newlines too if given option
+    std::function<bool(char)> predicate = remove_newline ? IsSpaceOrTabOrNewline : IsSpaceOrTab;
+
+    // ST20250418 Also there seemed to be a mistake here before where the last character is checked rather than first
+    // while(ss[0]==' ' || ss[ss.size()-1]=='\t') {
+    while(predicate(ss[0])) {
       ss.erase(0,1);
       if(ss.size()==0) return ss;  // nothing to do
     }
@@ -1355,11 +1373,12 @@ namespace aurostd {
   // Function RemoveWhiteSpacesFromTheFrontAndBack
   // ***************************************************************************
   // Removes all white spaces (spaces, tabs) from a string. Oses
-  string RemoveWhiteSpacesFromTheFrontAndBack(const string& s) {
+  string RemoveWhiteSpacesFromTheFrontAndBack(const string& s, bool remove_newline) {
     if(s.size()==0) return s;  // nothing to do
+    // ST20250418 pass along remove_newline argument
     string ss=s;
-    ss=RemoveWhiteSpacesFromTheBack(ss);
-    ss=RemoveWhiteSpacesFromTheFront(ss);
+    ss=RemoveWhiteSpacesFromTheBack(ss, remove_newline);
+    ss=RemoveWhiteSpacesFromTheFront(ss, remove_newline);
     return ss;
   }
 
@@ -2378,7 +2397,7 @@ namespace aurostd {
     //Will determine zipped extension
     if(CompressedFileName.find(".xz")!=string::npos)  {return "xzcat";}
     if(CompressedFileName.find(".bz2")!=string::npos) {return "bzcat";}
-    if(CompressedFileName.find(".gz")!=string::npos)  {return "zcat";}
+    if(CompressedFileName.find(".gz")!=string::npos)  {return "gzip -dc";}  //CO20261018 - macOS zcat reads only .Z files
     if(CompressedFileName.find(".zip")!=string::npos) {return "unzip -p";}
     return "cat";
   }
@@ -3434,7 +3453,8 @@ namespace aurostd {
     // cerr << "COMMAND " <<  command.c_str() << endl;
     string command=aurostd::CleanCommand4Execute(_command); //CO20200624
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " command.c_str()=\"" << command.c_str() << "\"" << endl;}
-    system(command.c_str());
+    int result=system(command.c_str());
+    if(result<0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"system returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
     //   command="";
     return TRUE;
   }
@@ -3484,7 +3504,8 @@ namespace aurostd {
     else if(fsio==stderr_fsio){cmdstream << command << " 2> " << file << (quiet?" 1> /dev/null":"");} //CO20200624
     else{cmdstream << command << " > " << file << (quiet?" 2> /dev/null":"");} //CO20200624
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " cmdstream=\"" << cmdstream.str() << "\"" << endl;}
-    system(cmdstream.str().c_str());
+    int result=system(cmdstream.str().c_str());
+    if(result<0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"system returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
     // command="";
     strstream << aurostd::file2string(file);
     aurostd::StringstreamClean(cmdstream);
@@ -4403,11 +4424,11 @@ namespace aurostd {
       // cerr << "ERROR - aurostd::gzfile2string: file=" << FileNameIN << " not present !" << endl;
       return 0;
     }
-    if(!aurostd::IsCommandAvailable("zcat")) {
-      // cerr << "ERROR - aurostd::gzfile2string: command \"zcat\" is necessary !" << endl;
+    if(!aurostd::IsCommandAvailable("gzip")) {  //CO20261018 - gzip -dc: macOS zcat reads only .Z files
+      // cerr << "ERROR - aurostd::gzfile2string: command \"gzip\" is necessary !" << endl;
       return 0;
     }
-    StringIN=aurostd::execute2string("zcat \""+FileNameIN+"\"");
+    StringIN=aurostd::execute2string("gzip -dc \""+FileNameIN+"\"");
     return StringIN.length();  // return 0 if something got messed up
   }
   uint xzfile2string(const string& _FileNameIN,string& StringIN) {  //CO20210624
@@ -4493,7 +4514,10 @@ namespace aurostd {
     bool writable=FileOUT.is_open(); //CO20190808 - captures whether we can open/write file
     for(uint iline=0;iline<vline.size();iline++) FileOUT << vline.at(iline) << endl;
     // FileOUT << StringstreamOUT.rdbuf();
-    FileOUT.flush();FileOUT.clear();FileOUT.close();
+    FileOUT.flush();
+    writable=(writable && FileOUT.good()); //CO20261004 - a failed write (full disk, quota) is a failure too; it used to leave a cut file and report success
+    FileOUT.clear();FileOUT.close();
+    writable=(writable && !FileOUT.fail()); //CO20261004 - so is a failed close
     return writable;
   }
 
@@ -4528,7 +4552,10 @@ namespace aurostd {
     bool writable=FileOUT.is_open(); //CO20190808 - captures whether we can open/write file
     for(uint iline=0;iline<vline.size();iline++)  FileOUT << vline.at(iline) << endl;
     // FileOUT << StringstreamOUT.rdbuf();
-    FileOUT.flush();FileOUT.clear();FileOUT.close();
+    FileOUT.flush();
+    writable=(writable && FileOUT.good()); //CO20261004 - a failed write (full disk, quota) is a failure too; it used to leave a cut file and report success
+    FileOUT.clear();FileOUT.close();
+    writable=(writable && !FileOUT.fail()); //CO20261004 - so is a failed close
     return writable;
   }
 
@@ -4564,7 +4591,10 @@ namespace aurostd {
     bool writable=FileOUT.is_open(); //CO20190808 - captures whether we can open/write file
     for(uint iline=0;iline<vline.size();iline++) FileOUT << vline.at(iline) << endl;
     // FileOUT << StringstreamOUT.rdbuf();
-    FileOUT.flush();FileOUT.clear();FileOUT.close();
+    FileOUT.flush();
+    writable=(writable && FileOUT.good()); //CO20261004 - a failed write (full disk, quota) is a failure too; it used to leave a cut file and report success
+    FileOUT.clear();FileOUT.close();
+    writable=(writable && !FileOUT.fail()); //CO20261004 - so is a failed close
     return writable;
   }
 
@@ -4679,6 +4709,7 @@ namespace aurostd {
   // wget URL to string - Stefano Curtarolo
   bool url2file(string url,string& fileIN,bool verbose) {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
+    if(aurostd::httpS4EPathRefused(aurostd::httpParseURL(url))) {return FALSE;} //CO20261006 - s4e.ai has no calculation folders
     if(!aurostd::IsCommandAvailable("wget")) {
       cerr << "ERROR - aurostd::url2file(): command \"wget\" is necessary !" << endl;
       return FALSE;
@@ -5272,7 +5303,9 @@ namespace aurostd {
       cerr << "ERROR - aurostd::RemoveDirectory: command \"rm\" is necessary !" << endl;
       return FALSE;
     }
-    aurostd::execute("rm -r \""+path+"\"");
+    //CO20261018 - -f: rm in a terminal asks before it removes a read-only file (a database the tests built), and
+    //aflow waited for the answer
+    aurostd::execute("rm -rf \""+path+"\"");
     return TRUE;
   }
   //CO END
@@ -6103,6 +6136,10 @@ namespace aurostd {
       }
     }
 
+    //CO20261004 - "A|B" means A or B (grep -E), so one pattern can hold the VASP 5 and VASP 6 wordings
+    //of a message; without this, a pattern with no spaces would go to fgrep and the | would be literal
+    if(use_regex && strsub1.find('|')!=string::npos){is_regex_used=true;}
+
     string temp_file=aurostd::TmpFileCreate("substring");
     ostringstream aus;
     ifstream FileFile;
@@ -6269,12 +6306,14 @@ namespace aurostd {
     string strline=_strline,strline2="",strline3="";
     bool found_strsub2=false;
     if(RemoveComments) {strline=aurostd::RemoveComments(strline);}
-      //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
-    while(!strline.empty()&&(read==TRUE||strline.find(strsub1)!=string::npos||strline.find(strsub2)!=string::npos)){
-        if(LDEBUG){
-          cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
-          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
-        }
+    //CO20230501 - fixing in case strsub1 and strsub2 are in the same line
+    //CO20261004 - outside a block (read==FALSE) only strsub1 starts work; a line with strsub2 but no strsub1 there
+    //changed nothing and looped forever, e.g. substring2string("a(b)c)","(",")")
+    while(!strline.empty()&&(read==TRUE||strline.find(strsub1)!=string::npos)){
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " (WHILE LOOP START)" << endl;
+        cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+      }
       if(read==TRUE){
         if(LDEBUG){cerr << __AFLOW_FUNC__ << " read==TRUE" << endl;}
         found_strsub2=(strline.find(strsub2)!=string::npos);
@@ -6285,11 +6324,11 @@ namespace aurostd {
           strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
           strline2=strline3;
         }
-          if(LDEBUG){
-            cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
-            cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
-          }
-          vlines.push_back(strline2);
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+        }
+        vlines.push_back(strline2);
         if(found_strsub2){
           if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
           tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
@@ -6318,12 +6357,12 @@ namespace aurostd {
           strline3=strline2.substr(0,strline2.find(strsub2));
           strline =strline2.substr(strline2.find(strsub2)+strsub2.length());
           strline2=strline3;
-        if(LDEBUG){
+          if(LDEBUG){
             cerr << __AFLOW_FUNC__ << " strline2.find(strsub2)!=string::npos" << endl;
-          cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
-          cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
-        }
-        vlines.push_back(strline2);
+            cerr << __AFLOW_FUNC__ << " strline2=" << strline2 << endl;
+            cerr << __AFLOW_FUNC__ << " strline=" << strline << endl;
+          }
+          vlines.push_back(strline2);
           if(trim_edges){trimEmptyEdges(vlines);} //CO20230502
           tokens.push_back(aurostd::joinWDelimiter(vlines,"\n"));
           if(LDEBUG){
@@ -6333,11 +6372,11 @@ namespace aurostd {
           vlines.clear();
           read=FALSE;
         }
-          }
-        if(LDEBUG){
-          cerr << __AFLOW_FUNC__ << " read=" << read << endl;
-          cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;
-        }
+      }
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " read=" << read << endl;
+        cerr << __AFLOW_FUNC__ << " (WHILE LOOP END)" << endl;
+      }
     }
     return tokens.size();
   }
@@ -7300,6 +7339,7 @@ namespace aurostd {
 
   template<class utype1,class utype2> // function quicksort //CO20200915
     void sort(deque<utype1>& arr, deque<utype2>& brr) {
+      if(arr.empty()){return;}  //CO20261010 - xvector(0) has two rows, so empty deques came back with two values (GetNeighbors() of an atom without neighbors within rmax)
       xvector<utype1> xarr(arr.size());
       xvector<utype2> xbrr(brr.size());
       for(uint i=0;i<arr.size();i++) xarr[i+1]=arr[i];
@@ -7588,7 +7628,7 @@ namespace aurostd {
       //this function seems to run faster than aurostd::sort() as well
 			uint i=0,j=0;
 			if(mode==1){
-				for(i=0;i<vec.size()-1;i++){
+				for(i=0;i+1<vec.size();i++){ //CO20261002 - was i<vec.size()-1, which wraps around for an empty vector
 					if(vorder[i]==i){continue;}
 					for(j=i+1;j<vorder.size();j++){
 						if(vorder[j]==i){break;}
@@ -7601,7 +7641,7 @@ namespace aurostd {
       else if(mode==2) {
 				uint alt=0;
 				// for all elements to put in place
-				for(i=0;i<vec.size()-1;++i){
+				for(i=0;i+1<vec.size();++i){ //CO20261002 - was i<vec.size()-1
 					// while the element i is not yet in place 
 					while(i!=vorder[i]){
 						// swap it with the element at its final place

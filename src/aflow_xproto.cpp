@@ -18,10 +18,10 @@
 #include "aflow_xproto_library_default.cpp"
 #include "aflow_symmetry_spacegroup.h" //DX20181009
 #include "aflow_compare_structure.h" //DX20181009
+#include "aflow_prototypes_jhu.h" //CO20260930
 
 #define _EPS_ 0.02
 //#define _XPROTO_TOO_CLOSE_ERROR_ 0.60 // was 0.75 //CO20171023 - see aflow.h
-//[CO20200404 - moved to aflow.h]#define AFLOWLIB_SERVER_DEFAULT string("aflowlib.duke.edu")
 
 using aurostd::isdifferent;
 using aurostd::isequal;
@@ -508,6 +508,26 @@ namespace aflowlib {
     if(label=="A1" || label=="A2" || label=="A3" || label=="A4" || label=="A5") {return (uint) 1;}
     if(label=="A6" || label=="A7" || label=="A8" || label=="A9" || label=="A10") {return (uint) 1;}
     if(label=="A11" || label=="A12" || label=="A13" || label=="A14" || label=="A15") {return (uint) 1;}
+    //CO20231224 - deriving prefix from whether PRE+ATOMIC exists as a word, check https://www.merriam-webster.com/
+    //https://en.wikipedia.org/wiki/Numeral_prefix
+    //https://www.angelo.edu/faculty/kboudrea/periodic/physical_diatomics.htm - S-ring with 8 atoms, Se-ring with 8 atoms, P-tetrahedron with 4 atoms (white and red)
+    //consider this a sandbox for creating molecules in a box
+    //do not use for database generation
+    //treat generic MONATOM, DIATOM, TRIATOM, TETRATOM, PENTATOM as (N-1)-simplexes: https://en.wikipedia.org/wiki/Simplex
+    //reserve names for special configurations: A_OCTASULFUR.A: https://en.wikipedia.org/wiki/Octasulfur
+    //or A_CYCLOOCTASELENIUM.A: https://pubchem.ncbi.nlm.nih.gov/compound/Cyclooctaselenium
+    if(label=="A_MONATOM"||label=="A_MONATOM.A") {return (uint) 1;} //CO20231224
+    if(label=="A_DIATOM"||label=="A_DIATOM.A") {return (uint) 1;}  //CO20231224
+    if(label=="A_TRIATOM"||label=="A_TRIATOM.A") {return (uint) 1;} //CO20231224
+    if(label=="A_TETRATOM"||label=="A_TETRATOM.A") {return (uint) 1;}  //CO20231224
+    if(label=="A_PENTATOM"||label=="A_PENTATOM.A") {return (uint) 1;}  //CO20231224
+    if(label=="A_HEXATOM"||label=="A_HEXATOM.A") {return (uint) 1;} //CO20231224
+    if(label=="A_HEPTATOM"||label=="A_HEPTATOM.A") {return (uint) 1;}  //CO20231224
+    if(label=="A_OCTATOM"||label=="A_OCTATOM.A") {return (uint) 1;} //CO20231224
+    if(label=="A_ENNEATOM"||label=="A_ENNEATOM.A") {return (uint) 1;}  //CO20231224
+    if(label=="A_DECATOM"||label=="A_DECATOM.A") {return (uint) 1;} //CO20231224
+    if(label=="AB_DIATOM"||label=="AB_DIATOM.AB"||label=="AB_DIATOM.BA") {return (uint) 2;} //CO20231224
+    //keep going... might need to fix AB ratio...
     // check ANRL
     vector<string> tokens;
     aurostd::string2tokens(label,tokens,"_");
@@ -644,6 +664,68 @@ namespace aflowlib {
 #endif
     }
     // done
+    
+    //CO20231224 - check for "LIB0" protos: A_MONATOM, A_DIATOM, etc.
+    //for POSCAR construction only (--proto), for database runs, use the ANRL designation
+    if(aurostd::substring2bool(label,"ATOM")&&aurostd::string2tokens(label,vlabel_ANRL,"_")==2) {
+      xstructure xstr;
+      //create box, 10 angstroms (default) should be enough vacuum for these molecules
+      xstr.scale=1.0;
+      xstr.lattice(xstr.lattice.lrows,xstr.lattice.lcols)=10.0;
+      xstr.lattice(xstr.lattice.lrows+1,xstr.lattice.lcols+1)=10.0;
+      xstr.lattice(xstr.lattice.lrows+2,xstr.lattice.lcols+2)=10.0; //create box
+      vector<double> vparams; if(!parameters.empty()){aurostd::string2tokens<double>(parameters,vparams,",");}
+      _atom a;
+      if(label=="A_MONATOM"||label=="A_MONATOM.A"){
+        //parameter inputs are the box dimensions
+        if(vparams.size()>0){ //overwrite as you go down
+          xstr.lattice(xstr.lattice.lrows,xstr.lattice.lcols)=vparams[0];
+          xstr.lattice(xstr.lattice.lrows+1,xstr.lattice.lcols+1)=vparams[0];
+          xstr.lattice(xstr.lattice.lrows+2,xstr.lattice.lcols+2)=vparams[0];
+        }
+        if(vparams.size()>1){xstr.lattice(xstr.lattice.lrows+1,xstr.lattice.lcols+1)=vparams[1];}
+        if(vparams.size()>2){xstr.lattice(xstr.lattice.lrows+2,xstr.lattice.lcols+2)=vparams[2];}
+        a.cpos[a.cpos.lrows]=a.cpos[a.cpos.lrows+1]=a.cpos[a.cpos.lrows+2]=0;a.fpos=C2F(xstr.lattice,a.cpos);
+        a.name=vatomX[0];
+        if(!a.name.empty()){a.name_is_given=true;}
+        xstr.AddAtom(a,true);
+        xstr.title=vatomX[0]+"/"+label;
+        if(!aurostd::substring2bool(label,".A")){xstr.title+=".A";}
+        if(!parameters.empty()){xstr.title+=" --params="+parameters;}
+        return xstr;
+      }
+      if(label=="A_DIATOM"||label=="A_DIATOM.A"){
+        //parameter inputs are the bond length and box dimensions
+        double length_bond=1.0;
+        if(vparams.size()>0){length_bond=vparams[0];}
+        if(vparams.size()>1){ //overwrite as you go down
+          xstr.lattice(xstr.lattice.lrows,xstr.lattice.lcols)=vparams[1];
+          xstr.lattice(xstr.lattice.lrows+1,xstr.lattice.lcols+1)=vparams[1];
+          xstr.lattice(xstr.lattice.lrows+2,xstr.lattice.lcols+2)=vparams[1];
+        }
+        if(vparams.size()>2){xstr.lattice(xstr.lattice.lrows+1,xstr.lattice.lcols+1)=vparams[2];}
+        if(vparams.size()>3){xstr.lattice(xstr.lattice.lrows+2,xstr.lattice.lcols+2)=vparams[3];}
+        //atom 1
+        a.cpos[a.cpos.lrows]=a.cpos[a.cpos.lrows+1]=a.cpos[a.cpos.lrows+2]=0;
+        a.fpos=C2F(xstr.lattice,a.cpos);
+        a.name=vatomX[0];
+        if(!a.name.empty()){a.name_is_given=true;}
+        xstr.AddAtom(a,true);
+        //atom 2
+        a.cpos[a.cpos.lrows]=a.cpos[a.cpos.lrows+1]=0;
+        a.cpos[a.cpos.lrows+2]=length_bond; //this is vasp style: https://www.vasp.at/wiki/index.php/O_dimer
+        a.fpos=C2F(xstr.lattice,a.cpos);
+        a.name=vatomX[0];
+        if(!a.name.empty()){a.name_is_given=true;}
+        xstr.AddAtom(a,true);
+        //
+        xstr.title=vatomX[0]+"/"+label;
+        if(!aurostd::substring2bool(label,".A")){xstr.title+=".A";}
+        if(!parameters.empty()){xstr.title+=" --params="+parameters;}
+        return xstr;
+      }
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Prototype not yet created",_INPUT_ILLEGAL_);
+    }
 
     deque<string> vatomX_backup(vatomX);
     deque<double> vvolumeX_backup(vvolumeX);
@@ -2366,6 +2448,7 @@ namespace aflowlib {
     //  strstream << aflow::Banner("BANNER_TINY") << endl;
     strstream << aflow::Banner("BANNER_BIG") << endl;
     strstream << init::InitGlobalObject("README_PROTO_TXT");
+    strstream << jhuproto::listing(); //CO20260930
     strstream << " " << endl;
     // throw aurostd::xerror(__AFLOW_FILE__,XPID+"aflowlib::PrototypesHelp():","Throw for debugging purposes.",_GENERIC_ERROR_);
     return strstream.str();
@@ -3798,7 +3881,7 @@ namespace aflowlib {
       string sgstring=(SpaceGroupOptionRequired(str.spacegroupnumber)?aurostd::utype2string(str.spacegroupnumber)+"."+aurostd::utype2string(str.spacegroupnumberoption):aurostd::utype2string(str.spacegroupnumber));
       if(mode_load==STRUCTURE_MODE_WYC) {
         label_library="";
-        PARAMS->vatomX.at(0)+PARAMS->vatomX.at(1)+"/"+label_library;
+        //[CO20231119 - does not seem to do anything...]PARAMS->vatomX.at(0)+PARAMS->vatomX.at(1)+"/"+label_library;
       }
 
 

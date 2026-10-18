@@ -122,10 +122,19 @@ namespace aflowlib {
         bool ZIPNOMIX=TRUE;
         bool BROKEN=FALSE;//TRUE; // VERY VERY SLOW
         bool TOUCH=FALSE;
+    
+        //CO020240407 START - looking for AEL-AGL run
+        vector<string> vaflowin_variants_aelagl;  //CO20240407
+        aurostd::string2tokens(DEFAULT_FILE_AFLOWIN_VARIANTS_AELAGL,vaflowin_variants_aelagl,",");  //CO20240407
+        vector<string> vlock_variants_aelagl;  //CO20240407
+        aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,",");  //CO20240407
+        bool found_aflowin_aelagl=false,exists_aflowin_aelagl=false,exists_lock_aelagl=false;
+        string aflowin_aelagl="",lock_aelagl="";
+        //CO020240407 STOP - looking for AEL-AGL run
 
         deque<string> vext; aurostd::string2tokens(".xz",vext,",");
         deque<string> vcmd; aurostd::string2tokens("xzcat",vcmd,",");
-        //  deque<string> vrelax; aurostd::string2tokens(".relax1,.relax2,.relax3,.static,.bands",vrelax,",");
+        //  deque<string> vrelax; aurostd::string2tokens(".relax1,.relax2,.relax3,.relax4,.relax_apl1,.relax_apl2,.relax_apl3,.relax_apl4,.static,.bands",vrelax,",");
         deque<string> vrelax; aurostd::string2tokens(".relax1",vrelax,",");
         //     deque<string> vbroken;aurostd::string2tokens("OUTCAR,CHG,CHGCAR,PROCAR,EIGENVAL,vasprun.xml",vbroken,",");
         deque<string> vbroken;aurostd::string2tokens("OUTCAR",vbroken,",");
@@ -137,6 +146,24 @@ namespace aflowlib {
           aurostd::StringSubst(directory_RAW,"/LIB/","/RAW/");
           string directory_WEB=directory_LIB;
           aurostd::StringSubst(directory_WEB,"/LIB/","/WEB/");
+
+          //CO020240407 START - looking for AEL-AGL run
+          for(uint k=0;k<vaflowin_variants_aelagl.size();k++){
+            if(_AFLOWIN_==vaflowin_variants_aelagl[k]){
+              found_aflowin_aelagl=true;
+              aflowin_aelagl=vaflowin_variants_aelagl[k];
+              exists_aflowin_aelagl=aurostd::FileExist(directory_LIB+"/"+aflowin_aelagl);
+              break;
+            }
+          }
+          for(uint k=0;k<vlock_variants_aelagl.size();k++){
+            if(aurostd::FileExist(directory_LIB+"/"+vlock_variants_aelagl[k])){
+              exists_lock_aelagl=true;
+              lock_aelagl=vlock_variants_aelagl[k];
+              break;
+            }
+          }
+          //CO020240407 STOP - looking for AEL-AGL run
 
           bool FileExist_directory_LIB_AFLOW_IN=aurostd::FileExist(directory_LIB+"/"+_AFLOWIN_);  // 6 times
           bool FileExist_directory_RAW_AFLOW_IN=aurostd::FileExist(directory_RAW+"/"+_AFLOWIN_);  // 5 times
@@ -227,6 +254,7 @@ namespace aflowlib {
           }
 
           // check LIB2AUID MISSING	
+          found_aflowin_aelagl=false;
           if(LIB2AUID) {
             if(FileExist_directory_LIB_AFLOW_IN || FileExist_directory_RAW_AFLOWLIB_ENTRY_OUT) {
               if(aflowlib::LIB2AUID(directory_LIB,TRUE,FALSE)) {	    
@@ -237,9 +265,11 @@ namespace aflowlib {
                   fixes++;
                 }
                 //	  if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
-                if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+                //[CO20240407 - OBSOLETE]if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+                if(found_aflowin_aelagl && exists_lock_aelagl)  //CO20240407
                 { //CO20200106 - patching for auto-indenting
-                  ossLIB2AUID << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --lib2auid=\"" << directory_LIB << "\"" << endl;
+                  //[CO20240407 - OBSOLETE]ossLIB2AUID << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --lib2auid=\"" << directory_LIB << "\"" << endl;
+                  ossLIB2AUID << "aflow "<< "--use_aflow.in=" << aflowin_aelagl << " --use_LOCK=" << lock_aelagl << " " << " --lib2auid=\"" << directory_LIB << "\"" << endl; //CO20240407
                   fixes++;
                 }
               }
@@ -256,9 +286,11 @@ namespace aflowlib {
                 fixes++;
               }
               //	  if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && !aurostd::FileExist(directory_LIB+"/LOCK") && aurostd::FileExist(directory_LIB+"/agl.LOCK"))
-              if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+              //[CO20240407 - OBSOLETE]if(_AFLOWIN_==_AFLOWIN_AGL_DEFAULT_ && aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+              if(found_aflowin_aelagl && exists_lock_aelagl)  //CO20240407
               { //CO20200106 - patching for auto-indenting
-                ossLIB2RAW << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;
+                //[CO20240407 - OBSOLETE]ossLIB2RAW << "aflow "<< "--use_aflow.in=agl_aflow.in --use_LOCK=agl.LOCK " << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;
+                ossLIB2RAW << "aflow "<< "--use_aflow.in=" << aflowin_aelagl << " --use_LOCK=" << lock_aelagl << " " << " --beep --force --showPID --lib2raw=\"" << directory_LIB << "\"" << endl;  //CO20240407
                 fixes++;
               }
             }
@@ -312,9 +344,12 @@ namespace aflowlib {
           }
 
           // check AGL_FIX
-          if(aurostd::FileExist(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_) && aurostd::FileExist(directory_LIB+"/LOCK") && !aurostd::FileExist(directory_LIB+"/agl.LOCK")) {
-            listAGL2FIX.push_back(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_);
-            ossAGL2FIX << "cp \"" << directory_LIB << "/" << "LOCK\"" << " \"" << directory_LIB << "/" << "agl.LOCK\"" << endl;
+          //[CO20240407 - OBSOLETE]if(aurostd::FileExist(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_) && aurostd::FileExist(directory_LIB+"/LOCK") && !aurostd::FileExist(directory_LIB+"/agl.LOCK")) 
+          if(exists_aflowin_aelagl && aurostd::FileExist(directory_LIB+"/LOCK") && exists_lock_aelagl==false)   //CO20240407
+          {
+            //[CO20240407 - OBSOLETE]listAGL2FIX.push_back(directory_LIB+"/"+_AFLOWIN_AGL_DEFAULT_);
+            listAGL2FIX.push_back(directory_LIB+"/"+aflowin_aelagl);  //CO20240407
+            ossAGL2FIX << "cp \"" << directory_LIB << "/" << "LOCK\"" << " \"" << directory_LIB << "/" << aflowin_aelagl << "\"" << endl;
             fixes++;	    
           }
 
@@ -530,9 +565,16 @@ namespace aflowlib {
     bool VERBOSE=FALSE;// _VERBOSE;
     if(VERBOSE) acerr << __AFLOW_FUNC__ + " BEGIN" << endl;
     string _entry=entry,directory_LIB,directory_RAW,directory_WEB;
+    
+    vector<string> vaflowin_variants_aelagl;  //CO20240407
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWIN_VARIANTS_AELAGL,vaflowin_variants_aelagl,",");  //CO20240407
+    
     aurostd::StringSubst(_entry,"/aflow.in","");
-    aurostd::StringSubst(_entry,"/"+_AFLOWIN_AEL_DEFAULT_,"");
-    aurostd::StringSubst(_entry,"/"+_AFLOWIN_AGL_DEFAULT_,"");
+    //[CO20240407 - OBSOLETE]aurostd::StringSubst(_entry,"/"+_AFLOWIN_AEL_DEFAULT_,"");
+    //[CO20240407 - OBSOLETE]aurostd::StringSubst(_entry,"/"+_AFLOWIN_AGL_DEFAULT_,"");
+    for(uint i=0;i<vaflowin_variants_aelagl.size();i++){  //CO20240407
+      aurostd::StringSubst(_entry,"/"+vaflowin_variants_aelagl[i],"");  // so it is easier to search
+    }
     aurostd::StringSubst(_entry,"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT,"");
     aurostd::StringSubst(_entry,"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_JSON,"");
     aurostd::StringSubst(_entry,"RAW/","LIB/");
@@ -566,7 +608,9 @@ namespace aflowlib {
     if(aurostd::FileExist(directory_RAW+"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT)) {
       _aflowlib_entry entry_tmp(string(directory_RAW+"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT));
       string auid=entry_tmp.auid;
-      if(auid.size()!=22) {
+      if(auid=="" || 
+        !((getAUIDPrefix()=="s4e"&&auid.size()==20) || (getAUIDPrefix()=="aflow"&&auid.size()==22))
+        ) { //CO20240406
         string message = "error on size of auid=";
         throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
       }

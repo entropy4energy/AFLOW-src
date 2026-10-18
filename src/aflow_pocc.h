@@ -19,6 +19,8 @@
 #define _AFLOW_POCC_H_
 
 #include "APL/aflow_apl.h"
+#include <set>  //CO20261005
+#include <array>  //CO20261006
 
 //precision defines tol and paddings
 //const int _AFLOW_POCC_PRECISION_ = 8;    //moved to aflow.h
@@ -43,6 +45,42 @@ const string STD_ELEMENTS_LIST="Sc Ti V Cr Mn Fe Co Ni Cu Zn "
 const int TEMPERATURE_PRECISION=2;  //not really going to explore more than 2000-3000K, looks weird if decimal is larger than non-decimal part of number //4;  //this is std::fixed
 
 namespace pocc {
+  /// @brief action of the symmetry of the colored parent on the sites of one supercell (ENUM)
+  /// @note slot=site*n+i, i as in v_types_config[site][i]; the translations of the parent form G=Z_snf[0] x Z_snf[1] x Z_snf[2]
+  /// @authors
+  /// @mod{CO,20261005,created}
+  struct POccSupercellAction {
+    xmatrix<long long int> H;                   //HNF matrix (rows: superlattice vectors in the parent basis)
+    xmatrix<long long int> V;                   //Smith normal form S=U*H*V: lattice vector x (row) goes to g=(x*V) mod snf
+    long long int snf[3]={1,1,1};               //diagonal of S
+    vector<xvector<long long int> > vx;         //lattice vector of each slot
+    vector<vector<uint> > slot_of;              //slot of (site,group element)
+    vector<vector<uint> > translations;         //translation by group element t: slot -> translations[t][slot]
+    vector<bool> keeps_superlattice;            //per factor group operation of the colored parent
+    vector<vector<uint> > perms;                //distinct permutations: translations after the operations that keep the superlattice
+    vector<bool> perm_translation;              //pure translation other than the identity
+    uint nrotations=0;                          //factor group operations that keep the superlattice
+    uint gindex(const xvector<long long int>& x) const;
+  };
+
+  //CO20261006 - cluster correlation functions (aflow_pocc_correlations.cpp)
+  typedef std::array<long long int,4> POccClusterPoint;  //site of xstr_nopocc, lattice vector (parent basis)
+  struct POccClusterOrbit {
+    string name;                                   //p1, p2, ..., t1, ...
+    vector<POccClusterPoint> points;               //representative: its points, translation-normalized and sorted
+    vector<vector<POccClusterPoint> > images;      //the representative under each factor group operation of the colored parent, point by point
+    vector<vector<uint> > vperm;                   //permutations of the points by the operations that fix the cluster
+    vector<vector<uint> > labels;                  //point functions (j_1,...,j_k), one per class of those permutations
+    uint multiplicity=0;                           //clusters per parent cell
+    uint shell=0;                                  //distance shell of the longest edge (1-based)
+    double size=0.0;                               //longest edge (Angstrom)
+    double perimeter=0.0;                          //sum of the edges (Angstrom)
+  };
+  double getPointFunction(uint nvalues,uint j,uint sigma);
+  bool parsePOccSupercellTitle(const string& title,int& n,xmatrix<double>& hnf,vector<vector<int> >& decoration);
+} // namespace pocc
+
+namespace pocc {
   class POccCalculator; //forward declaration
   class POccSuperCellSet; //forward declaration
 
@@ -50,6 +88,34 @@ namespace pocc {
   string POCC_MINIMUM_CONFIGURATION(const string& directory="./");
   bool structuresGenerated(const string& directory=".");
   xstructure extractPARTCAR(const string& AflowIn);
+  // Owns POCC supercell-name normalization, provenance-based pocc.out lookup, and weights.
+  class SupercellDegeneracies {
+    public:
+      //NECESSARY PUBLIC CLASS METHODS - START
+      //constructors - START
+      SupercellDegeneracies();
+      SupercellDegeneracies(const SupercellDegeneracies& b);
+      //constructors - STOP
+      ~SupercellDegeneracies();
+      const SupercellDegeneracies& operator=(const SupercellDegeneracies& b);
+      void clear();
+      //NECESSARY PUBLIC CLASS METHODS - END
+      bool load(const aflowlib::_aflowlib_entry& entry);
+      double getWeight(const aflowlib::_aflowlib_entry& child,bool& found_weight) const;
+    private:
+      //NECESSARY PRIVATE CLASS METHODS - START
+      void free();
+      void copy(const SupercellDegeneracies& b);
+      //NECESSARY PRIVATE CLASS METHODS - END
+      std::map<std::string,double> m_weights;
+      static bool isASCIIDigit(char c);
+      static bool isASCIIAlpha(char c);
+      static bool isASCIIAlnum(char c);
+      static std::string extractSupercellName(const std::string& text);
+      static std::string normalizeSupercellName(const std::string& text);
+      static void addUniquePath(std::vector<std::string>& paths,const std::string& path);
+      static std::vector<std::string> getPoccOutPathCandidates(const aflowlib::_aflowlib_entry& entry);
+  };
 
   vector<double> getVTemperatures(const string& temp_string);
 
@@ -76,7 +142,12 @@ namespace pocc {
   bool getNextSiteConfiguration(vector<vector<POccSiteConfiguration> >& vv_count_configs,vector<int>& v_config_iterators,vector<vector<int> >& v_types_config);
   bool getNextSiteConfiguration(vector<uint>& v_config_order,vector<vector<int> >& v_types_config);
   bool getNextSiteConfiguration(vector<int>& site_config);
+  unsigned long long int getDistinctPermutationsCount(const vector<int>& site_config);  //CO20261006 - how many configurations getNextSiteConfiguration() visits from site_config
+  vector<int> getDistinctPermutation(const vector<int>& site_config,unsigned long long int rank);  //CO20261006 - the rank-th of them, without visiting the others
   vector<uint> getConfigOrder(vector<vector<int> >& v_types_config);
+  //CO20261005 - ENUM (aflow_pocc_enumeration.cpp)
+  bool areEquivalentSuperlattices(const xmatrix<double>& Bi,const xmatrix<double>& Bj,const vector<_sym_op>& pgroup);
+  unsigned long long int rankMultisetPermutation(const vector<int>& seq,uint nvalues,unsigned long long int permutations);
   string getUFFParameterString(const string& element);
   vector<UFFParamAtom> getTypes2UFFParamsMap(const vector<string>& elements);
   xstructure createNonPOccStructure(const xstructure& xstr_pocc,const vector<POccUnit>& pocc_sites,bool use_automatic_volumes_in=true);             //convert pocc xstructure to non-pocc
@@ -95,6 +166,12 @@ namespace pocc {
   double getHmix(const xvector<double>& xv_energies,const xvector<double>& xv_dgs);
   double getHmix(const xvector<double>& xv_energies,const xvector<double>& xv_dgs,double& dg_total);
   double getEFA(const xvector<double>& xv_energies,const xvector<double>& xv_dgs);
+  // Central POCC definition used by every DEED input backend.
+  double getDEED(double entropy_forming_ability,double average_hull_loss);
+  void setRepresentativeSpecies(const vector<string>& vspecies,xstructure& xstr);  //CO20261004 - species from vspecies when xstr names none
+  void readRepresentativeStructure(const string& POSCAR_file,const vector<string>& vspecies,xstructure& xstr);  //CO20261004 - POSCAR-format file, then setRepresentativeSpecies()
+  double RStarPerAtom(const xstructure& xstr);  //CO20261005 - R*: edge of the cube with the volume per atom
+  double getParamGeo(double S_config,double delta);  //CO20261015 - S_config / delta^2, unset when not finite
 
   void poccOld2New(ostream& oss=cout);
   void poccOld2New(ofstream& FileMESSAGE,ostream& oss=cout);
@@ -108,12 +185,22 @@ namespace pocc {
   string getTemperatureString(double temperature,int precision,bool temperatures_int,int zero_padding_temperature);
 
   double poccDOSCAR2temperature(const string& doscar_path);
+  
+  // POCC sampling unit test - TL20251002
+  namespace unittest {
+    void deedTest(uint&, vector<vector<string> >&, vector<string>&);
+    void poccSamplingTest(uint&, vector<vector<string> >&, vector<string>&);
+    void poccEnumerationTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261005
+    void poccSamplingSpaceTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261006
+    void poccCorrelationsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261006
+  }
 } // namespace pocc
 
 namespace pocc {
   //POccUnit could be
   //1) a bunch of atoms on the same site (site)
   //2) within a site, a bunch of atoms with the same partial_occupation_value (group)
+  //3) a bunch of atoms on the same equivalent site by xstr_sym.iatoms (equivalent group)
   class POccUnit: public xStream {
     public:
       //NECESSARY PUBLIC CLASS METHODS - START
@@ -561,15 +648,153 @@ namespace pocc {
       unsigned long long int types_config_permutations_count;
       unsigned long long int total_permutations_count;
       std::list<POccSuperCellSet> l_supercell_sets;
+      //CO20261005 - ENUM (aflow_pocc_enumeration.cpp)
+      xstructure m_xstr_color;                                    //parent with one species per site occupation
+      vector<xmatrix<double> > m_vhnf_enum;                      //HNF matrices of ENUM
+      vector<unsigned long long int> m_vhnf_multiplicity;         //count of HNF matrices each listed one stands for
+      unsigned long long int m_hnf_count_lattice;                 //listed HNF matrices the lattice point group gives (they come first)
+      vector<unsigned long long int> m_enum_group_order;         //per HNF matrix: order of the permutation group
+      vector<unsigned long long int> m_enum_rotations;           //per HNF matrix: factor group operations that keep the superlattice
+      vector<unsigned long long int> m_enum_orbits;              //per HNF matrix: unique supercells
+      vector<unsigned long long int> m_enum_superperiodic;       //per HNF matrix: unique supercells with a smaller period
+      unsigned long long int m_enum_merged_hnf;                  //decorations of superperiodic supercells found again by operations that change the superlattice (same HNF matrix)
+      unsigned long long int m_enum_merged_across;               //decorations of superperiodic supercells found again on other HNF matrices
+      unsigned long long int m_enum_skipped;                     //decorations outside the sampled orbits (--pocc_sample_*)
+      vector<_sym_op> m_vpgroup_enum;                            //point group of the factor group operations that keep the structure configurations
+      vector<unsigned long long int> m_vhnf_lattice_class;        //per listed HNF matrix: its class under the lattice point group (H index of the UFF enumerator)
+      uint m_enum_fgroup_dropped;                                //factor group operations of the colored parent that change the structure configurations
+      double m_enum_seconds;
+      //CO20261006 - cluster correlation functions (aflow_pocc_correlations.cpp)
+      vector<POccClusterOrbit> m_corr_orbits;                    //pair and triplet orbits of the partially occupied sites
+      vector<vector<int> > m_corr_site_values;                   //per site of xstr_nopocc: species (decoration values, vacancy -1) in point-function order; empty if it does not mix
+      vector<vector<double> > m_corr_site_conc;                  //per site: concentration of each of those species
+      vector<string> m_vsupercell_titles;                        //post-processing: POSCAR title of each supercell (HNF matrix and decoration)
+      vector<vector<double> > m_vsupercell_corr;                 //post-processing: correlation functions of each supercell
+      vector<vector<vector<double> > > m_vsupercell_pair_probabilities;  //post-processing: per supercell and pair orbit, probability of each species pair
       //standard flags - ALL options will be handled via xoptions
-      aurostd::xoption enumerator_mode;       //how do we determine duplicates - UFF, SNF, ...
+      aurostd::xoption enumerator_mode;       //how do we determine duplicates - UFF, SNF, ... //CO20261005 - set to UFF, then ENUM, by compareEnumerators(); otherwise empty
 
       //post-processing
       bool m_convolution;
       bool m_count_unique_fast;
       vector<string> m_ARUN_directories;
-      double m_Hmix;
+      double m_Hmix; // ST20250701 this is from DFT
+      double m_Hmix_miedema; // ST20250701 regular solution model https://doi.org/10.1016/S0921-5093(00)01446-5
       double m_efa;
+      //CO20250321 START - other high-entropy descriptors
+      //see DOI:10.1063/5.0122727
+      double m_S_config_cell;       //no units
+      double m_S_config_atom;       //no units
+      double m_S_config_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _S_config_atom*n_atoms_rfu
+      double m_S_config_sublattice; //no units; _S_config_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      double m_S_config_species;    //no units; considers nary of original/ordered prototype; _S_config_atom *2(binary) || *3(ternary) etc.
+
+      double m_S_config_partial_atom; // ST20250530 Like m_S_config_atom, but separately treat all metal sites the same and all non-metal sites the same.
+      double m_k2; // ST20250530 for calculating m_kcr1
+      double m_kcr1; // ST20250530 Thermodynamic parameter from https://doi.org/10.1016/j.jallcom.2015.10.279
+
+      uint m_nsublattices_disordered;   //number of disordered sublattices, should match size of vectors below if properties are available for those species
+      vector<string> m_nsublattices_disordered_names; // ST20250604 names of disordered sites, like A*0.5,B*0.5
+      //see DOI:10.1016/S1002-0071(12)60080-X
+      vector<double> m_delta_electronegativity_Pauling_sublattice; //dimensionless
+      vector<double> m_delta_electronegativity_Pearson_sublattice; //eV
+      vector<double> m_delta_electronegativity_Ghosh_sublattice; //eV
+      vector<double> m_delta_electronegativity_Allen_sublattice; //dimensionless
+      //see:
+      //  delta_radius_XX_sublattice: DOI:10.1107/S0567739476001551; sublattice here is different than for S_config; here it is calculated per disordered sublattice/site, hence a vector
+      //  S_excess_XX: DOI:10.1063/1.1675048
+      //  param_geo_XX: DOI:10.1016/j.intermet.2014.04.019
+      vector<double> m_delta_radius_Saxena_sublattice; //dimensionless
+      //
+      vector<double> m_param_geo_radius_Saxena_cell;       //no units
+      vector<double> m_param_geo_radius_Saxena_atom;       //no units
+      vector<double> m_param_geo_radius_Saxena_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radius_Saxena_atom*n_atoms_rfu
+      vector<double> m_param_geo_radius_Saxena_sublattice; //no units; _param_geo_radius_Saxena_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radius_Saxena_species;    //no units; considers nary of original/ordered prototype; _param_geo_radius_Saxena_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radius_PT_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radius_PT_cell;       //no units
+      vector<double> m_param_geo_radius_PT_atom;       //no units
+      vector<double> m_param_geo_radius_PT_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radius_PT_atom*n_atoms_rfu
+      vector<double> m_param_geo_radius_PT_sublattice; //no units; _param_geo_radius_PT_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radius_PT_species;    //no units; considers nary of original/ordered prototype; _param_geo_radius_PT_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radius_covalent_PT_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radius_covalent_PT_cell;       //no units
+      vector<double> m_param_geo_radius_covalent_PT_atom;       //no units
+      vector<double> m_param_geo_radius_covalent_PT_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radius_covalent_PT_atom*n_atoms_rfu
+      vector<double> m_param_geo_radius_covalent_PT_sublattice; //no units; _param_geo_radius_covalent_PT_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radius_covalent_PT_species;    //no units; considers nary of original/ordered prototype; _param_geo_radius_covalent_PT_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radius_covalent_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radius_covalent_cell;       //no units
+      vector<double> m_param_geo_radius_covalent_atom;       //no units
+      vector<double> m_param_geo_radius_covalent_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radius_covalent_atom*n_atoms_rfu
+      vector<double> m_param_geo_radius_covalent_sublattice; //no units; _param_geo_radius_covalent_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radius_covalent_species;    //no units; considers nary of original/ordered prototype; _param_geo_radius_covalent_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radius_VanDerWaals_PT_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radius_VanDerWaals_PT_cell;       //no units
+      vector<double> m_param_geo_radius_VanDerWaals_PT_atom;       //no units
+      vector<double> m_param_geo_radius_VanDerWaals_PT_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radius_VanDerWaals_PT_atom*n_atoms_rfu
+      vector<double> m_param_geo_radius_VanDerWaals_PT_sublattice; //no units; _param_geo_radius_VanDerWaals_PT_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radius_VanDerWaals_PT_species;    //no units; considers nary of original/ordered prototype; _param_geo_radius_VanDerWaals_PT_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radii_Ghosh08_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radii_Ghosh08_cell;       //no units
+      vector<double> m_param_geo_radii_Ghosh08_atom;       //no units
+      vector<double> m_param_geo_radii_Ghosh08_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radii_Ghosh08_atom*n_atoms_rfu
+      vector<double> m_param_geo_radii_Ghosh08_sublattice; //no units; _param_geo_radii_Ghosh08_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radii_Ghosh08_species;    //no units; considers nary of original/ordered prototype; _param_geo_radii_Ghosh08_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radii_Slatter_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radii_Slatter_cell;       //no units
+      vector<double> m_param_geo_radii_Slatter_atom;       //no units
+      vector<double> m_param_geo_radii_Slatter_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radii_Slatter_atom*n_atoms_rfu
+      vector<double> m_param_geo_radii_Slatter_sublattice; //no units; _param_geo_radii_Slatter_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radii_Slatter_species;    //no units; considers nary of original/ordered prototype; _param_geo_radii_Slatter_atom *2(binary) || *3(ternary) etc.
+
+      vector<double> m_delta_radii_Pyykko_sublattice; //dimensionless
+      //
+      //
+      vector<double> m_param_geo_radii_Pyykko_cell;       //no units
+      vector<double> m_param_geo_radii_Pyykko_atom;       //no units
+      vector<double> m_param_geo_radii_Pyykko_rfu;        //no units; reduced formula unit: e.g., M3Si6 becomes M1Si2; _param_geo_radii_Pyykko_atom*n_atoms_rfu
+      vector<double> m_param_geo_radii_Pyykko_sublattice; //no units; _param_geo_radii_Pyykko_atom*n_iatoms; also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+      vector<double> m_param_geo_radii_Pyykko_species;    //no units; considers nary of original/ordered prototype; _param_geo_radii_Pyykko_atom *2(binary) || *3(ternary) etc.
+      
+      //in the future, make m_delta_XX_bond
+      //
+      //CO20250321 END - other high-entropy descriptors
+
+      // ST20250528 START More HEA descriptors
+      double m_solubility_parameter; // GPa * A^3
+      vector<double> m_vr_star;  //CO20261004 - R* of each representative (Angstrom): edge of the cube with its volume per atom (CO20261005); empty until setRStar()
+      double m_Omega;
+      double m_VEC;
+      double m_lat_distortion_relax_distance_stdev; // ST20250607 lattice distortion
+      double m_lat_distortion_relax_distance_mean; // ST20250610 lattice distortion
+      double m_lat_distortion_misfit_stdev; // ST20250607 lattice distortion
+      double m_lat_distortion_misfit_mean; // ST20250610 lattice distortion
+      // same size as supercell sets minus some which can't be calculated
+      vector<uint> m_vlat_distortion_supercells_accounted_for;
+      vector<double> m_vlat_distortion_accounted_for_probs;
+      vector<structure_mapping_info> m_vmisfit_info; // ST20250610 lattice distortion
+      vector<double> m_vlat_distortion_misfits; // ST20250610 lattice distortion
+      vector<double> m_vlat_distortion_relax_distances; // ST20250610 lattice distortion
+      // ST20250528 END More HEA descriptors
       int m_temperature_precision;
       int m_zero_padding_temperature;
       bool m_temperatures_int;
@@ -682,6 +907,11 @@ namespace pocc {
       string getARUNDirectoryPath(uint isupercell) const;
       string getOutputPath() const;
 
+
+      // ST20250602 format property
+      void formatProperty(stringstream& ss, vector<double> value, string name, uint32_t idx) const;
+      void formatProperty(stringstream& ss, double value, string name) const;
+
       // Modules
       bool inputFilesFoundAnywhereAPL();  //ME20211004
       void createModuleAflowIns(const _xvasp& xvasp, const string& MODULE);  //ME20211004
@@ -701,6 +931,30 @@ namespace pocc {
       void calculatePOccSuperCellUFF(int thread_id, vector<POccSuperCell>& vpsc, const vector<POccUFFEnergyAnalyzer>& v_energy_analyzer, const vector<vector<vector<int>>>& vv_types_config, size_t& npsc_queue, std::mutex& m_save, std::mutex& m_job); //SD20230604
       void countUniquePOccSuperCellUFF(int thread_id, std::map<unsigned long long int, std::unordered_map<unsigned long int, unsigned long int>>& map_unique, const vector<POccSuperCell>& vpsc, const vector<POccUFFEnergyAnalyzer>& v_energy_analyzer, const vector<vector<vector<int>>>& vv_types_config, size_t& npsc_queue, std::mutex& m_save, std::mutex& m_job); //SD20230609
       void calculate();
+      //CO20261005 - ENUM (aflow_pocc_enumeration.cpp)
+      string getStructureGenerationAlgo() const;  //UFF (default), ENUM or COMPARE
+      void prepareEnumeration();
+      void calculateEnum();
+      void compareEnumerators();
+      void getSupercellAction(const xmatrix<double>& hnf,POccSupercellAction& action) const;
+      vector<bool> getDecorationPeriods(const POccSupercellAction& action,const vector<vector<int> >& v_types_config) const;
+      bool pullBackDecoration(const POccSupercellAction& src,const vector<bool>& periods,const POccSupercellAction& dst,uint iop,const vector<vector<int> >& v_types_config,vector<vector<int> >& image) const;
+      void getEquivalentDecorations(const POccSupercellAction& src,const vector<bool>& periods,const POccSupercellAction& dst,bool same_superlattice,const vector<vector<int> >& v_types_config,std::set<unsigned long long int>& ranks) const;
+      unsigned long long int rankDecoration(const vector<vector<int> >& v_types_config) const;
+      //CO20261006 - cluster correlation functions (aflow_pocc_correlations.cpp)
+      void setCorrelationClusters(uint pair_shells=0,uint triplet_shells=0);  //0: DEFAULT_POCC_CORRELATION_PAIR_SHELLS and _TRIPLET_SHELLS
+      vector<string> getCorrelationLabels() const;
+      vector<double> getRandomCorrelations() const;
+      vector<double> getCorrelations(const POccSupercellAction& action,const vector<vector<int> >& decoration,vector<vector<double> >& vpair_probabilities) const;
+      bool calculateSupercellCorrelations();  //post-processing, from the supercell titles
+      void writeCorrelations(stringstream& pocc_out_ss,bool ensemble) const;
+      bool getWarrenCowleyPairs(const POccClusterOrbit& orbit,vector<std::pair<uint,uint> >& vst) const;
+      vector<string> getWarrenCowleyLabels() const;
+      vector<double> getWarrenCowley(const vector<vector<double> >& vpair_probabilities) const;
+      string getCorrelationSpeciesName(int value) const;
+      POccClusterPoint applyFactorGroup(uint iop,const POccClusterPoint& point) const;
+      xvector<double> getClusterPointPosition(const POccClusterPoint& point) const;
+      void writePreProcessing(const _xvasp& in_xvasp);
       string getARUNString(unsigned long long int i);
       xstructure getUniqueSuperCell(unsigned long long int i);
       vector<xstructure> getUniqueDerivativeStructures();
@@ -722,6 +976,16 @@ namespace pocc {
       bool QMVASPsFound() const;
       void setDFTEnergies();
       void setEFA();
+      void setSConfig();  //CO20250321
+      void setHmixMiedema(); // ST20250701
+      void setDeltaProperties();  //CO20250321
+      void setSolubilityParameter(double temperature=300); // ST20250528
+      bool setRStar();  //CO20261004 - R* of every representative from its relaxed structure, once
+      void setThermoParameter(double temperature=300); // ST20250530
+      void setLatticeDistortion(double temperature=300); // ST20250607
+      void setMisfitParams(); // ST20250607
+      void setOmega(); // ST20250529
+      void setVEC();
       void calculateRELAXProperties(double temperature=300);
       void calculateSTATICProperties(double temperature=300);
       void calculatePlasmonicProperties(double temperature=300);
@@ -735,12 +999,49 @@ namespace pocc {
       void plotAvgDOSCAR(const xDOSCAR& xdos,double temperature,const string& directory=".") const;
       void writeResults() const;
       void writeResults(double temperature) const;
+      //YL20240508 for pocc_sampling
+      double setPOccSampleRate(const string& pocc_sample_rate_string, int sample_round);   
+      vector<unsigned long long int> FirstRandomSampling(unsigned long long int hnf_count, unsigned long long int types_config_permutations_count);
+      vector<unsigned long long int> FirstRandomSamplingWholeSpace() const;  //CO20261006 - SAMPLE_NUMBER and SAMPLE_HASH: hnf_index*types_config_permutations_count+site_config_index, drawn from every configuration
+      vector<vector<int> > getSiteConfiguration(unsigned long long int site_config_index) const;  //CO20261006 - the configuration getNextSiteConfiguration() reaches at site_config_index
+      std::list<pocc::POccSuperCellSet> SecondRandomSamplingWithRate(std::list<pocc::POccSuperCellSet> l_supercell_sets, unsigned long long int hnf_count);
+      std::list<pocc::POccSuperCellSet> SecondRandomSampling(std::list<pocc::POccSuperCellSet> l_supercell_sets);
 
+      // ST20250612 helper function for lattice distortion
+      std::map<uint, double> getAtomDisplacement(const xstructure& xstr_orig, const xstructure& xstr_relaxed);
     private:
       //NECESSARY PRIVATE CLASS METHODS - START
       void free();
       void copy(const POccCalculator& b);
       //NECESSARY END CLASS METHODS - END
+
+      bool usePOccSampleNumber(string& sample_number_string, unsigned long long int& sample_number) const;  //TL20260204
+      bool usePOccSampleRate(string& sample_rate_string) const;  //TL20260205
+      bool usePOccSampleHash(string& sample_hash_string, unsigned long long int& sample_hash_hnf, unsigned long long int& sample_hash_site_config) const;  //TL20260303
+      bool usePOccSkipSiteConfigurations() const; //TL20260310
+
+      //CO20261005 - ENUM (aflow_pocc_enumeration.cpp)
+      bool m_enum_prepared;
+      bool m_hnf_from_list;                                       //iterateHNFMatrix() serves m_vhnf_enum
+      bool m_hnf_reduce;                                          //iterateHNFMatrix() reduces by the lattice point group (default) or lists every HNF matrix
+      unsigned long long int m_ihnf_list;
+      vector<uint> m_site_colors;                                 //occupation (color) of each site of xstr_nopocc
+      vector<vector<uint> > m_vfgroup_site_map;                   //factor group operation: site -> site
+      vector<vector<xvector<long long int> > > m_vfgroup_site_shift;  //factor group operation: lattice vector added to the site
+      vector<vector<uint> > m_vfgroup_site_inverse;               //factor group operation: site -> site it comes from
+      vector<xmatrix<long long int> > m_vfgroup_Uf;               //factor group operation: Uf
+      vector<xmatrix<long long int> > m_vfgroup_Uf_inv;           //factor group operation: Uf^-1
+      uint m_rank_values;                                         //species types + vacancy
+      vector<vector<uint> > m_rank_order;                         //per structure configuration: site order of getNextSiteConfiguration()
+      vector<vector<unsigned long long int> > m_rank_site_count;  //per structure configuration: permutations of each site
+      vector<unsigned long long int> m_rank_offset;               //per structure configuration: first site_config_index
+      vector<string> m_rank_key;                                  //per structure configuration: per-site species counts
+      vector<vector<vector<uint> > > m_rank_counts;               //per structure configuration and site: count of each value (vacancy first)
+      unsigned long long int m_rank_total;
+      void setColoredParent();
+      void setEnumHNFMatrices();
+      void setDecorationRanking();
+      string getDecorationCountsKey(const vector<vector<int> >& v_types_config) const;
 
       //hnf matrices
       int a_start, b_start, c_start;

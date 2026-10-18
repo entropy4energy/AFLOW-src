@@ -99,6 +99,11 @@ namespace AGL_functions {
     //CT20200721 Calls function AGL_Get_AflowInName to find correct aflow.in filename
     AGL_functions::AGL_Get_AflowInName(AflowInName, directory_LIB, agl_aflowin_found);
     FileNameAFLOWIN = directory_LIB+"/"+AflowInName;
+    
+    //CO20240406 START - fixing for different variants
+    vector<string> vlock_variants_aelagl;
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,",");
+    //CO20240406 STOP - fixing for different variants
 
     //CO20200502 STOP - CT, I am consolidating the following code with an outer loop, it should make it easier to patch in the future
     if (agl_aflowin_found) {
@@ -107,16 +112,43 @@ namespace AGL_functions {
       // [OBSOLETE] cerr << _AGLSTR_MESSAGE_ << "FileLockName = " << FileLockName << endl;
       if(FileLockName.length() > 0) {
         if (aurostd::FileExist(directory_LIB+"/"+FileLockName)) {
-          aurostd::execute("mv "+aurostd::CleanFileName(directory_LIB+"/"+FileLockName+" ")+aurostd::CleanFileName(directory_LIB+"/"+FileLockName+".run"));   
+          if(aurostd::FileExist(aurostd::CleanFileName(directory_LIB+"/"+FileLockName+".run"))){  //CO20240409
+            //CO20240409 - if it exists, then we are running this directory again and we want to keep the original LOCK.run
+            //remove the new LOCK so the rest of the algorithm can proceed
+            aurostd::RemoveFile(aurostd::CleanFileName(directory_LIB+"/"+FileLockName));  //CO20240409
+          }else{
+            //[CO20240409 - OBSOLETE]aurostd::execute("mv "+aurostd::CleanFileName(directory_LIB+"/"+FileLockName+" ")+aurostd::CleanFileName(directory_LIB+"/"+FileLockName+".run"));   
+            aurostd::file2file(aurostd::CleanFileName(directory_LIB+"/"+FileLockName),aurostd::CleanFileName(directory_LIB+"/"+FileLockName+".run")); //CO20240409
+          }
         }
         string FileNameMessage=directory_LIB+"/"+FileLockName;
         FileMESSAGE.open(FileNameMessage.c_str(),std::ios::app);
       } else {
-        if (aurostd::FileExist(directory_LIB+"/agl.LOCK")) {
-          aurostd::execute("mv "+aurostd::CleanFileName(directory_LIB+"/agl.LOCK ")+aurostd::CleanFileName(directory_LIB+"/agl.LOCK.run"));
+        //CO20240409 START - fixing ael-agl variants
+        bool found_lock_aelagl=false;
+        for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){
+          if(aurostd::FileExist(aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]))){
+            if(aurostd::FileExist(aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]+".run"))){
+              //CO20240409 - if it exists, then we are running this directory again and we want to keep the original LOCK.run
+              //remove the new LOCK so the rest of the algorithm can proceed
+              aurostd::RemoveFile(aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]));
+            }else{
+              //[CO20240409 - OBSOLETE]aurostd::execute("mv "+aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock])+" "+aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]+".run"));
+              aurostd::file2file(aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]),aurostd::CleanFileName(directory_LIB+"/"+vlock_variants_aelagl[ilock]+".run"));
+            }
+            string FileNameMessage=directory_LIB+"/"+vlock_variants_aelagl[ilock];
+            found_lock_aelagl=true;
+            break;
+          }
         }
-        string FileNameMessage=directory_LIB+"/agl.LOCK";
+        if(found_lock_aelagl==false){FileNameMessage=directory_LIB+"/"+"LOCK.agl";}
         FileMESSAGE.open(FileNameMessage.c_str(),std::ios::app);
+        //CO20240409 STOP - fixing ael-agl variants
+        //[CO20240409 - OBSOLETE]if (aurostd::FileExist(directory_LIB+"/agl.LOCK")) {
+        //[CO20240409 - OBSOLETE]  aurostd::execute("mv "+aurostd::CleanFileName(directory_LIB+"/agl.LOCK ")+aurostd::CleanFileName(directory_LIB+"/agl.LOCK.run"));
+        //[CO20240409 - OBSOLETE]}
+        //[CO20240409 - OBSOLETE]string FileNameMessage=directory_LIB+"/agl.LOCK";
+        //[CO20240409 - OBSOLETE]FileMESSAGE.open(FileNameMessage.c_str(),std::ios::app);
       }
       // Search for AGL aflow.in filename
       aurostd::StringstreamClean(aus);
@@ -265,7 +297,8 @@ namespace AGL_functions {
     vector<string> vaflowins;
     if(AflowInName.length()>0){vaflowins.push_back(AflowInName);} // Check if AflowInName exists
     if(_AFLOWIN_.length()>0){vaflowins.push_back(_AFLOWIN_);} // Otherwise, check if _AFLOWIN_ file is AGL input file
-    vaflowins.push_back(_AFLOWIN_AGL_DEFAULT_);  // Otherwise, check for other commonly used names for AGL aflow.in file
+    aurostd::string2tokensAdd(DEFAULT_FILE_AFLOWIN_VARIANTS_AELAGL,vaflowins,",");  //CO20240406
+    //[CO20240406 - OBSOLETE]vaflowins.push_back(_AFLOWIN_AGL_DEFAULT_);  // Otherwise, check for other commonly used names for AGL aflow.in file
     for(uint iaf=0;iaf<vaflowins.size()&&!agl_aflowin_found;iaf++){
       aflowinname = vaflowins.at(iaf);
       if(aurostd::EFileExist(directory_LIB+"/"+aflowinname,stmp)&&aurostd::IsCompressed(stmp)){aurostd::UncompressFile(stmp);}  //CO20210204 - fix aflow.in.xz
@@ -347,10 +380,22 @@ namespace AGL_functions {
         }    
       }  
     }
+    //CO20240406 START - fixing for different variants
+    vector<string> vlock_variants_aelagl;
+    string FileLockName; //CO20260930 empty until set below
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,",");
+    for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){
+      if(aurostd::FileExist(aurostd::CleanFileName(dirrunname+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}
+    }
+    //CO20240406 STOP - fixing for different variants
     // SOME WARNINGS: check existence of LOCK and OUTCAR.static files
     // [OBSOLETE] if( !aurostd::FileExist( vaspRun.Directory + "/"+_AFLOWLOCK_ ) && aurostd::FileExist( vaspRun.Directory + string("/OUTCAR.static") ) )
     if( !(aurostd::FileExist( dirrunname + "/" + _AFLOWLOCK_ ) ||
-          ((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && (aurostd::FileExist(dirrunname + "/agl.LOCK") || aurostd::FileExist(dirrunname + "/LOCK")))) &&
+          ((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && 
+           (aurostd::FileExist(dirrunname + "/"+FileLockName) ||  //CO202040409
+            aurostd::FileExist(dirrunname + "/"+_AFLOWLOCK_))
+            //[CO20240409 - OBSOLETE]aurostd::FileExist(dirrunname + "/LOCK"))
+           )) &&
         ( vfileexist ) ) {
       aurostd::StringstreamClean(aus);
       // [OBOLSETE] aus << _AGLSTR_WARNING_ + "found OUTCAR.static but no LOCK in " <<  vaspRun.Directory << endl;
@@ -385,7 +430,10 @@ namespace AGL_functions {
 
     // [OBSOLETE] if( aurostd::FileExist( vaspRun.Directory + "/"+_AFLOWLOCK_ ) && !aurostd::FileExist( vaspRun.Directory + string("/OUTCAR.static") ) )
     if( (aurostd::FileExist( dirrunname + "/" + _AFLOWLOCK_ ) ||
-          ((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && (aurostd::FileExist(dirrunname + "/agl.LOCK") || aurostd::FileExist(dirrunname + "/LOCK")))) &&
+          ((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && 
+           (aurostd::FileExist(dirrunname + "/"+FileLockName) ||  //CO20240409
+           //[CO20240409 - OBSOLETE](aurostd::FileExist(dirrunname + "/agl.LOCK") || 
+            aurostd::FileExist(dirrunname + "/"+_AFLOWLOCK_)))) &&
         !(vfileexist) ) {
       aurostd::StringstreamClean(aus);
       // [OBSOLETE] aus << _AGLSTR_WARNING_ + "found LOCK but no OUTCAR.static in " <<  vaspRun.Directory << endl;
@@ -740,6 +788,11 @@ namespace AGL_functions {
     AGL_data.energyinput.clear();
     AGL_data.pressurecalculated.clear();
     AGL_data.stresscalculated.clear();
+    //CO20240406 START - fixing for different variants
+    vector<string> vlock_variants_aelagl;
+    string FileLockName; //CO20260930 empty until set below
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,",");
+    //CO20240406 STOP - fixing for different variants
     for(uint idVaspRun = 0; idVaspRun < vaspRuns.size(); idVaspRun++) {
       skipdir = false;
       aurostd::StringstreamClean(aus);
@@ -798,9 +851,23 @@ namespace AGL_functions {
         aurostd::execute( string("tar -xf ") + dirrunname.at(idVaspRun) + ".tar.xz" );
       } // Extract all...
 
+      for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){ //CO20240409
+        //CO20240409 - it seems vaspRuns[idVaspRun].Directory is an OBSOLETE setting, we check both anyway
+        if(aurostd::FileExist(aurostd::CleanFileName(vaspRuns[idVaspRun].Directory+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+        if(aurostd::FileExist(aurostd::CleanFileName(dirrunname.at(idVaspRun)+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+      } //CO20240409
+      
       // If the LOCK file is missing, then it is probably a corrupted run
       // Do not accept it and wait for the new run
-      if( !aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_ ) && !aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_ ) && !((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && ((aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) || (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/LOCK")) || (aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) || (aurostd::FileExist( dirrunname.at(idVaspRun) + "/LOCK"))))) { //CT20200625 Modify to check for other LOCK file names if postprocessing run
+      if( !aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_ ) && !aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_ ) && 
+          !((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) && 
+            (
+             (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+FileLockName)) ||  //CO20240409
+             //[CO20240409 - OBSOLETE](aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) || 
+             (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_)) || 
+             (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+FileLockName)) ||  //CO2020409
+             //[CO20240409 - OBSOLETE](aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) || 
+             (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_))))) { //CT20200625 Modify to check for other LOCK file names if postprocessing run
         aurostd::StringstreamClean(aus);
         aus <<  _AGLSTR_WARNING_ + "The " << _AFLOWLOCK_ << " file in " << vaspRuns.at(idVaspRun).Directory << " directory is missing." << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);

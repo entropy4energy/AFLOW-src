@@ -145,14 +145,14 @@ namespace apennsy_std {
       for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus1<<c;
       aus1.seekp(0,ios_base::beg);  // RESET
       aus1 << "grep -c BB " << FileName.c_str() << " > " << FileNameResult.c_str() << endl;
-      system(aus1.str().c_str());
+      aurostd::execute(aus1.str().c_str());  //CO20250406
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
       FileResult.close();
       BB=atoi(buffer);
       aus1.seekp(0,ios_base::beg);  // RESET
       aus1 << "grep -c AA " << FileName.c_str() << " > " << FileNameResult.c_str() << endl;
-      system(aus1.str().c_str());
+      aurostd::execute(aus1.str().c_str());  //CO20250406
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
       FileResult.close();
@@ -198,7 +198,7 @@ namespace apennsy_std {
     { // GET SPACEGROUP
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_spacegroup | sed \"s/#/\\\\\\\\#/g\" "<<" > "<<FileNameResult.c_str()<<endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
@@ -211,7 +211,7 @@ namespace apennsy_std {
     { // GET PEARSON_NUMBER
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_pearsonN" << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
       FileResult.close();
@@ -222,7 +222,7 @@ namespace apennsy_std {
     { // GET PEARSON_SYMBOL    
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_pearson" << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
@@ -234,7 +234,7 @@ namespace apennsy_std {
     { // GET LATTICETYPE
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_latticetype" << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');
@@ -245,7 +245,7 @@ namespace apennsy_std {
       l[j] << "&{\\small  " << latticetype << "}\t";j++;
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_latticetype_abc" << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');a_lat=atof(buffer);//if(VERB) cerr << "a_lat=" << a_lat << endl;
@@ -264,7 +264,7 @@ namespace apennsy_std {
     { // GET A1 A2 A3
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_primitive " << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       FileResult.getline(buffer,APENNSY_BUFFER_MAXLEN,'\n');A(1,1)=atof(buffer);//if(VERB) cerr << "A(1,1)=" << A(1,1) << endl;
@@ -286,7 +286,7 @@ namespace apennsy_std {
     { // GET A1 A2 A3
       aus0.seekp(0,ios_base::beg);for(int i=0;i<APENNSY_BUFFER_MAXLEN;i++) aus0<<c;aus0.seekp(0,ios_base::beg);  // RESET
       aus0 << "cd " << XHOST.tmpfs << " && /home/auro/work/gndstate/GND_SCRIPTS_AB/BIN/xplato_positions " << " > " << FileNameResult.c_str() << endl;
-      system(aus0.str().c_str());
+      aurostd::execute(aus0.str().c_str());  //CO20250406
       // if(VERB) cerr << aus0.str() << "\t";
       FileResult.open(FileNameResult.c_str(),std::ios::in);
       l[j] << "&\t\t";j++;  // atomic positions
@@ -317,9 +317,9 @@ namespace apennsy_std {
       l[j] << "&\t\t";j++;  // fractional
     }
 
-    //system(aus0.str().c_str());
+    //aurostd::execute(aus0.str().c_str());  //CO20250406
     //if(VERB) cerr << aus0.str() << "\t";
-    //  system(aus0.str().c_str());
+    //  aurostd::execute(aus0.str().c_str());  //CO20250406
     if(VERB) cerr << endl;
   }
 }

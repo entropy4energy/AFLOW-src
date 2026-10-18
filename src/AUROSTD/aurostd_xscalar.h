@@ -63,6 +63,7 @@
 #define PLANCKSCONSTANTEV_hbar  (PLANCKSCONSTANTEV_h/TWOPI)     // eV*s
 #define KBOLTZ                  1.3806504E-23                   // J/K
 #define KBOLTZEV                (KBOLTZ/E_ELECTRON)             // eV/K //8.617343E-5
+#define C_MOL_GAS               8.31446261815324                // J mol-1 K-1  //CO20250321
 #define eV2K                    (11604.505)                     // 1eV=11604.505 K
 #define meV2K                   (11.604505)                     // 1meV=11.604505 K
 #define mol2atom                6.0221408E23                    // 1mol=6.022e23 atoms    //CO20180329
@@ -242,6 +243,7 @@ namespace aurostd {
   bool _isfloat(xcomplex<long double>) __xprototype;
 #endif
   bool isfloat(const string& in); //CO20180729
+  double string2finite(const string& in); //CO20261004
 }
 
 // ----------------------------------------------------------------------------

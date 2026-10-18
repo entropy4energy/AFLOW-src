@@ -7,14 +7,14 @@
 #include "../aflow.h"
 #include "aflow_apl.h"
 
-#define _ASTROPT_APL_OLD_ string("[AFLOW_PHONONS]") //CO20170601, ensure backwards compatibility (we ALWAYS support LEGACY)
-#define _ASTROPT_APL_ string("[AFLOW_APL]") //CO20170601
-#define _ASTROPT_QHA_ string("[AFLOW_QHA]") //CO20170601
-#define _ASTROPT_AAPL_ string("[AFLOW_AAPL]") //CO20170601
-//temporary directory for storing QHA files
-#define _STROPT_ string("[VASP_FORCE_OPTION]") //ME20181226
+//[CO20240618 - moved to aflow_apl.h]#define _ASTROPT_APL_OLD_ string("[AFLOW_PHONONS]") //CO20170601, ensure backwards compatibility (we ALWAYS support LEGACY)
+//[CO20240618 - moved to aflow_apl.h]#define _ASTROPT_APL_ string("[AFLOW_APL]") //CO20170601
+//[CO20240618 - moved to aflow_apl.h]#define _ASTROPT_QHA_ string("[AFLOW_QHA]") //CO20170601
+//[CO20240618 - moved to aflow_apl.h]#define _ASTROPT_AAPL_ string("[AFLOW_AAPL]") //CO20170601
+//[CO20240618 - moved to aflow_apl.h]//temporary directory for storing QHA files
+//[CO20240618 - moved to aflow_apl.h]#define _STROPT_ string("[VASP_FORCE_OPTION]") //ME20181226
 
-#define APL_AFLOWIN_DEFAULT string("aflow_apl.in")  // ME20210901
+//[CO20240618 - OBSOLETE]#define APL_AFLOWIN_DEFAULT string("aflow_apl.in")  // ME20210901
 
 static const string _ANHARMONIC_IFCS_FILE_[2] = {"anharmonicIFCs_3rd.xml", "anharmonicIFCs_4th.xml"};
 static const int _NUM_RELAX_ = 2; //ME20181226
@@ -37,7 +37,7 @@ namespace KBIN {
       ostream& oss) {
     stringstream message;
 
-    if (start_relax == _NUM_RELAX_) return true;  // Nothing to do here
+    if (start_relax > _NUM_RELAX_) return true;  // Nothing to do here //CO20261006 - start_relax is the next relaxation to run: with relax_apl1 done it is 2, and relax_apl2 still has to run
 
     // Store original settings
     string prec = vflags.KBIN_VASP_FORCE_OPTION_PREC.xscheme;
@@ -184,11 +184,11 @@ namespace KBIN {
         aurostd::PrintMessageStream(fileMessage, aus, XHOST.QUIET);
         if (i < _NUM_RELAX_) {
           Krun = VASP_Run(xvasp, aflags, kflags, vflags, _APL_RELAX_PREFIX_ + aurostd::utype2string<int>(i), _APL_RELAX_PREFIX_ + aurostd::utype2string<int>(i), true, fileMessage);
-          XVASP_INCAR_SPIN_REMOVE_RELAX(xvasp, aflags, vflags, i, true, fileMessage); //CO20210315 - always write_incar
+          XVASP_INCAR_SPIN_FIX_RELAX(xvasp, aflags, vflags, i, true, fileMessage); //CO20210315 - always write_incar
           XVASP_KPOINTS_IBZKPT_UPDATE(xvasp, aflags, vflags, i, true, fileMessage); //CO20210315 - always write_kpoints
         } else { 
           Krun = VASP_Run(xvasp, aflags, kflags, vflags, _APL_RELAX_PREFIX_ + aurostd::utype2string<int>(i), true, fileMessage);
-          XVASP_INCAR_SPIN_REMOVE_RELAX(xvasp, aflags, vflags, i, false, fileMessage);  //ME20200115 - or else SPIN_REMOVE_RELAX_2 does not work  //CO20210315 - write_incar only if (i<num_relax), no static afterward
+          XVASP_INCAR_SPIN_FIX_RELAX(xvasp, aflags, vflags, i, false, fileMessage);  //ME20200115 - or else SPIN_REMOVE_RELAX_2 does not work  //CO20210315 - write_incar only if (i<num_relax), no static afterward
         }
       }
       if (Krun && (i == _NUM_RELAX_)) {
@@ -388,19 +388,13 @@ namespace KBIN {
       START_RELAX = 1;
       if(xinput.AFLOW_MODE_VASP){
         // Check if the structure has already been relaxed
-        for (int i = 1; i <= _NUM_RELAX_; i++) {
-          string contcar = aflags.Directory + "/CONTCAR." + _APL_RELAX_PREFIX_ + aurostd::utype2string<int>(i);
-          if (aurostd::EFileExist(contcar) || aurostd::FileExist(contcar)) {  //ME20200103 - also look for uncompressed files
-            START_RELAX++;
-          } else {
-            break;
-          }
-        }
+        //CO20261006 - a relaxation counts when its OUTCAR is complete (KBIN::VASP_RelaxationsComplete()); a CONTCAR alone is also left by a relaxation that failed
+        START_RELAX += (int) KBIN::VASP_RelaxationsComplete(aflags.Directory, _APL_RELAX_PREFIX_, _NUM_RELAX_);
         if (START_RELAX == _NUM_RELAX_ + 1) {
           message << "Structure has already been relaxed. Relaxation will be skipped.";
           aplopts.flag("RELAX", false);
         } else if (START_RELAX != 1) {
-          message << "APL has already performed " << (START_RELAX + 1) << " relaxations.";
+          message << "APL has already performed " << (START_RELAX - 1) << " relaxations.";  //CO20261006 - was START_RELAX + 1
           message << " Number of relaxations remaining: " << (_NUM_RELAX_ - START_RELAX + 1) << ".";
         }
         pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, aflags, FileMESSAGE, oss);
@@ -640,7 +634,8 @@ namespace KBIN {
           message << "Checking VASP version for linear response calculations.";
           //[CO20210315 - new style]string vaspVersion;
           //[CO20210315 - new style]vaspVersion = getVASPVersionNumber( (kflags.KBIN_MPI ? kflags.KBIN_MPI_BIN : kflags.KBIN_BIN ) );
-          double vaspVersion=KBIN::getVASPVersionDouble( (kflags.KBIN_MPI ? kflags.KBIN_MPI_BIN : kflags.KBIN_BIN ) );  //CO20210315
+          //[CO20240603 - cannot run with `mpirun -n 1 vasp_std`]double vaspVersion=KBIN::getVASPVersionDouble( (kflags.KBIN_MPI ? kflags.KBIN_MPI_BIN : kflags.KBIN_BIN ) );  //CO20210315
+          double vaspVersion=KBIN::getVASPVersionDouble(kflags,aflags); //CO20240603
           //[CO20210315 - new style]if (!vaspVersion.empty())
           if (aurostd::isequal(vaspVersion,0.0)==false){  //CO20210315
             //[CO20210315 - new style]message << "[" << vaspVersion[0] << "]."; //CO20210315
@@ -1807,7 +1802,8 @@ namespace apl {
     string stmp="";
     if (!AflowInName.empty()) vaflowins.push_back(AflowInName);
     if (!_AFLOWIN_.empty()) vaflowins.push_back(_AFLOWIN_);
-    vaflowins.push_back(APL_AFLOWIN_DEFAULT);
+    //[CO20240407 - OBSOLETE]vaflowins.push_back(APL_AFLOWIN_DEFAULT);
+    aurostd::string2tokensAdd(DEFAULT_FILE_AFLOWIN_VARIANTS_APL,vaflowins,",");  //CO20240406
 
     string aflowin_name = "", aflowin = "", fullpath_aflowin_name = "";
     for (uint i=0; i<vaflowins.size(); i++){
@@ -1822,6 +1818,37 @@ namespace apl {
       aflowin = aurostd::RemoveComments(aflowin);
       if (aurostd::substring2bool(aflowin,_ASTROPT_APL_ + "CALC",TRUE) ||
           aurostd::substring2bool(aflowin,_ASTROPT_APL_OLD_ + "CALC",TRUE)){
+        AflowInName = aflowin_name;
+        aflowin_found = true;
+        break;
+      }
+    }
+
+    return aflowin_found;
+  }
+  // Checks for AAPL aflow.in files for lib2raw. Adapted from AS.
+  bool AAPL_Get_AflowInName(string& AflowInName, const string& directory_LIB)  {  //CO20240618 - adding for AAPL
+    bool aflowin_found = false;
+    vector<string> vaflowins;
+    string stmp="";
+    if (!AflowInName.empty()) vaflowins.push_back(AflowInName);
+    if (!_AFLOWIN_.empty()) vaflowins.push_back(_AFLOWIN_);
+    //[CO20240407 - OBSOLETE]vaflowins.push_back(AAPL_AFLOWIN_DEFAULT);
+    aurostd::string2tokensAdd(DEFAULT_FILE_AFLOWIN_VARIANTS_AAPL,vaflowins,",");  //CO20240406
+
+    string aflowin_name = "", aflowin = "", fullpath_aflowin_name = "";
+    for (uint i=0; i<vaflowins.size(); i++){
+      aflowin_name = vaflowins[i];
+      fullpath_aflowin_name = directory_LIB + '/' + aflowin_name;
+      if(aurostd::EFileExist(fullpath_aflowin_name,stmp)&&aurostd::IsCompressed(stmp)){aurostd::UncompressFile(stmp);}
+      if (aurostd::FileExist(fullpath_aflowin_name)){
+        aflowin = aurostd::file2string(fullpath_aflowin_name);
+        if (aflowin.empty()) continue;
+      }
+
+      aflowin = aurostd::RemoveComments(aflowin);
+      if (aurostd::substring2bool(aflowin,_ASTROPT_AAPL_ + "CALC",TRUE) ||
+          FALSE){
         AflowInName = aflowin_name;
         aflowin_found = true;
         break;

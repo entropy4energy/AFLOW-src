@@ -407,7 +407,7 @@ namespace aflowlib {
           throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message_error, _FILE_ERROR_);
         }
       } else {
-        if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " No old datbase found." << std::endl;
+        if (LDEBUG) std::cerr << __AFLOW_FUNC__ << " No old database found." << std::endl;
         ncols_old = 0;
         nentries_old = 0;
       }
@@ -418,22 +418,24 @@ namespace aflowlib {
       }
 
       if (nentries_tmp < nentries_old) {
-        message_error << "The rebuild process resulted in less entries"
-          << " than in the current database. To prevent accidental"
+        message_error << "The rebuild process resulted in fewer entries (" << nentries_tmp << ")"
+          << " than in the current database (" << nentries_old << "). To prevent accidental"
           << " data loss, the temporary database will not be copied."
           << " Rerun as aflow --rebuild_database if the database should"
           << " be updated regardless. The temporary database file will be"
           << " kept to allow debugging.";
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message_error, *p_FileMESSAGE, *p_oss); //CO20240409
         keep = true;
         copied = false;
         found_error = true;
       } else if (ncols_tmp < ncols_old) {
-        message_error << "The rebuild process resulted in less properties"
-          << " than in the current database. To prevent accidental"
+        message_error << "The rebuild process resulted in fewer properties (" << ncols_tmp << ")"
+          << " than in the current database (" << ncols_old << "). To prevent accidental"
           << " data loss, the temporary database will not be copied."
           << " Rerun as aflow --rebuild_database if the database should"
           << " be updated regardless. The temporary database file will be"
           << " kept to allow debugging.";
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message_error, *p_FileMESSAGE, *p_oss); //CO20240409
         keep = true;
         copied = false;
         found_error = true;
@@ -443,6 +445,14 @@ namespace aflowlib {
       }
       message << "Database file " << (copied?"successfully":"not") << " copied.";
       pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss);
+      if(nentries_tmp > nentries_old){
+        message << (nentries_tmp-nentries_old) << " new entries were added to the database." << endl;
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss); //CO20240409
+      }
+      if(ncols_tmp > ncols_old){
+        message << (ncols_tmp-ncols_old) << " new properties were added to the database." << endl;
+        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss); //CO20240409
+      }
     }
     if (!found_error && !keep) {
       aurostd::RemoveFile(tmp_file);
@@ -461,6 +471,7 @@ namespace aflowlib {
 
     aurostd::string2file("", lock_file);
     if (copied) aurostd::ChmodFile("444", database_file);
+    aurostd::RemoveFile(lock_file); //CO20231218 - lock file stays, although it is empty
     return copied;
   }
 
@@ -549,7 +560,7 @@ namespace aflowlib {
         rebuild_db = (k != nkeys);
       }
       if (rebuild_db) {
-        message << " Rebuilding database (schema updated).";
+        message << "The database schema changed, so the database is rebuilt."; //CO20260930
         pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss);
       }
     }
@@ -560,9 +571,9 @@ namespace aflowlib {
       for (int i = 0; i < _N_AUID_TABLES_; i++) {
         stringstream t;
         t << std::setfill('0') << std::setw(2) << std::hex << i;
-        json_files[i] = aurostd::CleanFileName(data_path + "/aflow:" + t.str() + ".jsonl");
+        json_files[i] = aurostd::CleanFileName(data_path + "/" + getAUIDPrefix() + ":" + t.str() + ".jsonl"); //WJ+KC20231217 Changed "aflow" to getAUIDPrefix()
         if (!aurostd::EFileExist(json_files[i]) && !aurostd::FileExist(json_files[i])) {
-          message << data_path << " is not a valid data path. Missing file for aflow:" << t.str() << ".";
+          message << data_path << " is not a valid data path. Missing file for " << getAUIDPrefix() << ":" << t.str() << "."; //WJ+KC20231217 Changed "aflow" to getAUIDPrefix()
           throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _FILE_NOT_FOUND_);
         }
       }
@@ -725,6 +736,8 @@ namespace aflowlib {
     }
     vector<string> types = getDataTypes(columns, true);
 
+    readPoccSystems();  //CO20261008 - every supercell's pocc_system comes from this
+
     // Rebuild
 #ifdef AFLOW_MULTITHREADS_ENABLE
     int ncpus = init::GetCPUCores();
@@ -744,28 +757,35 @@ namespace aflowlib {
   //buildTables///////////////////////////////////////////////////////////////
   // Reads a .jsonl files and processes the JSONs for the database writer.
   void AflowDB::buildTable(int i, const vector<string>& columns, const vector<string>& types) {
+    bool LDEBUG = (FALSE || XHOST.DEBUG || _AFLOW_DB_DEBUG_);
     stringstream t;
     t << std::setfill('0') << std::setw(2) << std::hex << i;
-    string table = "auid_" + t.str();
-    string auid_prefix = "\"aflow:" + t.str();
+    string table = tableName(i);  //CO20261008 - was auid_XX
+    string auid_prefix = "\"" + getAUIDPrefix() + ":" + t.str(); //WJ+KC20231217 Changed "aflow" to getAUIDPrefix()
 
-    string jsonfile = aurostd::CleanFileName(data_path + "/aflow:" + t.str() + ".jsonl");
+    string jsonfile = aurostd::CleanFileName(data_path + "/" + getAUIDPrefix() + ":" + t.str() + ".jsonl"); //WJ+KC20231217 Changed "aflow" to getAUIDPrefix()
     vector<string> data;
     aurostd::efile2vectorstring(jsonfile, data);
     vector<vector<string> > values;
     uint ndata = data.size();
-    string aurl = "", auid = "";
+    string aurl = "", auid = "", line = "";
     for (uint d = 0; d < ndata; d++) {
+      //CO20261008 - lines that say auid and aurl (written before) read as chaos_id and chaos_path; supercells get pocc_system
+      line = normalizeEntryJSON(data[d], pocc_systems);
       // Filter auids that are in the wrong file
-      auid = aurostd::extractJsonValueAflow(data[d], "auid");
-      if (auid.rfind(auid_prefix, 0) != 0) continue;
-      // Filter non-POCC ARUNs
-      aurl = aurostd::extractJsonValueAflow(data[d], "aurl");
-      if ((aurl.find("ARUN") != string::npos)
-          && (aurl.find("ARUN.POCC") == string::npos)) {
+      auid = aurostd::extractJsonValueAflow(line, "chaos_id");
+      if (auid.rfind(auid_prefix, 0) != 0){
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping line, no auid_prefix found: auid=\"" << auid << "\", auid_prefix=\"" << auid_prefix << "\", line=\"" << data[d] << "\"" << endl;}
         continue;
       }
-      values.push_back(getDataValues(data[d], columns, types));
+      // Filter non-POCC ARUNs
+      aurl = aurostd::extractJsonValueAflow(line, "chaos_path");
+      if ((aurl.find("ARUN") != string::npos)
+          && (aurl.find("ARUN.POCC") == string::npos)) {
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " skipping line, non ARUN.POCC ARUN found: line=\"" << data[d] << "\"" << endl;}
+        continue;
+      }
+      values.push_back(getDataValues(line, columns, types));
     }
     populateTable(table, columns, types, values);
   }
@@ -795,7 +815,7 @@ namespace aflowlib {
 
     // Create indexes on important database properties
     vector<string> index_cols;
-    string indexes = "alloy,auid,aurl,catalog,compound,nspecies,Pearson_symbol_relax,spacegroup_relax";
+    string indexes = "alloy,chaos_id,chaos_path,pocc_system,catalog,compound,nspecies,Pearson_symbol_relax,spacegroup_relax";  //CO20261008 - were auid, aurl
     aurostd::string2tokens(indexes, index_cols, ",");
     string index, index_expression;
     for (uint i = 0; i < index_cols.size(); i++) {
@@ -825,7 +845,11 @@ namespace aflowlib {
 
     uint chunk_size = 1000;
 
-    vector<string> schema_keys = getAllSchemaKeys();
+    //CO20261004 - a patch line carries column names (distance_hull), while getAllSchemaKeys() returns the upper-case
+    //schema keys (DISTANCE_HULL), so no line matched and every patch was skipped
+    vector<string> schema_names = init::getSchemaNames(vschema);
+    const vector<string> schema_names_internal = init::getSchemaNames(vschema_internal);
+    schema_names.insert(schema_names.end(), schema_names_internal.begin(), schema_names_internal.end());
 
     // Patch
     vector<string> keys, vals, cols, types;
@@ -834,15 +858,16 @@ namespace aflowlib {
     transaction(true);
     for (uint l = 0; l < nlines; l++) {
       cols.clear();
+      auid.clear();  //CO20261004 - a line without an AUID must not patch the AUID of the line before it
       keys = aurostd::extractJsonKeysAflow(data[l]);
       nkeys = keys.size();
 
       // Check
       for (uint k = 0; k < nkeys; k++) {
-        if (keys[k] == "auid") {
+        if (keys[k] == "auid" || keys[k] == "chaos_id") {  //CO20261008 - chaos_id too
           auid = aurostd::extractJsonValueAflow(data[l], keys[k]);
           auid = auid.substr(1, auid.size() - 2);  // Remove quotes
-        } else if (aurostd::WithinList(schema_keys, keys[k])) {
+        } else if (aurostd::WithinList(schema_names, keys[k])) {  //CO20261004 - names, not keys
           cols.push_back(keys[k]);
         }
       }
@@ -889,21 +914,41 @@ namespace aflowlib {
     return npatches;
   }
 
+  //getAuidTable//////////////////////////////////////////////////////////////
+  // CO20261004
+  // Returns the table that holds an AUID: auid_ followed by the two
+  // characters after the namespace (aflow:, s4e:, ...). The table used to be
+  // taken at a fixed offset (auid.substr(6,2)), which fits only aflow: AUIDs,
+  // so lookups and patches of s4e: AUIDs went to the wrong table.
+  string AflowDB::getDatabaseFile() const {return database_file;}  //CO20261007
+
+  string AflowDB::getAuidTable(const string& auid) {
+    deque<string> vauid;
+    aflowlib::auid2vauid(auid, vauid);  // vauid[0] is the namespace with the first two characters
+    const string::size_type loc = vauid[0].find(':');
+    if (loc == string::npos || vauid[0].size() != loc + 3) {
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "Invalid AUID: " + auid, _INPUT_ILLEGAL_);
+    }
+    return "auid_" + aurostd::tolower(vauid[0].substr(loc + 1));
+  }
+
   //auidInDatabase////////////////////////////////////////////////////////////
   // Test if an AUID is in the database by retrieving a value of the row (here
   // AUID since it is indexed).
   bool AflowDB::auidInDatabase(const string& auid) {
-    string table = "auid_" + auid.substr(6, 2);
-    string where = "auid='\"" + auid + "\"'";
-    string result = getValue(table, "auid", where);
+    string table = tableOf(auid);  //CO20261008 - was auid_+auid.substr(6,2), the wrong digits for s4e: identifiers
+    if (table.empty()) return false;
+    const string id = idColumn();
+    string where = id + "='\"" + auid + "\"'";
+    string result = getValue(table, id, where);
     return (!result.empty());
   }
 
   //updateEntry///////////////////////////////////////////////////////////////
   // Updates columns of an entry with a specific AUID.
   void AflowDB::updateEntry(const string& auid, const vector<string>& cols, const vector<string>& vals) {
-    string table = "auid_" + auid.substr(6, 2);
-    string where = "AUID='\"" + auid + "\"'";
+    string table = tableOf(auid);  //CO20261008 - was auid_+auid.substr(6,2)
+    string where = idColumn() + "='\"" + auid + "\"'";
     updateRow(table, cols, vals, where);
   }
 
@@ -1413,8 +1458,8 @@ namespace aflowlib {
   string AflowDB::getEntry(const string& auid, filetype ft) {
     string entry = "";
     if (auidInDatabase(auid)) {
-      string table = "auid_" + auid.substr(6,2);
-      string where = "auid='\"" + auid + "\"'";
+      string table = tableOf(auid);  //CO20261008 - was auid_+auid.substr(6,2)
+      string where = idColumn() + "='\"" + auid + "\"'";
       vector<string> values = getRows(table, where)[0];
       if (values.size() == 0) return "";  // Nothing found
       vector<string> keys = getColumnNames(table);
@@ -1463,7 +1508,7 @@ namespace aflowlib {
     uint ndata = data.size();
     vector<string> entries(ndata);
     if (ndata > 0) {
-      vector<string> keys = getColumnNames("auid_00");
+      vector<string> keys = getColumnNames(getTables()[0]);  //CO20261008 - was auid_00
       uint nkeys = keys.size();
       vector<string> keyval;
       for (uint i = 0; i < ndata; i++) {
@@ -1551,6 +1596,112 @@ namespace aflowlib {
     string command = "DROP TABLE IF EXISTS " + table;
     sql::SQLexecuteCommand(db, command);
   }
+
+  //CO20261008 START - the identifier and the run's path as CHAOS names them; see the unit test chaos_path
+  /// @brief the identifier's column: chaos_id, or auid in a database built before (CO20261008)
+  string AflowDB::idColumn() {
+    const vector<string> tables = getTables();
+    if (tables.empty()) return "chaos_id";
+    const vector<string> cols = getColumnNames(tables[0]);
+    if (aurostd::WithinList(cols, string("chaos_id"))) return "chaos_id";
+    if (aurostd::WithinList(cols, string("auid"))) return "auid";
+    return "chaos_id";
+  }
+
+  /// @brief the column of the run's path: chaos_path, or aurl in a database built before (CO20261008)
+  string AflowDB::pathColumn() {
+    return (idColumn() == "auid") ? string("aurl") : string("chaos_path");
+  }
+
+  /// @brief the table of an identifier: its two hexadecimal digits after the prefix, "s4e:0171c43afba95d07" -> chaos_id_01
+  /// @return "" for an identifier without a prefix
+  /// @note the digits as getAuidTable() reads them (it replaced auid.substr(6,2), which took the wrong ones of
+  ///       an "s4e:" identifier); the table's name follows the database's identifier column
+  string AflowDB::tableOf(const string& id) {
+    string table = "";
+    try {table = getAuidTable(id);}  // "auid_" and the identifier's two digits (CO20261004)
+    catch (aurostd::xerror&) {return "";}
+    return idColumn() + table.substr(4);  // "auid_0d" -> "chaos_id_0d" in a database built with chaos_id
+  }
+
+  /// @brief the name of table i of _N_AUID_TABLES_: chaos_id_00 ... chaos_id_ff (auid_00 ... before)
+  string AflowDB::tableName(int i, const string& id_column) {
+    stringstream t;
+    t << id_column << "_" << std::setfill('0') << std::setw(2) << std::hex << i;
+    return t.str();
+  }
+
+  /// @brief an entry line of the database's jsonl files as CHAOS names the keys: "auid" is "chaos_id", "aurl"
+  ///        is "chaos_path" (aflowlib::AURL2ChaosPath() of its value), and a POCC supercell gets
+  ///        "pocc_system", the chaos_id of its system, from pocc_systems
+  /// @note lines written before (auid, aurl) and after (chaos_id, chaos_path) give the same database; a key that
+  ///       is already there is not written twice
+  string AflowDB::normalizeEntryJSON(const string& line, const std::map<string,string>& pocc_systems) {
+    // where the key "name" starts, as a key of the object: after { or , and blanks
+    auto key_at = [](const string& s, const string& name) -> string::size_type {
+      const string quoted = "\"" + name + "\":";
+      string::size_type p = s.find(quoted);
+      while (p != string::npos) {
+        string::size_type b = p;
+        while (b > 0 && (s[b - 1] == ' ' || s[b - 1] == '\t')) b--;
+        if (b > 0 && (s[b - 1] == '{' || s[b - 1] == ',')) return p;
+        p = s.find(quoted, p + 1);
+      }
+      return string::npos;
+    };
+    string out = line;
+    string::size_type p = key_at(out, "auid");
+    if (p != string::npos && key_at(out, "chaos_id") == string::npos) out.replace(p + 1, 4, "chaos_id");
+    p = key_at(out, "aurl");
+    if (p != string::npos && key_at(out, "chaos_path") == string::npos) {
+      const string::size_type v = p + 7;  // "aurl":
+      if (v < out.size() && out[v] == '"') {
+        const string::size_type e = out.find('"', v + 1);
+        if (e != string::npos) {
+          out.replace(p, e + 1 - p, "\"chaos_path\":\"" + aflowlib::AURL2ChaosPath(out.substr(v + 1, e - v - 1)) + "\"");
+        }
+      } else {
+        out.replace(p + 1, 4, "chaos_path");  // null: the name only
+      }
+    }
+    if (!pocc_systems.empty() && key_at(out, "pocc_system") == string::npos) {
+      string path = aurostd::extractJsonValueAflow(out, "chaos_path");
+      if (path.size() >= 2 && path[0] == '"') path = path.substr(1, path.size() - 2);
+      const string system = aflowlib::ChaosPathPoccSystem(path);
+      const std::map<string,string>::const_iterator it = system.empty() ? pocc_systems.end() : pocc_systems.find(system);
+      const string::size_type close = out.rfind('}');
+      if (it != pocc_systems.end() && close != string::npos) out.insert(close, ",\"pocc_system\":\"" + it->second + "\"");
+    }
+    return out;
+  }
+
+  /// @brief the chaos_path and chaos_id of every POCC system in the jsonl files, so buildTable() can give each
+  ///        supercell its pocc_system (a system and its supercells sit in different files)
+  void AflowDB::readPoccSystems() {
+    pocc_systems.clear();
+    vector<string> data;
+    for (int i = 0; i < _N_AUID_TABLES_; i++) {
+      stringstream t;
+      t << std::setfill('0') << std::setw(2) << std::hex << i;
+      const string jsonfile = aurostd::CleanFileName(data_path + "/" + getAUIDPrefix() + ":" + t.str() + ".jsonl");
+      data.clear();
+      aurostd::efile2vectorstring(jsonfile, data);
+      for (size_t d = 0; d < data.size(); d++) {
+        if (data[d].find(":POCC_") == string::npos) continue;  // fast: only POCC entries
+        const string line = normalizeEntryJSON(data[d]);
+        string path = aurostd::extractJsonValueAflow(line, "chaos_path");
+        string id = aurostd::extractJsonValueAflow(line, "chaos_id");
+        if (path.size() >= 2 && path[0] == '"') path = path.substr(1, path.size() - 2);
+        if (id.size() >= 2 && id[0] == '"') id = id.substr(1, id.size() - 2);
+        if (path.empty() || id.empty() || path.find("/ARUN.") != string::npos) continue;
+        pocc_systems[path] = id;
+      }
+    }
+    stringstream message;
+    message << "POCC systems read for the supercells: " << pocc_systems.size() << ".";
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, *p_FileMESSAGE, *p_oss);
+  }
+  //CO20261008 STOP
 
   //getTables/////////////////////////////////////////////////////////////////
   // Retrieves a set of tables. If where is empty, all tables in the database
@@ -1693,26 +1844,44 @@ namespace aflowlib {
     return sql::SQLexecuteCommand2DVECTOR(cursor, command);
   }
 
-  vector<vector<string> > AflowDB::getRowsMultiTables(const string& where) {
+  //[WJ20230720 OBSOLETE - Use SQLite Filtering functionality]
+  // vector<vector<string>> AflowDB::getRowsMultiTables(const string& where, const string& keywords) {
+  //   vector<string> tables = getTables();
+  //   return getRowsMultiTables(db, tables, where, keywords);
+  // }
+
+  //WJ20230807 START
+  vector<vector<string> > AflowDB::getRowsMultiTables(sqlite3* cursor, const string& where, const string& keywords) {
     vector<string> tables = getTables();
-    return getRowsMultiTables(db, tables, where);
+    return getRowsMultiTables(cursor, tables, where, keywords);
   }
 
-  vector<vector<string> > AflowDB::getRowsMultiTables(sqlite3* cursor, const string& where) {
+  vector<vector<string> > AflowDB::getRowsMultiTables(const vector<string>& tables, const string& where, const string& keywords) {
+    return getRowsMultiTables(db, tables, where, keywords);
+  }
+
+  vector<vector<string> > AflowDB::getRowsMultiTables(const string& where, const string& keywords, const string& order_by){
     vector<string> tables = getTables();
-    return getRowsMultiTables(cursor, tables, where);
+    return getRowsMultiTables(db, tables, where, keywords, order_by);
   }
 
-  vector<vector<string> > AflowDB::getRowsMultiTables(const vector<string>& tables, const string& where) {
-    return getRowsMultiTables(db, tables, where);
-  }
-
-  vector<vector<string> > AflowDB::getRowsMultiTables(sqlite3* cursor, const vector<string>& tables, const string& where) {
+  vector<vector<string> > AflowDB::getRowsMultiTables(sqlite3* cursor, const vector<string>& tables, const string& where, const string& keywords, const string& order_by) {
+    string keys = keywords;
+    string largeCommand = "";
     uint ntables = tables.size();
     vector<string> commands(ntables);
-    for (uint t = 0; t < ntables; t++) commands[t] = prepareSELECT(tables[t], "", "*", where);
-    return sql::SQLexecuteCommand2DVECTOR(cursor, aurostd::joinWDelimiter(commands, " UNION ALL "));
+    if (order_by.size()){
+      for (uint t = 0; t < ntables; t++) commands[t] = prepareSELECT(tables[t], "", keys, where);
+    } else {
+      for (uint t = 0; t < ntables; t++) commands[t] = prepareSELECT(tables[t], "", keys, where, 0);
+    }
+    largeCommand = aurostd::joinWDelimiter(commands, " UNION ALL "); 
+    if(order_by.size()) { //WJ20230720 Allow order results asc or desc 
+      largeCommand += " ORDER BY "; largeCommand += order_by;
+    }
+    return sql::SQLexecuteCommand2DVECTOR(cursor, largeCommand);
   }
+  //WJ20230807 STOP
 
   //getValue//////////////////////////////////////////////////////////////////
   // Gets a value from a specific column. The row must be specified in the

@@ -933,6 +933,30 @@ namespace xthread {
           vector<string>&,
           aurostd::xoption&, _aflags&, vector<uint>&, std::ostream&);
 
+  //database derived properties  //CO20261004
+  template void xthread::xThread::run<
+    std::function<void (
+        uint,
+        const vector<string>&,
+        vector<vector<aflowlib::_aflowlib_entry> >&,
+        vector<uint>&,
+        std::ostream&
+        )>,
+    vector<string>,
+    vector<vector<aflowlib::_aflowlib_entry> >,
+    vector<uint>,
+    std::ostream
+      >(uint,
+          std::function<void (
+            uint,
+            const vector<string>&,
+            vector<vector<aflowlib::_aflowlib_entry> >&,
+            vector<uint>&,
+            std::ostream&
+            )>&,
+          vector<string>&,
+          vector<vector<aflowlib::_aflowlib_entry> >&, vector<uint>&, std::ostream&);
+
   // runPredistributed --------------------------------------------------------
 
   //XTalFinderCalculator::calculateSpaceGroups

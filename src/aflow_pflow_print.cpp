@@ -882,21 +882,21 @@ namespace pflow {
     // Space group
     bool Platon_EQUAL=FALSE,Platon_EXACT=FALSE;
     double Platon_ang=1.0,Platon_d1=0.25,Platon_d2=0.25,Platon_d3=0.25;
-    system("touch pflow_tmp_in"); // Create input file to connect to stream.
+    aurostd::execute("touch pflow_tmp_in"); //CO20250406 // Create input file to connect to stream.
     ofstream outfile("pflow_tmp_out");
     ifstream infile("pflow_tmp_in");
     string spcgrp1a,spcgrp2a,spcgrp1b,spcgrp2b;
     platon2print(str1,Platon_EQUAL,Platon_EXACT,Platon_ang,Platon_d1,Platon_d2,Platon_d3,outfile);
-    system("cat pflow_tmp_out | platonSG > pflow_tmp_in");
+    aurostd::execute("cat pflow_tmp_out | platonSG > pflow_tmp_in");  //CO20250406
     infile >> spcgrp1a >> spcgrp1b;
     // Puts file position pointers back to beginning.
     outfile.seekp(0);
     infile.seekg(0);
     platon2print(sstr2,Platon_EQUAL,Platon_EXACT,Platon_ang,Platon_d1,Platon_d2,Platon_d3,outfile);
-    system("cat pflow_tmp_out | platonSG > pflow_tmp_in");
+    aurostd::execute("cat pflow_tmp_out | platonSG > pflow_tmp_in");  //CO20250406
     infile >> spcgrp2a >> spcgrp2b;
-    system("/bin/rm pflow_tmp_out");
-    system("/bin/rm pflow_tmp_in");
+    aurostd::execute("/bin/rm pflow_tmp_out");  //CO20250406
+    aurostd::execute("/bin/rm pflow_tmp_in"); //CO20250406
     oss << "Space groups " << endl;
     oss << "  SG Str1: " << spcgrp1a << " " << spcgrp1b << endl;
     oss << "  SG Str2: " << spcgrp2a << " " << spcgrp2b << endl;
@@ -2510,21 +2510,21 @@ namespace pflow {
     //    // Space group
     //    bool Platon_EQUAL=FALSE,Platon_EXACT=FALSE;
     //    double Platon_ang=1.0,Platon_d1=0.25,Platon_d2=0.25,Platon_d3=0.25;
-    //    system("touch pflow_tmp_in"); // Create input file to connect to stream.
+    //    aurostd::execute("touch pflow_tmp_in"); // Create input file to connect to stream.  //CO20250406
     //    ofstream outfile("pflow_tmp_out");
     //    ifstream infile("pflow_tmp_in");
     //    string spcgrp1a,spcgrp2a,spcgrp1b,spcgrp2b;
     //    platon2print(str1,Platon_EQUAL,Platon_EXACT,Platon_ang,Platon_d1,Platon_d2,Platon_d3,outfile);
-    //    system("cat pflow_tmp_out | platonSG > pflow_tmp_in");
+    //    aurostd::execute("cat pflow_tmp_out | platonSG > pflow_tmp_in");  //CO20250406
     //    infile >> spcgrp1a >> spcgrp1b;
     //    // Puts file position pointers back to beginning.
     //    outfile.seekp(0);
     //    infile.seekg(0);
     //    platon2print(sstr2,Platon_EQUAL,Platon_EXACT,Platon_ang,Platon_d1,Platon_d2,Platon_d3,outfile);
-    //    system("cat pflow_tmp_out | platonSG > pflow_tmp_in");
+    //    aurostd::execute("cat pflow_tmp_out | platonSG > pflow_tmp_in");  //CO20250406
     //    infile >> spcgrp2a >> spcgrp2b;
-    //    system("/bin/rm pflow_tmp_out");
-    //    system("/bin/rm pflow_tmp_in");
+    //    aurostd::execute("/bin/rm pflow_tmp_out");  //CO20250406
+    //    aurostd::execute("/bin/rm pflow_tmp_in"); //CO20250406
     //    oss << "Space groups " << endl;
     //    oss << "  SG Str1: " << spcgrp1a << " " << spcgrp1b << endl;
     //    oss << "  SG Str2: " << spcgrp2a << " " << spcgrp2b << endl;

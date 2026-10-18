@@ -423,9 +423,9 @@ namespace aurostd {
   string CGI_StringClean(const string& stringIN) __xprototype;
   string RemoveWhiteSpaces(const string& s) __xprototype;
   string RemoveWhiteSpaces(const string& s, const char toogle) __xprototype;
-  string RemoveWhiteSpacesFromTheBack(const string& s) __xprototype;
-  string RemoveWhiteSpacesFromTheFront(const string& s) __xprototype;
-  string RemoveWhiteSpacesFromTheFrontAndBack(const string& s) __xprototype;
+  string RemoveWhiteSpacesFromTheBack(const string& s, bool remove_newline = false) __xprototype; // ST20250418 add remove_newline argument
+  string RemoveWhiteSpacesFromTheFront(const string& s, bool remove_newline = false) __xprototype; // ST20250418 add remove_newline argument
+  string RemoveWhiteSpacesFromTheFrontAndBack(const string& s, bool remove_newline = false) __xprototype; // ST20250418 add remove_newline argument
   string RemoveSpaces(const string& s) __xprototype;
   string RemoveSpaces(const string& s, const char toogle) __xprototype;
   string RemoveSpacesFromTheBack(const string& s) __xprototype;

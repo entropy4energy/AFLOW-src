@@ -128,6 +128,8 @@ namespace pflow {
   //DX20170818 [OBSOLETE] xstructure EQUIVALENT(_aflags &aflags,istream& input);
   string EQUIVALENT(_aflags &aflags,istream& input, aurostd::xoption& vpflow);
   void EWALD(const string& options,istream& input);
+  string EXTRACT_POSCAR_INSTANCE_FROM_AFLOWIN(const aurostd::xoption& vpflow);  //CO20231130
+  string EXTRACT_POSCAR_INSTANCE_FROM_AFLOWIN(const string& aflowin_path,int instance); //CO20231130
   string EXTRACT_xcar(_aflags &aflags,vector<string>,string,string);
   string EXTRACT_Symmetry(_aflags &aflags,vector<string>);
   void FGROUP(_aflags &aflags,istream& input);
@@ -378,8 +380,8 @@ namespace pflow {
   void PYTHON_MODULES(const string& modules, ofstream& FileMESSAGE, ostream& oss=std::cout);  //ME20211103
   void PYTHON_MODULES(const vector<string>& vmodules, ostream& oss=std::cout);  //ME20211103
   void PYTHON_MODULES(const vector<string>& vmodules, ofstream& FileMESSAGE, ostream& oss=std::cout);  //ME20211103
-  bool QMVASP(aurostd::xoption& vpflow);  //vector<string> argv); //CO20180703
-  bool QMVASP_20210813(aurostd::xoption& vpflow);  //CO20180703
+  bool QMVASP(aurostd::xoption& vpflow, bool use_tmp_dir = false);  //vector<string> argv); //CO20180703 //KT20230509 - added use_temp_dir
+  bool QMVASP_20210813(aurostd::xoption& vpflow, bool use_tmp_dir=false);  //CO20180703 //KT20230509 - added use_temp_dir
   bool QMVASP_20210101(aurostd::xoption& vpflow);  //CO20180703
   xstructure POSCAR(istream& input);
   xmatrix<double> QE_ibrav2lattice(const int& ibrav, const xvector<double>& parameters, const bool& isabc); //DX20180123 - added more robust QE reader
@@ -406,6 +408,7 @@ namespace pflow {
   // [OBSOLETE] xstructure PROTO_HTQC_PURE(vector<string>);
   // [OBSOLETE] xstructure PROTO_GUS_PURE(vector<string>);
   // [OBSOLETE] bool PROTO_GUS_CPP(vector<string>);
+  void PROTO_REDECORATE(const aurostd::xoption& vpflow); //KT20250210
   bool PROTO_ICSD_AFLOWIN(vector<string> &argv);
   xstructure PRIM(istream& input,uint mode);
   void RASMOL(const string& options,istream& input);

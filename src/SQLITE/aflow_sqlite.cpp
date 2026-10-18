@@ -25,14 +25,24 @@ namespace sql {
   // to keep the number of functions to a minimum. Conversion to other data
   // types should be handled outside these functions.
 
+  // error reporting shared by the SQLexecuteCommand functions //CO20260930
+  // frees the SQLite error string before throwing
+  [[noreturn]] static void throwSQLiteError(const string& caller, char* sql_error_message, int sql_code, const string& command) {
+    string message = "SQLite error " + aurostd::utype2string<int>(sql_code);
+    if (sql_error_message != nullptr) {
+      message += ": " + string(sql_error_message);
+      sqlite3_free(sql_error_message);
+    }
+    message += " (command: " + command + ")";
+    throw aurostd::xerror(__AFLOW_FILE__, caller, message, _RUNTIME_SQL_);
+  }
+
   void SQLexecuteCommand(sqlite3* cursor, const string& command) {
     if (_SQL_COMMAND_DEBUG_) std::cerr << XPID << "sql::SQLexecuteCommand(): command = " << command << std::endl;
     char* sqlErrMsg = 0;
     int sql_code = sqlite3_exec(cursor, command.c_str(), SQLcallback, 0, &sqlErrMsg);
     if (sql_code != SQLITE_OK) {
-      std::string function = "sql::SQLexecuteCommand():";
-      std::string message = string(sqlErrMsg) + " in command " + command;
-      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
+      throwSQLiteError(__AFLOW_FUNC__, sqlErrMsg, sql_code, command); //CO20260930
     }
   }
 
@@ -42,10 +52,7 @@ namespace sql {
     string returnstring = "";
     int sql_code = sqlite3_exec(cursor, command.c_str(), SQLcallbackSCALAR, &returnstring, &sqlErrMsg);
     if (sql_code != SQLITE_OK) {
-      string function = XPID + "sql::SQLexecuteCommandSCALAR():";
-      string message = string(sqlErrMsg) + " in command " + command;
-      message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
+      throwSQLiteError(__AFLOW_FUNC__, sqlErrMsg, sql_code, command); //CO20260930
     } else {
       return returnstring;
     }
@@ -57,10 +64,7 @@ namespace sql {
     vector<string> returnvector;
     int sql_code = sqlite3_exec(cursor, command.c_str(), SQLcallbackVECTOR, &returnvector, &sqlErrMsg);
     if (sql_code != SQLITE_OK) {
-      string function = XPID + "sql::SQLexecuteCommandVECTOR():";
-      string message = string(sqlErrMsg) + " in command " + command;
-      message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
+      throwSQLiteError(__AFLOW_FUNC__, sqlErrMsg, sql_code, command); //CO20260930
     } else {
       return returnvector;
     }
@@ -72,10 +76,7 @@ namespace sql {
     vector<vector<string> > returnvector;
     int sql_code = sqlite3_exec(cursor, command.c_str(), SQLcallback2DVECTOR, &returnvector, &sqlErrMsg);
     if (sql_code != SQLITE_OK) {
-      string function = XPID + "sql::SQLexecuteCommand2DVECTOR():";
-      string message = string(sqlErrMsg) + " in command " + command;
-      message += " (SQL code " + aurostd::utype2string<int>(sql_code) + ").";
-      throw aurostd::xerror(__AFLOW_FILE__, function, message, _RUNTIME_SQL_);
+      throwSQLiteError(__AFLOW_FUNC__, sqlErrMsg, sql_code, command); //CO20260930
     } else {
       return returnvector;
     }

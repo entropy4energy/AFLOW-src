@@ -110,6 +110,8 @@ namespace pocc {
     bool ael_aflowin_found = false;
     string AflowInName = _AFLOWIN_;
     string FileLockName = _AFLOWLOCK_;
+    vector<string> vlock_variants_aelagl; //CO20240409
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,","); //CO20240409
     for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
       isupercell=std::distance(l_supercell_sets.begin(),it);
       pocc_directory_abs=m_aflags.Directory+"/"+m_ARUN_directories[isupercell];
@@ -130,11 +132,17 @@ namespace pocc {
         throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem finding AEL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
       }
       if (ael_aflowin_found) {
-        if(aurostd::FileExist(pocc_directory_abs+"/ael.LOCK")) {
-          FileLockName = "ael.LOCK";
-        } else if(aurostd::FileExist(pocc_directory_abs+"/agl.LOCK")) {
-          FileLockName = "agl.LOCK";
-        }
+        for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){ //CO20240409
+          if(aurostd::FileExist(aurostd::CleanFileName(pocc_directory_abs+"/"+vlock_variants_aelagl[ilock]))){  //CO20240409
+            FileLockName=vlock_variants_aelagl[ilock];  //CO20240409
+            break;  //CO20240409
+          } //CO20240409
+        } //CO20240409
+        //[CO20210204 - OBSOLETE]if(aurostd::FileExist(pocc_directory_abs+"/ael.LOCK")) {
+        //[CO20210204 - OBSOLETE]  FileLockName = "ael.LOCK";
+        //[CO20210204 - OBSOLETE]} else if(aurostd::FileExist(pocc_directory_abs+"/agl.LOCK")) {
+        //[CO20210204 - OBSOLETE]  FileLockName = "agl.LOCK";
+        //[CO20210204 - OBSOLETE]}
         run_directory=true;
       }
       if(run_directory){
@@ -148,7 +156,15 @@ namespace pocc {
         //set env for RUN_Directory()
         _AFLOWIN_=AflowInName;
         _AFLOWLOCK_=FileLockName;
-        if(aurostd::FileExist(pocc_directory_abs+"/"+_AFLOWLOCK_)){aurostd::file2file(pocc_directory_abs+"/"+_AFLOWLOCK_,pocc_directory_abs+"/"+_AFLOWLOCK_+".run");} //keep original LOCK
+        if(aurostd::FileExist(pocc_directory_abs+"/"+_AFLOWLOCK_)){ //keep original LOCK
+          if(aurostd::FileExist(aurostd::CleanFileName(pocc_directory_abs+"/"+_AFLOWLOCK_+".run"))){  //CO20240409
+            //CO20240409 - if it exists, then we are running this directory again and we want to keep the original LOCK.run
+            //remove the new LOCK so the rest of the algorithm can proceed
+            aurostd::RemoveFile(aurostd::CleanFileName(pocc_directory_abs+"/"+_AFLOWLOCK_));  //CO20240409
+          }else{
+            aurostd::file2file(pocc_directory_abs+"/"+_AFLOWLOCK_,pocc_directory_abs+"/"+_AFLOWLOCK_+".run"); //CO20240409
+          }
+        }
         KBIN::RUN_Directory(aflags);
 
         //return to original
@@ -871,6 +887,8 @@ namespace pocc {
     bool agl_aflowin_found = false;
     string AflowInName = _AFLOWIN_;
     string FileLockName = _AFLOWLOCK_;
+    vector<string> vlock_variants_aelagl; //CO20240409
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,","); //CO20240409
     for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
       isupercell=std::distance(l_supercell_sets.begin(),it);
       pocc_directory_abs=m_aflags.Directory+"/"+m_ARUN_directories[isupercell];
@@ -891,9 +909,15 @@ namespace pocc {
         throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Problem finding AGL aflow.in filename [dir="+pocc_directory_abs+"]",_FILE_ERROR_);
       }
       if (agl_aflowin_found) {
-        if(aurostd::FileExist(pocc_directory_abs+"/agl.LOCK")) {
-          FileLockName = "agl.LOCK";
-        }
+        for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){ //CO20240409
+          if(aurostd::FileExist(aurostd::CleanFileName(pocc_directory_abs+"/"+vlock_variants_aelagl[ilock]))){  //CO20240409
+            FileLockName=vlock_variants_aelagl[ilock];  //CO20240409
+            break;  //CO20240409
+          } //CO20240409
+        } //CO20240409
+        //[CO20210204 - OBSOLETE]if(aurostd::FileExist(pocc_directory_abs+"/agl.LOCK")) {
+        //[CO20210204 - OBSOLETE]  FileLockName = "agl.LOCK";
+        //[CO20210204 - OBSOLETE]}
         run_directory=true;
       }
       if(run_directory){
@@ -907,7 +931,15 @@ namespace pocc {
         //set env for RUN_Directory()
         _AFLOWIN_=AflowInName;
         _AFLOWLOCK_=FileLockName;
-        if(aurostd::FileExist(pocc_directory_abs+"/"+_AFLOWLOCK_)){aurostd::file2file(pocc_directory_abs+"/"+_AFLOWLOCK_,pocc_directory_abs+"/"+_AFLOWLOCK_+".run");} //keep original LOCK
+        if(aurostd::FileExist(pocc_directory_abs+"/"+_AFLOWLOCK_)){ //keep original LOCK
+          if(aurostd::FileExist(aurostd::CleanFileName(pocc_directory_abs+"/"+_AFLOWLOCK_+".run"))){  //CO20240409
+            //CO20240409 - if it exists, then we are running this directory again and we want to keep the original LOCK.run
+            //remove the new LOCK so the rest of the algorithm can proceed
+            aurostd::RemoveFile(aurostd::CleanFileName(pocc_directory_abs+"/"+_AFLOWLOCK_));  //CO20240409
+          }else{
+            aurostd::file2file(pocc_directory_abs+"/"+_AFLOWLOCK_,pocc_directory_abs+"/"+_AFLOWLOCK_+".run"); //CO20240409
+          }
+        }
         KBIN::RUN_Directory(aflags);
 
         //return to original

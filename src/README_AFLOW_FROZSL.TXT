@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                         materials.duke.edu/AFLOW/README_AFLOW_FROZSL.TXT
-****************************************************************************************************
 Simple calculation with the Frozen Phonon code called FROZSL by Harold Stokes and
 the high-throughpout wrapper functions of aflow.
 

@@ -20,9 +20,17 @@
 #include "aflow.h"
 #include "aflow_pocc.h"
 #include "aflow_compare_structure.h"
+#include "aflow_cce.h"
+#include "aflow_xbinary.h"
 
 #define _DEBUG_POCC_ false  //CO20190116
 #define _DEBUG_POCC_CLUSTER_ANALYSIS_ false && _DEBUG_POCC_  //CO20190116
+
+// ST20250602 Preprocessor macros for formatting sublattice properties
+// See: https://stackoverflow.com/questions/38696440/a-standard-way-for-getting-variable-name-at-compile-time
+// #value is the name of the variable as a string
+#define POCC_FORMAT_PROPERTY_SCALAR( stream, value ) formatProperty( stream, value, #value )
+#define POCC_FORMAT_PROPERTY_VECTOR( stream, value, idx ) formatProperty( stream, value, #value, idx )
 
 const string POSCAR_START_tag=_VASP_POSCAR_MODE_EXPLICIT_START_; //no-period is important
 const string POSCAR_STOP_tag=_VASP_POSCAR_MODE_EXPLICIT_STOP_; //no-period is important
@@ -260,7 +268,13 @@ namespace KBIN {
 
       if(!pocc::structuresGenerated(aflags.Directory)){
         try{pcalc.generateStructures(xvasp);}
-        catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), aflags, FileMESSAGE, oss, _LOGGER_ERROR_);}
+        catch(aurostd::xerror& err){
+          if(aurostd::substring2bool(err.whereFileName(),"aflow_pocc.cpp") &&
+              aurostd::substring2bool(err.what(),"Skipping structure generation as requested")){
+            throw aurostd::xerror(err.whereFileName(),err.whereFunction(),err.what());  //properly throw so it can exit immediately
+          }
+          pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), aflags, FileMESSAGE, oss, _LOGGER_ERROR_);
+        }
         //ME2021104
         if (kflags.KBIN_PHONONS_CALCULATION_AEL
             || kflags.KBIN_PHONONS_CALCULATION_AGL
@@ -287,7 +301,14 @@ namespace KBIN {
       //pocc::patchStructuresFile(aflags,FileMESSAGE,oss);  //patch if needed
       pcalc.postProcessing();
     }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), aflags, FileMESSAGE, oss, _LOGGER_ERROR_);return;}
+    catch(aurostd::xerror& err){
+      if(aurostd::substring2bool(err.whereFileName(),"aflow_pocc.cpp") &&
+          aurostd::substring2bool(err.what(),"Skipping structure generation as requested")){
+        throw aurostd::xerror(err.whereFileName(),err.whereFunction(),err.what());  //properly throw so it can exit immediately
+      }
+      pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), aflags, FileMESSAGE, oss, _LOGGER_ERROR_);
+      return;
+    }
 
     return;
   }
@@ -355,6 +376,145 @@ namespace pocc {
     }
     xstructure xstr_pocc(ss_pocc_structure, IOVASP_POSCAR);
     return xstr_pocc;
+  }
+
+  SupercellDegeneracies::SupercellDegeneracies() {free();}
+
+  SupercellDegeneracies::SupercellDegeneracies(const SupercellDegeneracies& b) {copy(b);}
+
+  SupercellDegeneracies::~SupercellDegeneracies() {free();}
+
+  const SupercellDegeneracies& SupercellDegeneracies::operator=(const SupercellDegeneracies& b) {
+    if(this!=&b){copy(b);}
+    return *this;
+  }
+
+  void SupercellDegeneracies::clear() {free();}
+
+  void SupercellDegeneracies::free() {m_weights.clear();}
+
+  void SupercellDegeneracies::copy(const SupercellDegeneracies& b) {
+    if(this==&b){return;}
+    m_weights.clear();
+    for(std::map<std::string,double>::const_iterator it=b.m_weights.begin();it!=b.m_weights.end();++it){
+      m_weights[it->first]=it->second;
+    }
+  }
+
+  bool SupercellDegeneracies::isASCIIDigit(char c) {
+    return c>='0' && c<='9';
+  }
+
+  bool SupercellDegeneracies::isASCIIAlpha(char c) {
+    return (c>='A' && c<='Z') || (c>='a' && c<='z');
+  }
+
+  bool SupercellDegeneracies::isASCIIAlnum(char c) {
+    return isASCIIAlpha(c) || isASCIIDigit(c);
+  }
+
+  string SupercellDegeneracies::extractSupercellName(const string& text) {
+    string name=text;
+    string::size_type pos=name.find("ARUN.POCC_");
+    if(pos!=string::npos){name=name.substr(pos);}
+    else{name=aurostd::basename(name);}
+    string clean;
+    for(uint i=0,fl_size_i=name.size();i<fl_size_i;i++){
+      char c=name[i];
+      if(isASCIIAlnum(c) || c=='_' || c=='.'){clean+=c;}
+      else{break;}
+    }
+    return clean;
+  }
+
+  string SupercellDegeneracies::normalizeSupercellName(const string& text) {
+    string name=extractSupercellName(text);
+    string prefix="ARUN.POCC_";
+    if(name.find(prefix)!=0){return name;}
+    string::size_type number_start=prefix.size();
+    string::size_type number_end=number_start;
+    while(number_end<name.size() && isASCIIDigit(name[number_end])){number_end++;}
+    if(number_end==number_start){return name;}
+    string number=name.substr(number_start,number_end-number_start);
+    string::size_type first_nonzero=number.find_first_not_of('0');
+    if(first_nonzero==string::npos){number="0";}
+    else{number=number.substr(first_nonzero);}
+    return prefix+number+name.substr(number_end);
+  }
+
+  void SupercellDegeneracies::addUniquePath(vector<string>& paths,const string& path) {
+    if(path.empty()){return;}
+    if(!aurostd::WithinList(paths,path)){paths.push_back(path);}
+  }
+
+  vector<string> SupercellDegeneracies::getPoccOutPathCandidates(const aflowlib::_aflowlib_entry& entry) {
+    // Prefer loader provenance, then the configured AFLOWLIB filesystem root; no host-specific paths.
+    const string pocc_out_filename=string(POCC_FILE_PREFIX)+string(POCC_OUT_FILE);
+    vector<string> vcandidates; //CO20260930
+    if(entry.el_source_type.find("FILESYSTEM")==0 && !entry.el_source.empty()){
+      string source_directory=aurostd::dirname(entry.el_source);
+      if(aurostd::basename(source_directory).find("ARUN.POCC_")==0){source_directory=aurostd::dirname(source_directory);}
+      if(!source_directory.empty()){addUniquePath(vcandidates,source_directory+"/"+pocc_out_filename);}
+    }
+    string relative_raw=entry.getPoccParentRelativePath("RAW");
+    string root=DEFAULT_ENTRY_LOADER_FS_PATH;
+    if(!relative_raw.empty() && !root.empty()){
+      if(root[root.size()-1]!='/'){root+="/";}
+      addUniquePath(vcandidates,root+relative_raw+"/"+pocc_out_filename);
+    }
+    return vcandidates;
+  }
+
+  bool SupercellDegeneracies::load(const aflowlib::_aflowlib_entry& entry) {
+    m_weights.clear();
+    vector<string> candidate_paths=getPoccOutPathCandidates(entry);
+    for(uint ipath=0,fl_size_ipath=candidate_paths.size();ipath<fl_size_ipath;ipath++){
+      const string& pocc_out_path=candidate_paths[ipath];
+      string pocc_out_found_path;
+      if(!aurostd::EFileExist(pocc_out_path,pocc_out_found_path)){continue;}
+      string pocc_out=aurostd::efile2string(pocc_out_found_path);
+      string pocc_out_all=aurostd::substring2string(pocc_out,"[AFLOW_POCC]START_TEMPERATURE=ALL","[AFLOW_POCC]STOP_TEMPERATURE=ALL",0);
+      if(!pocc_out_all.empty()){pocc_out=pocc_out_all;}
+      stringstream pocc_out_ss;
+      pocc_out_ss << pocc_out;
+      vector<string> lines;
+      aurostd::stream2vectorstring(pocc_out_ss,lines);
+      for(uint iline=0,fl_size_iline=lines.size();iline<fl_size_iline;iline++){
+        string line=lines[iline];
+        if(line.find("degeneracy_supercell_")==string::npos){continue;}
+        aurostd::StringSubst(line,"="," ");
+        vector<string> value_tokens;
+        aurostd::string2tokens(line,value_tokens," ");
+        if(value_tokens.size()<2 || value_tokens[0].find("degeneracy_supercell_")==string::npos || !aurostd::isfloat(value_tokens[1])){continue;}
+        double weight=aurostd::string2utype<double>(value_tokens[1]);
+        if(!std::isfinite(weight) || weight<=_AFLOW_POCC_ZERO_TOL_){continue;}
+        string child_name=extractSupercellName(line);
+        string normalized_child_name=normalizeSupercellName(child_name);
+        if(child_name.empty() || normalized_child_name.empty()){continue;}
+        m_weights[child_name]=weight;
+        m_weights[normalized_child_name]=weight;
+      }
+      if(!m_weights.empty()){return true;}
+    }
+    return false;
+  }
+
+  double SupercellDegeneracies::getWeight(const aflowlib::_aflowlib_entry& child,bool& found_weight) const {
+    found_weight=false;
+    if(m_weights.empty()){return 1.0;}
+    vector<string> candidates;
+    candidates.push_back(extractSupercellName(child.prototype));
+    candidates.push_back(normalizeSupercellName(child.prototype));
+    candidates.push_back(extractSupercellName(child.aurl));
+    candidates.push_back(normalizeSupercellName(child.aurl));
+    for(uint i=0,fl_size_i=candidates.size();i<fl_size_i;i++){
+      std::map<std::string,double>::const_iterator it=m_weights.find(candidates[i]);
+      if(it!=m_weights.end() && std::isfinite(it->second) && it->second>_AFLOW_POCC_ZERO_TOL_){
+        found_weight=true;
+        return it->second;
+      }
+    }
+    return 1.0;
   }
 } // namespace pocc
 
@@ -727,6 +887,45 @@ namespace pocc {
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " efa=" << efa << endl;}
     return efa;
   }
+  double getDEED(double entropy_forming_ability,double average_hull_loss) {
+    if(aurostd::isNaN(entropy_forming_ability) || !std::isfinite(entropy_forming_ability) || entropy_forming_ability<=_AFLOW_POCC_ZERO_TOL_){return AUROSTD_MAX_DOUBLE;} //HP20260820
+    if(aurostd::isNaN(average_hull_loss) || !std::isfinite(average_hull_loss) || average_hull_loss<=_AFLOW_POCC_ZERO_TOL_){return AUROSTD_MAX_DOUBLE;} //HP20260820
+    double deed=sqrt(entropy_forming_ability/average_hull_loss);
+    if(aurostd::isNaN(deed) || !std::isfinite(deed) || deed<=_AFLOW_POCC_ZERO_TOL_){return AUROSTD_MAX_DOUBLE;} //HP20260820
+    return deed;
+  }
+
+  //species of a representative's structure from vspecies (its directory's, aflowlib::GetSpeciesDirectory()) when the
+  //structure names none (VASP4 POSCAR, aflow.in); the structure read from a POSCAR-format file first //CO20261004
+  //one helper for setAvgRDF() and setRStar(), which repeated this block
+  void setRepresentativeSpecies(const vector<string>& vspecies,xstructure& xstr) {
+    if(xstr.species.empty()||(xstr.species.size()>0 && xstr.species[0].empty())){xstr.SetSpecies(aurostd::vector2deque(vspecies));}
+  }
+  void readRepresentativeStructure(const string& POSCAR_file,const vector<string>& vspecies,xstructure& xstr) {
+    xstr.clear();
+    xstr.initialize(POSCAR_file,IOVASP_POSCAR);
+    setRepresentativeSpecies(vspecies,xstr);
+  }
+
+  //R* of a representative (Angstrom): the edge of the cube with its volume per atom, (V / N)^(1/3), the average space
+  //each atom has (Shao-Yu Tseng) //CO20261005
+  //Without vacancies a representative of |HNF| PARTCAR cells holds N = |HNF| Z atoms (Z the PARTCAR sites), so R*^3 is
+  //the volume per PARTCAR cell over Z: R* needs no parent cell, and it does not depend on the PARTCAR's basis or on
+  //which of the parent's equivalent cells a matching would find.
+  double RStarPerAtom(const xstructure& xstr) {
+    const double V=fabs(xstr.GetVolume());
+    if(xstr.atoms.size()==0 || !(V>0.0)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no atoms or no volume",_VALUE_ILLEGAL_);}
+    return std::cbrt(V/(double)xstr.atoms.size());
+  }
+
+  //geometric parameter S_config / delta^2 of a sublattice; unset (AUROSTD_MAX_DOUBLE, not written to aflow.pocc.out)
+  //when either is unset or delta is 0 (equal radii), where the ratio is not a finite number //CO20261015
+  double getParamGeo(double S_config,double delta){
+    if(S_config==AUROSTD_MAX_DOUBLE || delta==AUROSTD_MAX_DOUBLE){return AUROSTD_MAX_DOUBLE;}
+    const double param_geo=S_config/(delta*delta);
+    if(!std::isfinite(param_geo)){return AUROSTD_MAX_DOUBLE;}
+    return param_geo;
+  }
 
   void POccCalculator::StructuresAllFile2SupercellSets(){
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
@@ -980,6 +1179,1141 @@ namespace pocc {
     m_Hmix=pocc::getHmix(xv_energies,xv_dgs);
     m_efa=pocc::getEFA(xv_energies,xv_dgs);
   }
+  void POccCalculator::setSConfig(){  //CO20250321
+    bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    m_S_config_cell=0.0;
+    m_S_config_atom=0.0;
+    m_S_config_sublattice=0.0;
+    m_S_config_rfu=0.0;
+    m_S_config_species=0.0;
+    
+    uint isite=0,iocc=0;
+
+    for(isite=0;isite<m_pocc_sites.size();isite++){
+      if(m_pocc_sites[isite].partial_occupation_flag){
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size();iocc++){
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(LDEBUG){
+            cerr << __AFLOW_FUNC__ << " pocc_atom[i=" << m_pocc_sites[isite].v_occupants[iocc] << "].partial_occupation_value=" << c << endl;
+          }
+          m_S_config_cell+= ( c * aurostd::ln(c) );
+        }
+      }
+    }
+    m_S_config_cell*=-1.0;  //*C_MOL_GAS for J/mol/K units
+    m_S_config_atom=m_S_config_cell/(double)xstr_sym.atoms.size();  //aurostd::sum(natoms_sublattice);
+    m_S_config_sublattice=m_S_config_atom*(double)xstr_sym.iatoms.size();
+    m_S_config_species=m_S_config_atom*(double)xstr_sym.num_each_type.size();  //also called entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+
+    // ST20250530 START
+    // Calculate entropy of cell (per atom), only differentiating between metallic and non-metallic sites (basically, treat it as if there are two pocc sites, one for metals and one for non-metals)
+    // Meant to be a generalization of intermetallic entropy to oxides, etc
+    // If there is only one type of site for both metals and non-metals, this should be the same as m_S_config_atom
+    // A modified formulation of http://dx.doi.org/10.1016/j.jallcom.2015.10.279
+    m_S_config_partial_atom = 0.0;
+    double metal_stoich = 0.0;
+    double nonmetal_stoich = 0.0;
+    double S_config_metal = 0.0;
+    double S_config_nonmetal = 0.0;
+    // check if site is metal or non-metal, need to do it in two passes since we need to know the stoichiometry first
+    for (uint i = 0; i < xstr_pocc.species.size(); i++) {
+      double stoich = xstr_pocc.stoich_each_type.at(i);
+      xelement::xelement element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr_pocc.species[i]));
+      string series = element.getPropertyString("series"); // Nonmetal, Metalloid, etc
+      if (series == "Nonmetal" or series == "Chalcogen" or series == "Halogen") {
+        nonmetal_stoich += stoich;
+      }
+      else {
+        metal_stoich += stoich;
+      }
+    }
+    if (LDEBUG) {
+      cerr << __AFLOW_FUNC__ << " metal_stoich=" << metal_stoich << endl;
+      cerr << __AFLOW_FUNC__ << " nonmetal_stoich=" << nonmetal_stoich << endl;
+    }
+
+    for (uint i = 0; i < xstr_pocc.species.size(); i++) {
+      double stoich = xstr_pocc.stoich_each_type.at(i);
+      if (stoich == 0.0) continue; // avoid log 0
+
+      xelement::xelement element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr_pocc.species[i]));
+      string series = element.getPropertyString("series"); // Nonmetal, Metalloid, etc
+      if (series == "Nonmetal" or series == "Chalcogen" or series == "Halogen") {
+        S_config_nonmetal += stoich * aurostd::ln(stoich/nonmetal_stoich);
+      }
+      else {
+        S_config_metal += stoich * aurostd::ln(stoich/metal_stoich);
+      }
+    }
+    m_S_config_partial_atom = S_config_metal + S_config_nonmetal;
+    m_S_config_partial_atom *= -1.0;
+    m_k2 = AUROSTD_MAX_DOUBLE;
+    if (m_S_config_partial_atom > _AFLOW_POCC_ZERO_TOL_) {m_k2 = m_S_config_atom / m_S_config_partial_atom;}  //CO20261015 - no division by 0
+    // sanity check, should be less than 1
+    if (m_k2 != AUROSTD_MAX_DOUBLE && m_k2 > 1.0) {
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "m_S_config_atom / m_S_config_partial_atom > 1.0, check structure", m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+      m_kcr1 = AUROSTD_MAX_DOUBLE;
+      m_k2 = AUROSTD_MAX_DOUBLE;
+    }
+    // ST20250530 END
+
+    //notes about the entropy metric here: DOI:10.1016/j.scriptamat.2021.113974
+    //the entropy metric is defined wrt sublattices (i.e., distinct Wyckoff positions)
+    //however, it does not consider that for perovskite, oxygen occupies two distinct sublattices, see here: https://aflow.org/prototype-encyclopedia/AB3C_oP20_62_c_cd_a-001/
+    //in the paper, it treats O as sitting on one aggregate "anion"-sublattice
+    //therefore, we also create m_S_config_species
+    //perovskite is a ternary compound, so we recover back the values presented in DOI:10.1016/j.scriptamat.2021.113974
+
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " m_S_config_cell=" << m_S_config_cell << endl;
+      cerr << __AFLOW_FUNC__ << " m_S_config_atom=" << m_S_config_atom << endl;
+      cerr << __AFLOW_FUNC__ << " m_S_config_sublattice=" << m_S_config_sublattice << endl;
+      cerr << __AFLOW_FUNC__ << " m_S_config_species=" << m_S_config_species << endl;
+      cerr << __AFLOW_FUNC__ << " m_S_config_partial_atom=" << m_S_config_partial_atom << endl;
+      cerr << __AFLOW_FUNC__ << " m_k2=" << m_k2 << endl;
+    }
+
+    //get per reduced formula unit
+    xvector<uint> natoms_sublattice(xstr_sym.iatoms.size());
+    for(isite=0;isite<xstr_sym.iatoms.size();isite++){natoms_sublattice[isite+natoms_sublattice.lrows]=xstr_sym.iatoms[isite].size();}
+    xvector<uint> natoms_sublattice_gcd=natoms_sublattice;
+    aurostd::reduceByGCD(natoms_sublattice,natoms_sublattice_gcd);
+    if(LDEBUG){
+      cerr << "natoms_sublattice=" << aurostd::joinWDelimiter(natoms_sublattice,",") << endl;
+      cerr << "natoms_sublattice_gcd=" << aurostd::joinWDelimiter(natoms_sublattice_gcd,",") << endl;
+    }
+
+    m_S_config_rfu=m_S_config_atom*(double)aurostd::sum(natoms_sublattice_gcd);
+    
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_S_config_rfu=" << m_S_config_rfu << endl;}
+  }
+
+  void POccCalculator::setHmixMiedema() {
+    m_Hmix_miedema = xbinary::get_total_hmix_regular_solution(xstr_pocc);
+  }
+  
+  void POccCalculator::setDeltaProperties(){  //CO20250321
+    bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+    
+    m_nsublattices_disordered=0;
+    
+    //CO20250510 - the m_delta_XX_sublattice properties are calculated per disordered sublattice/site
+    //eventually we will add m_delta_XX_bond as calculated between, e.g., M-O
+    m_delta_electronegativity_Pauling_sublattice.clear();
+    m_delta_electronegativity_Pearson_sublattice.clear();
+    m_delta_electronegativity_Ghosh_sublattice.clear();
+    m_delta_electronegativity_Allen_sublattice.clear();
+    
+    m_delta_radius_Saxena_sublattice.clear();
+    //
+    m_param_geo_radius_Saxena_cell.clear();
+    m_param_geo_radius_Saxena_atom.clear();
+    m_param_geo_radius_Saxena_rfu.clear();
+    m_param_geo_radius_Saxena_sublattice.clear();
+    m_param_geo_radius_Saxena_species.clear();
+    
+    m_delta_radius_PT_sublattice.clear();
+    //
+    //
+    m_param_geo_radius_PT_cell.clear();
+    m_param_geo_radius_PT_atom.clear();
+    m_param_geo_radius_PT_rfu.clear();
+    m_param_geo_radius_PT_sublattice.clear();
+    m_param_geo_radius_PT_species.clear();
+
+    m_delta_radius_covalent_PT_sublattice.clear();
+    //
+    //
+    m_param_geo_radius_covalent_PT_cell.clear();
+    m_param_geo_radius_covalent_PT_atom.clear();
+    m_param_geo_radius_covalent_PT_rfu.clear();
+    m_param_geo_radius_covalent_PT_sublattice.clear();
+    m_param_geo_radius_covalent_PT_species.clear();
+    
+    m_delta_radius_covalent_sublattice.clear();
+    //
+    //
+    m_param_geo_radius_covalent_cell.clear();
+    m_param_geo_radius_covalent_atom.clear();
+    m_param_geo_radius_covalent_rfu.clear();
+    m_param_geo_radius_covalent_sublattice.clear();
+    m_param_geo_radius_covalent_species.clear();
+    
+    m_delta_radius_VanDerWaals_PT_sublattice.clear();
+    //
+    //
+    m_param_geo_radius_VanDerWaals_PT_cell.clear();
+    m_param_geo_radius_VanDerWaals_PT_atom.clear();
+    m_param_geo_radius_VanDerWaals_PT_rfu.clear();
+    m_param_geo_radius_VanDerWaals_PT_sublattice.clear();
+    m_param_geo_radius_VanDerWaals_PT_species.clear();
+    
+    m_delta_radii_Ghosh08_sublattice.clear();
+    //
+    //
+    m_param_geo_radii_Ghosh08_cell.clear();
+    m_param_geo_radii_Ghosh08_atom.clear();
+    m_param_geo_radii_Ghosh08_rfu.clear();
+    m_param_geo_radii_Ghosh08_sublattice.clear();
+    m_param_geo_radii_Ghosh08_species.clear();
+    
+    m_delta_radii_Slatter_sublattice.clear();
+    //
+    //
+    m_param_geo_radii_Slatter_cell.clear();
+    m_param_geo_radii_Slatter_atom.clear();
+    m_param_geo_radii_Slatter_rfu.clear();
+    m_param_geo_radii_Slatter_sublattice.clear();
+    m_param_geo_radii_Slatter_species.clear();
+    
+    m_delta_radii_Pyykko_sublattice.clear();
+    //
+    //
+    m_param_geo_radii_Pyykko_cell.clear();
+    m_param_geo_radii_Pyykko_atom.clear();
+    m_param_geo_radii_Pyykko_rfu.clear();
+    m_param_geo_radii_Pyykko_sublattice.clear();
+    m_param_geo_radii_Pyykko_species.clear();
+    //
+
+    bool calc_delta=true;
+    //
+    bool calc_delta_electronegativity_Pauling_sublattice=true;
+    bool calc_delta_electronegativity_Pearson_sublattice=true;
+    bool calc_delta_electronegativity_Ghosh_sublattice=true;
+    bool calc_delta_electronegativity_Allen_sublattice=true;
+    //
+    bool calc_delta_radius_Saxena_sublattice=true;
+    bool calc_delta_radius_PT_sublattice=true;
+    bool calc_delta_radius_covalent_PT_sublattice=true;
+    bool calc_delta_radius_covalent_sublattice=true;
+    bool calc_delta_radius_VanDerWaals_PT_sublattice=true;
+    bool calc_delta_radii_Ghosh08_sublattice=true;
+    bool calc_delta_radii_Slatter_sublattice=true;
+    bool calc_delta_radii_Pyykko_sublattice=true;
+    
+    uint isite=0,iocc=0;
+
+    //get per reduced formula unit
+    xvector<uint> natoms_sublattice(xstr_sym.iatoms.size());
+    for(isite=0;isite<xstr_sym.iatoms.size();isite++){natoms_sublattice[isite+natoms_sublattice.lrows]=xstr_sym.iatoms[isite].size();}
+    xvector<uint> natoms_sublattice_gcd=natoms_sublattice;
+    aurostd::reduceByGCD(natoms_sublattice,natoms_sublattice_gcd);
+    if(LDEBUG){
+      cerr << "natoms_sublattice=" << aurostd::joinWDelimiter(natoms_sublattice,",") << endl;
+      cerr << "natoms_sublattice_gcd=" << aurostd::joinWDelimiter(natoms_sublattice_gcd,",") << endl;
+    }
+    
+    double avg=0.0;
+    xelement::xelement element;
+
+    for(isite=0;isite<m_pocc_sites.size()&&calc_delta;isite++){
+      if(m_pocc_sites[isite].partial_occupation_flag){
+        m_nsublattices_disordered+=1;
+        // ST20250604 START remember names of the disordered sites
+        stringstream sitenamess;
+        for (uint _iocc=0; _iocc<m_pocc_sites[isite].v_occupants.size(); _iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[_iocc]].cleanname;
+          double occ_prob=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[_iocc]].partial_occupation_value;
+          // format: element*probability,
+          sitenamess << occ << "*" << occ_prob;
+          if (_iocc != m_pocc_sites[isite].v_occupants.size()-1) sitenamess << ","; // comma unless last item
+        }
+        m_nsublattices_disordered_names.push_back(sitenamess.str());
+        // ST20250604 END
+        //START - m_delta_electronegativity_Pauling_sublattice
+        m_delta_electronegativity_Pauling_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Pauling_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Pauling==NNN){calc_delta_electronegativity_Pauling_sublattice=false;}
+          avg+= c * element.electronegativity_Pauling;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Pauling_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Pauling==NNN){calc_delta_electronegativity_Pauling_sublattice=false;}
+          m_delta_electronegativity_Pauling_sublattice.back()+= c * std::pow((element.electronegativity_Pauling-avg),2.0);
+        }
+        m_delta_electronegativity_Pauling_sublattice.back()=std::pow(m_delta_electronegativity_Pauling_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << "m_delta_electronegativity_Pauling_sublattice.back()=" << m_delta_electronegativity_Pauling_sublattice.back() << endl;}
+        //STOP - m_delta_electronegativity_Pauling_sublattice
+        //START - m_delta_electronegativity_Pearson_sublattice
+        m_delta_electronegativity_Pearson_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Pearson_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Pearson==NNN){calc_delta_electronegativity_Pearson_sublattice=false;}
+          avg+= c * element.electronegativity_Pearson;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Pearson_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Pearson==NNN){calc_delta_electronegativity_Pearson_sublattice=false;}
+          m_delta_electronegativity_Pearson_sublattice.back()+= c * std::pow((element.electronegativity_Pearson-avg),2.0);
+        }
+        m_delta_electronegativity_Pearson_sublattice.back()=std::pow(m_delta_electronegativity_Pearson_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_electronegativity_Pearson_sublattice.back()=" << m_delta_electronegativity_Pearson_sublattice.back() << endl;}
+        //STOP - m_delta_electronegativity_Pearson_sublattice
+        //START - m_delta_electronegativity_Ghosh_sublattice
+        m_delta_electronegativity_Ghosh_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Ghosh_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Ghosh==NNN){calc_delta_electronegativity_Ghosh_sublattice=false;}
+          avg+= c * element.electronegativity_Ghosh;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Ghosh_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Ghosh==NNN){calc_delta_electronegativity_Ghosh_sublattice=false;}
+          m_delta_electronegativity_Ghosh_sublattice.back()+= c * std::pow((element.electronegativity_Ghosh-avg),2.0);
+        }
+        m_delta_electronegativity_Ghosh_sublattice.back()=std::pow(m_delta_electronegativity_Ghosh_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_electronegativity_Ghosh_sublattice.back()=" << m_delta_electronegativity_Ghosh_sublattice.back() << endl;}
+        //STOP - m_delta_electronegativity_Ghosh_sublattice
+        //START - m_delta_electronegativity_Allen_sublattice
+        m_delta_electronegativity_Allen_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Allen_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Allen==NNN){calc_delta_electronegativity_Allen_sublattice=false;}
+          avg+= c * element.electronegativity_Allen;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_electronegativity_Allen_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.electronegativity_Allen==NNN){calc_delta_electronegativity_Allen_sublattice=false;}
+          m_delta_electronegativity_Allen_sublattice.back()+= c * std::pow((element.electronegativity_Allen-avg),2.0);
+        }
+        m_delta_electronegativity_Allen_sublattice.back()=std::pow(m_delta_electronegativity_Allen_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_electronegativity_Allen_sublattice.back()=" << m_delta_electronegativity_Allen_sublattice.back() << endl;}
+        //STOP - m_delta_electronegativity_Allen_sublattice
+        //START - m_delta_radius_Saxena_sublattice
+        m_delta_radius_Saxena_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_Saxena_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_Saxena==NNN){calc_delta_radius_Saxena_sublattice=false;}
+          avg+= c * element.radius_Saxena;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_Saxena_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_Saxena==NNN){calc_delta_radius_Saxena_sublattice=false;}
+          m_delta_radius_Saxena_sublattice.back()+= c * std::pow((1-element.radius_Saxena/avg),2.0);
+        }
+        m_delta_radius_Saxena_sublattice.back()=100.0 * std::pow(m_delta_radius_Saxena_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radius_Saxena_sublattice.back()=" << m_delta_radius_Saxena_sublattice.back() << endl;}
+        //STOP - m_delta_radius_Saxena_sublattice
+        //START - m_delta_radius_PT_sublattice
+        m_delta_radius_PT_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_PT==NNN){calc_delta_radius_PT_sublattice=false;}
+          avg+= c * element.radius_PT;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_PT==NNN){calc_delta_radius_PT_sublattice=false;}
+          m_delta_radius_PT_sublattice.back()+= c * std::pow((1-element.radius_PT/avg),2.0);
+        }
+        m_delta_radius_PT_sublattice.back()=100.0 * std::pow(m_delta_radius_PT_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radius_PT_sublattice.back()=" << m_delta_radius_PT_sublattice.back() << endl;}
+        //STOP - m_delta_radius_PT_sublattice
+        //START - m_delta_radius_covalent_PT_sublattice
+        m_delta_radius_covalent_PT_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_covalent_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_covalent_PT==NNN){calc_delta_radius_covalent_PT_sublattice=false;}
+          avg+= c * element.radius_covalent_PT;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_covalent_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_covalent_PT==NNN){calc_delta_radius_covalent_PT_sublattice=false;}
+          m_delta_radius_covalent_PT_sublattice.back()+= c * std::pow((1-element.radius_covalent_PT/avg),2.0);
+        }
+        m_delta_radius_covalent_PT_sublattice.back()=100.0 * std::pow(m_delta_radius_covalent_PT_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radius_covalent_PT_sublattice.back()=" << m_delta_radius_covalent_PT_sublattice.back() << endl;}
+        //STOP - m_delta_radius_covalent_PT_sublattice
+        //START - m_delta_radius_covalent_sublattice
+        m_delta_radius_covalent_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_covalent_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_covalent==NNN){calc_delta_radius_covalent_sublattice=false;}
+          avg+= c * element.radius_covalent;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_covalent_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_covalent==NNN){calc_delta_radius_covalent_sublattice=false;}
+          m_delta_radius_covalent_sublattice.back()+= c * std::pow((1-element.radius_covalent/avg),2.0);
+        }
+        m_delta_radius_covalent_sublattice.back()=100.0 * std::pow(m_delta_radius_covalent_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radius_covalent_sublattice.back()=" << m_delta_radius_covalent_sublattice.back() << endl;}
+        //STOP - m_delta_radius_covalent_sublattice
+        //START - m_delta_radius_VanDerWaals_PT_sublattice
+        m_delta_radius_VanDerWaals_PT_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_VanDerWaals_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_VanDerWaals_PT==NNN){calc_delta_radius_VanDerWaals_PT_sublattice=false;}
+          avg+= c * element.radius_VanDerWaals_PT;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radius_VanDerWaals_PT_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radius_VanDerWaals_PT==NNN){calc_delta_radius_VanDerWaals_PT_sublattice=false;}
+          m_delta_radius_VanDerWaals_PT_sublattice.back()+= c * std::pow((1-element.radius_VanDerWaals_PT/avg),2.0);
+        }
+        m_delta_radius_VanDerWaals_PT_sublattice.back()=100.0 * std::pow(m_delta_radius_VanDerWaals_PT_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radius_VanDerWaals_PT_sublattice.back()=" << m_delta_radius_VanDerWaals_PT_sublattice.back() << endl;}
+        //STOP - m_delta_radius_VanDerWaals_PT_sublattice
+        //START - m_delta_radii_Ghosh08_sublattice
+        m_delta_radii_Ghosh08_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Ghosh08_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Ghosh08==NNN){calc_delta_radii_Ghosh08_sublattice=false;}
+          avg+= c * element.radii_Ghosh08;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Ghosh08_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Ghosh08==NNN){calc_delta_radii_Ghosh08_sublattice=false;}
+          m_delta_radii_Ghosh08_sublattice.back()+= c * std::pow((1-element.radii_Ghosh08/avg),2.0);
+        }
+        m_delta_radii_Ghosh08_sublattice.back()=100.0 * std::pow(m_delta_radii_Ghosh08_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radii_Ghosh08_sublattice.back()=" << m_delta_radii_Ghosh08_sublattice.back() << endl;}
+        //STOP - m_delta_radii_Ghosh08_sublattice
+        //START - m_delta_radii_Slatter_sublattice
+        m_delta_radii_Slatter_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Slatter_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Slatter==NNN){calc_delta_radii_Slatter_sublattice=false;}
+          avg+= c * element.radii_Slatter;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Slatter_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Slatter==NNN){calc_delta_radii_Slatter_sublattice=false;}
+          m_delta_radii_Slatter_sublattice.back()+= c * std::pow((1-element.radii_Slatter/avg),2.0);
+        }
+        m_delta_radii_Slatter_sublattice.back()=100.0 * std::pow(m_delta_radii_Slatter_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radii_Slatter_sublattice.back()=" << m_delta_radii_Slatter_sublattice.back() << endl;}
+        //STOP - m_delta_radii_Slatter_sublattice
+        //START - m_delta_radii_Pyykko_sublattice
+        m_delta_radii_Pyykko_sublattice.push_back(0.0);
+        avg=0.0;
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Pyykko_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Pyykko==NNN){calc_delta_radii_Pyykko_sublattice=false;}
+          avg+= c * element.radii_Pyykko;
+        }
+        for(iocc=0;iocc<m_pocc_sites[isite].v_occupants.size()&&calc_delta&&calc_delta_radii_Pyykko_sublattice;iocc++){
+          const string& occ=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].cleanname;
+          const double c=xstr_pocc.atoms[m_pocc_sites[isite].v_occupants[iocc]].partial_occupation_value;
+          if(xelement::xelement::isElement(occ)==0){calc_delta=false;break;}
+          element.populate(occ);
+          if(element.radii_Pyykko==NNN){calc_delta_radii_Pyykko_sublattice=false;}
+          m_delta_radii_Pyykko_sublattice.back()+= c * std::pow((1-element.radii_Pyykko/avg),2.0);
+        }
+        m_delta_radii_Pyykko_sublattice.back()=100.0 * std::pow(m_delta_radii_Pyykko_sublattice.back(),0.5);
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_delta_radii_Pyykko_sublattice.back()=" << m_delta_radii_Pyykko_sublattice.back() << endl;}
+        //STOP - m_delta_radii_Pyykko_sublattice
+      }
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radius_Saxena_sublattice.size();i++){
+      m_param_geo_radius_Saxena_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radius_Saxena_sublattice[i]));  //CO20261015
+      m_param_geo_radius_Saxena_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radius_Saxena_sublattice[i]));  //CO20261015
+      m_param_geo_radius_Saxena_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radius_Saxena_sublattice[i]));  //CO20261015
+      m_param_geo_radius_Saxena_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radius_Saxena_sublattice[i]));  //CO20261015
+      m_param_geo_radius_Saxena_species.push_back(getParamGeo(m_S_config_species,m_delta_radius_Saxena_sublattice[i]));  //CO20261015
+    }
+
+    //
+    for(uint i=0;i<m_delta_radius_PT_sublattice.size();i++){
+      m_param_geo_radius_PT_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radius_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_PT_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radius_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_PT_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radius_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_PT_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radius_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_PT_species.push_back(getParamGeo(m_S_config_species,m_delta_radius_PT_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radius_covalent_PT_sublattice.size();i++){
+      m_param_geo_radius_covalent_PT_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radius_covalent_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_PT_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radius_covalent_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_PT_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radius_covalent_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_PT_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radius_covalent_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_PT_species.push_back(getParamGeo(m_S_config_species,m_delta_radius_covalent_PT_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radius_covalent_sublattice.size();i++){
+      m_param_geo_radius_covalent_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radius_covalent_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radius_covalent_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radius_covalent_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radius_covalent_sublattice[i]));  //CO20261015
+      m_param_geo_radius_covalent_species.push_back(getParamGeo(m_S_config_species,m_delta_radius_covalent_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radius_VanDerWaals_PT_sublattice.size();i++){
+      m_param_geo_radius_VanDerWaals_PT_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radius_VanDerWaals_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_VanDerWaals_PT_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radius_VanDerWaals_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_VanDerWaals_PT_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radius_VanDerWaals_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_VanDerWaals_PT_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radius_VanDerWaals_PT_sublattice[i]));  //CO20261015
+      m_param_geo_radius_VanDerWaals_PT_species.push_back(getParamGeo(m_S_config_species,m_delta_radius_VanDerWaals_PT_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radii_Ghosh08_sublattice.size();i++){
+      m_param_geo_radii_Ghosh08_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radii_Ghosh08_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Ghosh08_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radii_Ghosh08_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Ghosh08_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radii_Ghosh08_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Ghosh08_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radii_Ghosh08_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Ghosh08_species.push_back(getParamGeo(m_S_config_species,m_delta_radii_Ghosh08_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radii_Slatter_sublattice.size();i++){
+      m_param_geo_radii_Slatter_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radii_Slatter_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Slatter_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radii_Slatter_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Slatter_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radii_Slatter_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Slatter_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radii_Slatter_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Slatter_species.push_back(getParamGeo(m_S_config_species,m_delta_radii_Slatter_sublattice[i]));  //CO20261015
+    }
+    
+    //
+    for(uint i=0;i<m_delta_radii_Pyykko_sublattice.size();i++){
+      m_param_geo_radii_Pyykko_cell.push_back(getParamGeo(m_S_config_cell,m_delta_radii_Pyykko_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Pyykko_atom.push_back(getParamGeo(m_S_config_atom,m_delta_radii_Pyykko_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Pyykko_rfu.push_back(getParamGeo(m_S_config_rfu,m_delta_radii_Pyykko_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Pyykko_sublattice.push_back(getParamGeo(m_S_config_sublattice,m_delta_radii_Pyykko_sublattice[i]));  //CO20261015
+      m_param_geo_radii_Pyykko_species.push_back(getParamGeo(m_S_config_species,m_delta_radii_Pyykko_sublattice[i]));  //CO20261015
+    }
+
+    //clear if not available
+    if(!calc_delta || !calc_delta_electronegativity_Pauling_sublattice){m_delta_electronegativity_Pauling_sublattice.clear();}
+    if(!calc_delta || !calc_delta_electronegativity_Pearson_sublattice){m_delta_electronegativity_Pearson_sublattice.clear();}
+    if(!calc_delta || !calc_delta_electronegativity_Ghosh_sublattice){m_delta_electronegativity_Ghosh_sublattice.clear();}
+    if(!calc_delta || !calc_delta_electronegativity_Allen_sublattice){m_delta_electronegativity_Allen_sublattice.clear();}
+    //
+    if(!calc_delta || !calc_delta_radius_Saxena_sublattice){
+      m_delta_radius_Saxena_sublattice.clear();
+      //
+      //
+      m_param_geo_radius_Saxena_cell.clear();
+      m_param_geo_radius_Saxena_atom.clear();
+      m_param_geo_radius_Saxena_rfu.clear();
+      m_param_geo_radius_Saxena_sublattice.clear();
+      m_param_geo_radius_Saxena_species.clear();
+    }
+
+    if(!calc_delta || !calc_delta_radius_PT_sublattice){
+      m_delta_radius_PT_sublattice.clear();
+      //
+      //
+      m_param_geo_radius_PT_cell.clear();
+      m_param_geo_radius_PT_atom.clear();
+      m_param_geo_radius_PT_rfu.clear();
+      m_param_geo_radius_PT_sublattice.clear();
+      m_param_geo_radius_PT_species.clear();
+    }
+
+    if(!calc_delta || !calc_delta_radius_covalent_PT_sublattice){
+      m_delta_radius_covalent_PT_sublattice.clear();
+      //
+      //
+      m_param_geo_radius_covalent_PT_cell.clear();
+      m_param_geo_radius_covalent_PT_atom.clear();
+      m_param_geo_radius_covalent_PT_rfu.clear();
+      m_param_geo_radius_covalent_PT_sublattice.clear();
+      m_param_geo_radius_covalent_PT_species.clear();
+    }
+
+    if(!calc_delta || !calc_delta_radius_covalent_sublattice){
+      m_delta_radius_covalent_sublattice.clear();
+      //
+      //
+      m_param_geo_radius_covalent_cell.clear();
+      m_param_geo_radius_covalent_atom.clear();
+      m_param_geo_radius_covalent_rfu.clear();
+      m_param_geo_radius_covalent_sublattice.clear();
+      m_param_geo_radius_covalent_species.clear();
+    }
+
+    if(!calc_delta || !calc_delta_radius_VanDerWaals_PT_sublattice){
+      m_delta_radius_VanDerWaals_PT_sublattice.clear();
+      //
+      //
+      m_param_geo_radius_VanDerWaals_PT_cell.clear();
+      m_param_geo_radius_VanDerWaals_PT_atom.clear();
+      m_param_geo_radius_VanDerWaals_PT_rfu.clear();
+      m_param_geo_radius_VanDerWaals_PT_sublattice.clear();
+      m_param_geo_radius_VanDerWaals_PT_species.clear();
+    }
+      
+    if(!calc_delta || !calc_delta_radii_Ghosh08_sublattice){
+      m_delta_radii_Ghosh08_sublattice.clear();
+      //
+      //
+      m_param_geo_radii_Ghosh08_cell.clear();
+      m_param_geo_radii_Ghosh08_atom.clear();
+      m_param_geo_radii_Ghosh08_rfu.clear();
+      m_param_geo_radii_Ghosh08_sublattice.clear();
+      m_param_geo_radii_Ghosh08_species.clear();
+    }
+
+    if(!calc_delta || !calc_delta_radii_Slatter_sublattice){
+      m_delta_radii_Slatter_sublattice.clear();
+      //
+      //
+      m_param_geo_radii_Slatter_cell.clear();
+      m_param_geo_radii_Slatter_atom.clear();
+      m_param_geo_radii_Slatter_rfu.clear();
+      m_param_geo_radii_Slatter_sublattice.clear();
+      m_param_geo_radii_Slatter_species.clear();
+    }
+      
+    if(!calc_delta || !calc_delta_radii_Pyykko_sublattice){
+      m_delta_radii_Pyykko_sublattice.clear();
+      //
+      //
+      m_param_geo_radii_Pyykko_cell.clear();
+      m_param_geo_radii_Pyykko_atom.clear();
+      m_param_geo_radii_Pyykko_rfu.clear();
+      m_param_geo_radii_Pyykko_sublattice.clear();
+      m_param_geo_radii_Pyykko_species.clear();
+    }
+  }
+
+  void POccCalculator::setSolubilityParameter(double temperature) {
+    // ST20250528 START
+    // From: DOI: 10.1002/adma.201702712
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    if (LDEBUG) {
+      // show xstr_pocc.atoms and xstr_pocc.stoich_each_type
+      cerr << __AFLOW_FUNC__ << " xstr_pocc.species.size() = " << xstr_pocc.species.size() << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_pocc.stoich_each_type.size() = " << xstr_pocc.stoich_each_type.size() << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_pocc.species:";
+      for (const string &atom : xstr_pocc.species) {
+        cerr << " " << atom;
+      }
+      cerr << endl;
+      cerr << __AFLOW_FUNC__ << " xstr_pocc.stoich_each_type:";
+      for (const double &stoich : xstr_pocc.stoich_each_type) {
+        cerr << " " << stoich;
+      }
+      cerr << endl;
+    }
+
+    // Calculate G
+
+    double avg_shear_modulus = 0.0;
+    double accounted_for_proportion = 0.0;
+    for (uint i = 0; i < xstr_pocc.species.size(); i++) {
+      // const _atom &atom = xstr_pocc.atoms[i];
+      xelement::xelement element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr_pocc.species.at(i)));
+      // shear_moduli.push_back(element.getPropertyDouble("modulus_shear"));
+      double element_shear_modulus = element.getPropertyDouble("modulus_shear");
+      if (element_shear_modulus == NNN) { // but the metals should have shear modulus
+        continue;
+      }
+      avg_shear_modulus += xstr_pocc.stoich_each_type[i] * element_shear_modulus;
+      accounted_for_proportion += xstr_pocc.stoich_each_type[i];
+    }
+    avg_shear_modulus /= accounted_for_proportion;
+    if (LDEBUG) {cerr << __AFLOW_FUNC__ << " avg_shear_modulus = (GPa) " << avg_shear_modulus << endl;}
+
+
+    // Get R*
+    // R* of each representative: the edge of the cube with its volume per atom
+    // (setRStar(), computed once; the probabilities change with temperature, R* does not) //CO20261004
+    if(m_vr_star.size()!=l_supercell_sets.size()){setRStar();}
+    m_solubility_parameter=AUROSTD_MAX_DOUBLE;
+    if(m_vr_star.size()!=l_supercell_sets.size()){return;}
+    // representatives without a relaxed structure (setRStar() said which) are left out and the probabilities
+    // renormalized over the rest //CO20261005
+    vector<double> v_prob, v_r_star;
+    double sum_prob=0.0;
+    uint isupercell=0;
+    for (POccSuperCellSet &pscs : l_supercell_sets) {
+      if (m_vr_star[isupercell] != AUROSTD_MAX_DOUBLE) {
+        v_r_star.push_back(m_vr_star[isupercell]);
+        v_prob.push_back(pscs.m_probability);
+        sum_prob += pscs.m_probability;
+      }
+      isupercell++;
+    }
+    if (v_r_star.size() == 0 || !(sum_prob > 0.0)) {return;}  // nothing mapped, or only representatives of zero weight at this temperature
+    for (double &prob : v_prob) {prob /= sum_prob;}
+    if (LDEBUG) {
+      for (uint i = 0; i < v_r_star.size(); i++) {
+        cerr << __AFLOW_FUNC__ << " Structure " << i+1 << ", R*=" << v_r_star[i] << ", prob=" << v_prob[i] << endl;
+      }
+    }
+    double avg_r_star = 0.0;
+    for (uint i = 0; i < v_r_star.size(); i++) {
+      avg_r_star += v_r_star[i] * v_prob[i];
+    }
+    if (LDEBUG) {
+      cerr << __AFLOW_FUNC__ << " Average R* = " << avg_r_star << endl;
+    }
+
+    // Get Delta R*
+    // The paper defines Delta R* for binary systems; for any number of components we take the spread of R* over the
+    // representatives, weighted by their probabilities (it enters squared in the original equation: the variance)
+    double var_r_star = 0.0;
+    for (uint i = 0; i < v_r_star.size(); i++) {
+      var_r_star += v_prob[i] * aurostd::pow(v_r_star[i] - avg_r_star, 2.0);
+    }
+
+    // no division by Z, the number of atoms in the primitive structure: R*^3 is already the volume per atom
+    // (setRStar()), which is the volume per PARTCAR cell over Z without vacancies //CO20261005
+    m_solubility_parameter = avg_shear_modulus * avg_r_star * var_r_star; // GPa * A^3
+    if (LDEBUG) {
+      cerr << __AFLOW_FUNC__ << " Var R* = " << var_r_star << endl;
+    }
+    stringstream message;
+    message << "Solubility parameter @" << temperature <<  "K = " << m_solubility_parameter << " (GPa * A^3)";
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE,*p_oss, _LOGGER_MESSAGE_);
+    // ST20250528 END
+  }
+
+  //R* of every representative, for setSolubilityParameter() //CO20261004
+  //The edge of the cube with each representative's volume per atom (RStarPerAtom(); Shao-Yu Tseng), from its
+  //relaxed structure (the last CONTCAR.relax) alone //CO20261005
+  //The volume per atom needs no parent cell, so every representative with a relaxed structure counts. One without keeps
+  //AUROSTD_MAX_DOUBLE and is left out of the solubility parameter, whose probabilities are renormalized over the
+  //others; returns false when none has one. R* is computed once, not again at each temperature.
+  //Before: the HNF was taken as (first POSCAR of the ARUN aflow.in lattice) x inverse(PARTCAR lattice), and its
+  //inverse applied to KBIN::GetMostRelaxedStructure(); for runs whose aflow.in POSCAR is not the HNF supercell in
+  //the PARTCAR's basis (CONVERT_UNIT_CELL=SPRIM, rescaled volume) that product is not an integer matrix and the
+  //"primitive" cell it gives is not the PARTCAR cell (on 18 runs checked, solubility parameters 3 to 10^7 times too large).
+  bool POccCalculator::setRStar() {
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+    stringstream message;
+    m_vr_star.assign(l_supercell_sets.size(),AUROSTD_MAX_DOUBLE);
+    if(m_ARUN_directories.size()==0 || m_ARUN_directories.size()!=l_supercell_sets.size()){
+      message << "Supercell directories do not match the supercell sets, no R* (solubility parameter)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+      return false;
+    }
+    //last relaxation
+    if(m_relaxation_max==AUROSTD_MAX_UINT){
+      for(uint i=1;i<=10;i++){
+        if(aurostd::EFileExist(getARUNDirectoryPath(0)+"/OUTCAR.relax"+aurostd::utype2string(i))){m_relaxation_max=i;}
+        else{break;}
+      }
+    }
+    vector<string> vspecies;
+    string POSCAR_file="";
+    xstructure xstr;
+    uint nfound=0;
+    for(unsigned long long int isupercell=0;isupercell<l_supercell_sets.size();isupercell++){
+      bool found=aurostd::EFileExist(getARUNDirectoryPath(isupercell)+"/CONTCAR.relax",POSCAR_file);
+      if(found==false && m_relaxation_max!=AUROSTD_MAX_UINT){found=aurostd::EFileExist(getARUNDirectoryPath(isupercell)+"/CONTCAR.relax"+aurostd::utype2string(m_relaxation_max),POSCAR_file);}
+      if(found==false){
+        message << "Relaxed structure (CONTCAR.relax) not found in " << m_ARUN_directories[isupercell] << ", left out of R* (solubility parameter)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+        continue;
+      }
+      try{
+        if(aflowlib::GetSpeciesDirectory(getARUNDirectoryPath(isupercell),vspecies)==0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot extract vspecies from "+m_ARUN_directories[isupercell],_FILE_CORRUPT_);}
+        readRepresentativeStructure(POSCAR_file,vspecies,xstr);
+        m_vr_star[isupercell]=RStarPerAtom(xstr);
+      }
+      catch(aurostd::xerror& err){
+        message << "R* of " << m_ARUN_directories[isupercell] << " failed (" << err.what() << "), left out of R* (solubility parameter)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+        continue;
+      }
+      nfound++;
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " " << m_ARUN_directories[isupercell] << ": " << xstr.atoms.size() << " atoms, volume " << xstr.GetVolume() << ", R*=" << m_vr_star[isupercell] << endl;}
+    }
+    if(nfound<l_supercell_sets.size()){
+      message << nfound << " of " << l_supercell_sets.size() << " representatives have a relaxed structure; R* (solubility parameter) is taken over those";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+    }
+    return (nfound>0);
+  }
+
+  void POccCalculator::setThermoParameter(double temperature) {
+    // ST20250530
+    // Generalized version of the k_cr1(T) descriptor https://doi.org/10.1016/j.jallcom.2015.10.279
+    if (m_Hmix_miedema == AUROSTD_MAX_DOUBLE) {
+      m_kcr1 = AUROSTD_MAX_DOUBLE;
+      m_k2 = AUROSTD_MAX_DOUBLE;
+      return;
+    }
+    // k_cr1 = 1 - T dS_mix (1 - k2) / dH_mix for dH_mix < 0, as in the reference. S_config_atom is in units of k_B and
+    // Hmix_miedema in eV/atom, so dS_mix = k_B S_config_atom (KBOLTZEV, eV/K) //CO20261015
+    if (m_k2 == AUROSTD_MAX_DOUBLE || m_S_config_atom == AUROSTD_MAX_DOUBLE || !(aurostd::abs(m_Hmix_miedema) > _AFLOW_POCC_ZERO_TOL_)) {
+      m_kcr1 = AUROSTD_MAX_DOUBLE;
+      return;
+    }
+    m_kcr1 = (temperature * KBOLTZEV * m_S_config_atom) / aurostd::abs(m_Hmix_miedema) * (1 - m_k2) + 1;
+    stringstream message;
+    message << "k_cr1 = " << m_kcr1;
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE,*p_oss, _LOGGER_MESSAGE_);
+
+  }
+
+  void POccCalculator::setOmega() {
+    // ST20250529 START
+    // From: https://doi.org/10.1016/j.matchemphys.2011.11.021
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    // Calculate weighted average melting temperature
+    double avg_melting_temp = 0.0;
+    double accounted_for_proportion = 0.0;
+    for (uint i = 0; i < xstr_pocc.species.size(); i++) {
+      xelement::xelement element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr_pocc.species.at(i)));
+      double element_melting_temp = element.getPropertyDouble("temperature_melting");
+      if (element_melting_temp == NNN) {  // no melting temperature: checked before the conversion //CO20261015
+        continue;
+      }
+      element_melting_temp += 273.15; // convert to K
+      avg_melting_temp += xstr_pocc.stoich_each_type.at(i) * element_melting_temp;
+      accounted_for_proportion += xstr_pocc.stoich_each_type.at(i);
+    }
+    if (!(accounted_for_proportion > 0.0)) {avg_melting_temp = AUROSTD_MAX_DOUBLE;}  //CO20261015 - no element with a melting temperature
+    else {avg_melting_temp /= accounted_for_proportion;}
+
+    if (LDEBUG) {
+      cerr << __AFLOW_FUNC__ << " avg_melting_temp = " << avg_melting_temp << endl;
+      cerr << __AFLOW_FUNC__ << " m_S_config_cell = " << m_S_config_cell
+           << endl;
+      cerr << __AFLOW_FUNC__ << " m_Hmix = " << m_Hmix << endl;
+    }
+    if (m_Hmix_miedema != AUROSTD_MAX_DOUBLE && avg_melting_temp != AUROSTD_MAX_DOUBLE && m_S_config_cell != AUROSTD_MAX_DOUBLE &&
+        xstr_nopocc.atoms.size() > 0 && aurostd::abs(m_Hmix_miedema) > _AFLOW_POCC_ZERO_TOL_) {  //CO20261015 - no division by 0
+      m_Omega = (avg_melting_temp * m_S_config_cell * KBOLTZEV)  / aurostd::abs(m_Hmix_miedema * xstr_nopocc.atoms.size());
+    }
+    else {
+      m_Omega = AUROSTD_MAX_DOUBLE;
+    }
+
+    stringstream message;
+    message << "Omega = " << m_Omega;
+    pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE,*p_oss, _LOGGER_MESSAGE_);
+
+    // ST20250529 END
+  }
+
+  void POccCalculator::setVEC() {
+    // ST20250529 START
+    // Valence electron concentration per atom
+    // DOI: 10.1002/adma.202102904
+
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    // Simply just a weighted sum of valence electrons for each atom type
+    // Value is given per atom
+
+    m_VEC = 0.0;
+    for (uint i = 0; i < xstr_pocc.species.size(); i++) {
+      xelement::xelement element = xelement::xelement(KBIN::VASP_PseudoPotential_CleanName(xstr_pocc.species.at(i)));
+      double element_valence = element.getPropertyDouble("valence_std");
+      if (element_valence == NNN) {
+        continue;
+      }
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " Element: " << xstr_pocc.species.at(i) << ", valence_std=" << element_valence << " stoich=" << xstr_pocc.stoich_each_type[i] << endl;
+      }
+      m_VEC += xstr_pocc.stoich_each_type[i] * element_valence;
+    }
+    stringstream message;
+    message<< "VEC = " << m_VEC;
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+    // ST20250529 END
+  }
+
+  std::map<uint, double> POccCalculator::getAtomDisplacement(const xstructure& xstr_orig, const xstructure& xstr_relaxed) {
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+    // ST20250612 brute force method to get atom displacement
+    std::map<uint, double> atom_disp_map;
+
+    // group all the atoms by type and handle each separately
+    std::map<uint, vector<std::pair<uint,_atom>>> atoms_orig, atoms_relaxed; // key is Z
+
+    for (uint idx=0; idx<xstr_orig.atoms.size(); idx++) {
+      atoms_orig[xstr_orig.atoms.at(idx).type].push_back(std::make_pair(idx, xstr_orig.atoms.at(idx)));
+      atoms_relaxed[xstr_relaxed.atoms.at(idx).type].push_back(std::make_pair(idx, xstr_relaxed.atoms.at(idx)));
+    }
+
+    // Just brute force it by looking at every possible atom of the same type
+    // This should be practical so long as the number of atoms of the same type are small
+    for (std::pair<const unsigned int, std::vector<std::pair<uint,_atom>>> z_atom : atoms_orig) {
+      for(uint i=0; i<atoms_orig.at(z_atom.first).size(); i++){
+        double mindist = AUROSTD_MAX_DOUBLE;
+        uint orig_atom_idx = atoms_orig.at(z_atom.first).at(i).first;
+        const _atom& orig_atom = atoms_orig.at(z_atom.first).at(i).second;
+
+        // inner loop to match every atom of the same type in the relaxed structure
+        for (uint j=0; j<atoms_relaxed.at(z_atom.first).size(); j++) {
+          uint relaxed_atom_idx = atoms_relaxed.at(z_atom.first).at(j).first;
+          const _atom& relaxed_atom = atoms_relaxed.at(z_atom.first).at(j).second;
+          double dist = aurostd::modulus(SYM::minimizeDistanceCartesianMethod(orig_atom.cpos, relaxed_atom.cpos, xstr_orig.lattice));
+          if (LDEBUG) {
+            cerr << __AFLOW_FUNC__ << "orig_atom=" << orig_atom_idx << "(" << orig_atom.cleanname << ") to relaxed_atom="
+                 <<  relaxed_atom_idx << "(" << relaxed_atom.cleanname << "), dist="<< dist << endl;
+          }
+          if (dist < mindist) {
+            mindist = dist;
+          }
+        }
+
+        atom_disp_map[orig_atom_idx] = mindist;
+
+        if (LDEBUG) {
+            cerr << __AFLOW_FUNC__ << "orig_atom=" << orig_atom << ",mindist="<< mindist << endl;
+        }
+      }
+    }
+    return atom_disp_map;
+  }
+
+  void POccCalculator::setMisfitParams() {
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    string arun_directory="";
+    vector<xstructure> xstr_orig_candidates;
+    xstructure xstr_relaxed;
+
+    // misfit info not yet populated, do it
+    for (std::list<POccSuperCellSet>::iterator it = l_supercell_sets.begin(); it != l_supercell_sets.end(); ++it) {
+      uint32_t isupercell = std::distance(l_supercell_sets.begin(), it);
+
+      arun_directory = getARUNDirectoryPath(isupercell);
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " Calculating misfit for supercell " << isupercell+1 << endl;
+      }
+      // note: 1 is the first one
+      // This gets the original structure from the aflow.in
+      // xstructure xstr_orig(arun_directory+"/POSCAR.relax1.xz", IOVASP_AUTO);
+
+      xstr_orig_candidates.clear();;
+      xstr_orig_candidates.push_back(KBIN::GetPOSCARXStructureFromDirectory(arun_directory, IOVASP_POSCAR, 1));
+      xstr_orig_candidates.push_back(xstructure(arun_directory+"/POSCAR.relax1.xz", IOVASP_AUTO));
+      xstr_relaxed = KBIN::GetMostRelaxedStructure(arun_directory);
+
+      // for (const xstructure& xstr_orig : xstr_orig_candidates) {
+      uint i=0;
+      structure_mapping_info misfit_info;
+      for (i=0; i<xstr_orig_candidates.size(); i++) {
+        const xstructure& xstr_orig = xstr_orig_candidates.at(i);
+        if (LDEBUG){
+          cerr << __AFLOW_FUNC__ << " Candidate: " << i << ", structure:\n" << xstr_orig << endl;
+        }
+
+        uint ncpus_default = 1;
+        misfit_info = compare::getTransformationBetweenStructures(xstr_orig, xstr_relaxed, true, true, ncpus_default);
+        // a mapping without a computed misfit (still AUROSTD_MAX_DOUBLE) cannot be averaged //CO20260924
+        if (misfit_info.distances_mapped.size() != 0 && std::isfinite(misfit_info.misfit) && misfit_info.misfit != AUROSTD_MAX_DOUBLE) break;
+      }
+      bool misfit_updated=false;
+      if (i==xstr_orig_candidates.size()) {
+        // failed to find any misfit info
+        misfit_updated=false;
+      }
+      else {
+        // normalize by the matched candidate and skip empty structures (division by zero) //CO20260924
+        const uint natoms = xstr_orig_candidates.at(i).atoms.size();
+        if (natoms > 0) {
+          double rms_distance=0.0;
+          for (double dist : misfit_info.distances_mapped) {
+            rms_distance += aurostd::pow(dist, 2.0);
+          }
+          rms_distance = aurostd::sqrt(rms_distance / natoms);
+          m_vmisfit_info.push_back(misfit_info);
+          m_vlat_distortion_supercells_accounted_for.push_back(isupercell);
+          m_vlat_distortion_misfits.push_back(misfit_info.misfit);
+          m_vlat_distortion_relax_distances.push_back(rms_distance);
+          misfit_updated=true;
+        }
+      }
+
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " Computed misfit info." << endl;
+        cerr << __AFLOW_FUNC__ << " misfit=" << misfit_info.misfit << endl;
+        cerr << __AFLOW_FUNC__ << " misfit_info.distances.size()="  << misfit_info.distances_mapped.size() << endl;
+        if (misfit_updated)
+          cerr << __AFLOW_FUNC__ << compare::printAtomMappings(m_vmisfit_info.back()) << endl;
+      }
+    }
+  }
+
+  void POccCalculator::setLatticeDistortion(double) {
+    // ST20250607 misfit and RMS atom displacement
+    bool LDEBUG = (FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+
+    try {
+      if (m_vmisfit_info.size() == 0 and m_vlat_distortion_relax_distances.size() == 0) {
+        setMisfitParams();
+      }
+      m_vlat_distortion_accounted_for_probs.clear();
+      for (std::list<POccSuperCellSet>::iterator it = l_supercell_sets.begin(); it != l_supercell_sets.end(); ++it) {
+        uint isupercell=std::distance(l_supercell_sets.begin(),it);
+        bool supercell_has_misfit=false;
+        // for(uint is : m_vlat_distortion_supercells_accounted_for) {
+        for(uint i=0; i<m_vlat_distortion_supercells_accounted_for.size(); i++) {
+          if (isupercell == m_vlat_distortion_supercells_accounted_for.at(i)) {
+            supercell_has_misfit = true;
+          }
+        }
+        if (supercell_has_misfit)
+          m_vlat_distortion_accounted_for_probs.push_back(it->m_probability);
+      }
+
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << "m_vmisfit_info.size()=" << m_vmisfit_info.size() << endl;
+        cerr << __AFLOW_FUNC__ << "m_vlat_distortion_accounted_for_probs.size()=" << m_vlat_distortion_accounted_for_probs.size() << endl;
+        cerr << __AFLOW_FUNC__ << "m_vlat_distortion_relax_distances.size()=" <<  m_vlat_distortion_relax_distances.size() << endl;
+        cerr << __AFLOW_FUNC__ << "m_vlat_distortion_misfits.size()=" << m_vlat_distortion_misfits.size() << endl;
+
+      }
+      // Check all the vectors are of the same size
+      if (m_vmisfit_info.size() != m_vlat_distortion_accounted_for_probs.size()) {
+        throw aurostd:: xerror(__AFLOW_FILE__,__AFLOW_FUNC__," unequal sizes of vectors",_RUNTIME_ERROR_);
+      }
+      if (m_vmisfit_info.size() != m_vlat_distortion_relax_distances.size()) {
+        throw aurostd:: xerror(__AFLOW_FILE__,__AFLOW_FUNC__," unequal sizes of vectors",_RUNTIME_ERROR_);
+      }
+      if (m_vmisfit_info.size() != m_vlat_distortion_misfits.size()) {
+        throw aurostd:: xerror(__AFLOW_FILE__,__AFLOW_FUNC__," unequal sizes of vectors",_RUNTIME_ERROR_);
+      }
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " " << m_vmisfit_info.size() << "/" <<  l_supercell_sets.size() << " supercells are accounted for."<< endl;
+      }
+      // Normalize the probabilities so they add to one
+      double sum_prob = 0.0;
+      for (double prob : m_vlat_distortion_accounted_for_probs) {
+        sum_prob += prob;
+      }
+      // at low temperature the weight can sit entirely on supercells without distortion data //CO20260924
+      if (!std::isfinite(sum_prob) || sum_prob <= _AFLOW_POCC_ZERO_TOL_) {
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no weighted supercell has lattice distortion data at this temperature",_RUNTIME_ERROR_);
+      }
+      for (double& prob : m_vlat_distortion_accounted_for_probs) {
+        prob /= sum_prob;
+      }
+      if (LDEBUG){
+        cerr << __AFLOW_FUNC__ << " sum_prob=" << sum_prob << endl;
+      }
+
+      // Get the mean and standard deviation of rms distance
+      m_lat_distortion_relax_distance_mean = 0.0;
+      m_lat_distortion_relax_distance_stdev = 0.0;
+      for (uint i=0; i<m_vlat_distortion_accounted_for_probs.size(); i++){
+        m_lat_distortion_relax_distance_mean += m_vlat_distortion_accounted_for_probs.at(i) * m_vlat_distortion_relax_distances.at(i);
+      }
+      for (uint i=0; i<m_vlat_distortion_accounted_for_probs.size(); i++){
+        m_lat_distortion_relax_distance_stdev += m_vlat_distortion_accounted_for_probs.at(i) * aurostd::pow(m_vlat_distortion_relax_distances.at(i) - m_lat_distortion_relax_distance_mean, 2.0);
+      }
+      m_lat_distortion_relax_distance_stdev = aurostd::sqrt(m_lat_distortion_relax_distance_stdev);
+
+      // Then do the misfits too
+      m_lat_distortion_misfit_mean = 0.0;
+      m_lat_distortion_misfit_stdev = 0.0;
+      for (uint i=0; i<m_vlat_distortion_accounted_for_probs.size(); i++){
+        m_lat_distortion_misfit_mean += m_vlat_distortion_accounted_for_probs.at(i) * m_vlat_distortion_misfits.at(i);
+      }
+      for (uint i=0; i<m_vlat_distortion_accounted_for_probs.size(); i++){
+        m_lat_distortion_misfit_stdev += m_vlat_distortion_accounted_for_probs.at(i) * aurostd::pow(m_vlat_distortion_misfits.at(i) - m_lat_distortion_misfit_mean, 2.0);
+      }
+      m_lat_distortion_misfit_stdev = aurostd::sqrt(m_lat_distortion_misfit_stdev);
+      if (!std::isfinite(m_lat_distortion_misfit_mean) || !std::isfinite(m_lat_distortion_misfit_stdev) ||
+          !std::isfinite(m_lat_distortion_relax_distance_mean) || !std::isfinite(m_lat_distortion_relax_distance_stdev)) { //CO20260924
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"non-finite lattice distortion statistics",_RUNTIME_ERROR_);
+      }
+
+      if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " m_lat_distortion_misfit_stdev=" << m_lat_distortion_misfit_stdev<< endl;
+        cerr << __AFLOW_FUNC__ << " m_lat_distortion_misfit_mean=" << m_lat_distortion_misfit_mean << endl;
+        cerr << __AFLOW_FUNC__ << " m_lat_distortion_relax_distance_stdev=" << m_lat_distortion_relax_distance_stdev << endl;
+        cerr << __AFLOW_FUNC__ << " m_lat_distortion_relax_distance_mean=" << m_lat_distortion_relax_distance_mean << endl;
+      }
+    }
+    catch(aurostd::xerror& err){
+      pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+      if (LDEBUG) {
+          cerr << __AFLOW_FUNC__ << " Error encountered in lattice distortion calculation, discarding data";
+      }
+      m_lat_distortion_misfit_stdev=AUROSTD_MAX_DOUBLE;
+      m_lat_distortion_relax_distance_stdev=AUROSTD_MAX_DOUBLE;
+      m_lat_distortion_misfit_mean=AUROSTD_MAX_DOUBLE;
+      m_lat_distortion_relax_distance_mean=AUROSTD_MAX_DOUBLE;
+    }
+
+}
+
 
   void getTemperatureStringParameters(int& temperature_precision,bool& temperatures_int,int& zero_padding_temperature){
     vector<double> v_temperatures=getVTemperatures(DEFAULT_POCC_TEMPERATURE_STRING);
@@ -992,7 +2326,7 @@ namespace pocc {
     if(!v_temperatures.empty()){
       temperatures_int=true;
       for(uint itemp=0;itemp<v_temperatures.size();itemp++){if(!aurostd::isinteger(v_temperatures[itemp])){temperatures_int=false;break;}}  //found a non-int temperature
-      zero_padding_temperature=aurostd::getZeroPadding(max(v_temperatures))+(temperatures_int ? 0 : TEMPERATURE_PRECISION+1); //+1 for decimal place
+      zero_padding_temperature=aurostd::getZeroPadding(aurostd::max(v_temperatures))+(temperatures_int ? 0 : TEMPERATURE_PRECISION+1); //+1 for decimal place
     }
   }
 
@@ -1018,7 +2352,7 @@ namespace pocc {
   }
 
   void POccCalculator::setAvgRDF(double temperature){
-    bool LDEBUG=(true || _DEBUG_POCC_ || XHOST.DEBUG);
+    bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
     stringstream message;
 
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
@@ -1027,7 +2361,9 @@ namespace pocc {
     if(m_ARUN_directories.size()!=l_supercell_sets.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"m_ARUN_directories.size()!=l_supercell_sets.size()",_RUNTIME_ERROR_);}
 
     setPOccStructureProbabilities(temperature); //done in calculateRELAXProperties() - repetita iuvant
-
+    setSolubilityParameter(temperature); // ST20250528 Note this is temperature dependent in accordance with the Boltzmann probabilities
+    setThermoParameter(temperature);
+    setLatticeDistortion(); // ST20250607
     //check if pdos can be averaged
     //depends not only the number of atoms (after relaxation), but also whether species/num_each_type are identical
     bool perform_rdf=true;
@@ -1055,15 +2391,13 @@ namespace pocc {
         throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"CONTCAR.relax"+aurostd::utype2string(m_relaxation_max)+" not found in "+m_ARUN_directories[isupercell],_FILE_NOT_FOUND_);
       }
       message << "Processing CONTCAR.relax of " << m_ARUN_directories[isupercell] << " for the RDF (takes some time)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
-      xstr.clear();
-      xstr.initialize(POSCAR_file,IOVASP_POSCAR);
+      readRepresentativeStructure(POSCAR_file,_vspecies,xstr);  //CO20261004
       if(LDEBUG){
         cerr << __AFLOW_FUNC__ << " xstr[isupercell=" << isupercell << "]=" << endl << xstr;
         cerr << __AFLOW_FUNC__ << " xstr.atoms.size()=" << xstr.atoms.size() << endl;
         cerr << __AFLOW_FUNC__ << " xstr.num_each_type=" << aurostd::joinWDelimiter(xstr.num_each_type,",") << endl;
         cerr << __AFLOW_FUNC__ << " vspecies=" << aurostd::joinWDelimiter(_vspecies,",") << endl;
       }
-      if(xstr.species.empty()||(xstr.species.size()>0 && xstr.species[0].empty())){xstr.SetSpecies(aurostd::vector2deque(_vspecies));}
       if(isupercell==0){
         vspecies.clear();for(i=0;i<_vspecies.size();i++){vspecies.push_back(_vspecies[i]);}
         num_each_type.clear();for(i=0;i<xstr.num_each_type.size();i++){num_each_type.push_back(xstr.num_each_type[i]);}
@@ -1083,7 +2417,7 @@ namespace pocc {
         pflow::GetRDF(xstr,rdf_all,m_rdf_rmax,m_rdf_nbins,raw_counts,sigma,window_gaussian);
         m_rdf_all+=(*it).m_probability * rdf_all;
       }
-      PrintRDF(xstr,m_rdf_rmax,m_rdf_nbins,rdf_all,*p_oss);
+      if(0){PrintRDF(xstr,m_rdf_rmax,m_rdf_nbins,rdf_all,*p_oss);}
     }
     if(perform_rdf==false){m_rdf_all.clear();return;}
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " m_rdf_all=" << endl << m_rdf_all << endl;}
@@ -1526,7 +2860,11 @@ namespace pocc {
       //plot_opts.push_attached("EXTENSION","dos_species_T"+aurostd::utype2string(temperature,TEMPERATURE_PRECISION)+"K");
       plot_opts.push_attached("EXTENSION","dos_species_T"+(*this).getTemperatureString(temperature)+"K");
       xstructure xstr=plotter::getStructureWithNames(plot_opts,*p_FileMESSAGE,xdos.carstring,*p_oss);
-      if(xdos.vDOS.size()==xstr.atoms.size()){plotter::PLOT_DOS(plot_opts,xdos,*p_FileMESSAGE,*p_oss);}
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " xdos.vDOS.size()=" << xdos.vDOS.size() << endl;
+        cerr << __AFLOW_FUNC__ << " xstr.atoms.size()=" << xstr.atoms.size() << endl;
+      }
+      if(xdos.vDOS.size()-1==xstr.atoms.size()){plotter::PLOT_DOS(plot_opts,xdos,*p_FileMESSAGE,*p_oss);} //CO20230530 - vDOS is total+num_atoms
       else{
         message << "Skipping species-projected plots, there are varying num_each_type among POCC.ARUN's" << endl;
         pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
@@ -1561,9 +2899,39 @@ namespace pocc {
 
 #define pocc_precision _DOUBLE_WRITE_PRECISION_ //12
 #define pocc_roundoff_tol 5.0*pow(10,-((int)pocc_precision)-1)
+
+  // ST20250602 convenience functions for printing sublattice properties
+  // Meant to be used with the preprocessor macro POCC_FORMAT_PROPERTY_VECTOR
+  void POccCalculator::formatProperty(stringstream& ss, vector<double> value, string name, uint32_t idx) const {
+    // remove the m_ prefix
+    if (name.substr(0, 2) == "m_") {
+      name = name.substr(2);
+    }
+    if (value.size() == 0) { return; }
+    if (idx >= value.size()) {
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, name + ": index out of bounds: ", _INDEX_BOUNDS_);
+    }
+    // if this is violated, the values are going to be incorrect
+    if (value[idx] != AUROSTD_MAX_DOUBLE) { // ST20250610 Don't write if invalid value
+      ss << name << "=" << aurostd::utype2string(value[idx],pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM);
+      ss << endl;
+    }
+  }
+  // Meant to be used with the preprocessor macro POCC_FORMAT_PROPERTY_SCALAR
+  void POccCalculator::formatProperty(stringstream& ss, double value, string name) const {
+    // remove the m_ prefix
+    if (name.substr(0, 2) == "m_") {
+      name = name.substr(2);
+    }
+    if (value != AUROSTD_MAX_DOUBLE) {
+      ss << name << "=" << aurostd::utype2string(value,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM);
+      ss << endl;
+    }
+  }
+
   void POccCalculator::writeResults() const { //TEMPERATURE-INDEPENDENT
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
-    stringstream message;
+    stringstream message,output;
 
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
@@ -1578,13 +2946,16 @@ namespace pocc {
     stringstream pocc_out_ss;
     pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
     pocc_out_ss << POCC_AFLOWIN_tag << "START_TEMPERATURE=ALL" << endl;  //"  (K)"
+    pocc_out_ss << "enumerator=" << getStructureGenerationAlgo() << endl;  //CO20261006 - how the supercells were grouped
     //[CO20200502 - removed unnecessary separation line]pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
 
     //supercell degeneracy
     isupercell=0;
+    uint padding=35;
     for(std::list<POccSuperCellSet>::const_iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
       isupercell=std::distance(l_supercell_sets.begin(),it);
-      pocc_out_ss << "degeneracy_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << aurostd::utype2string((*it).getDegeneracy()) << "  [" << m_ARUN_directories[isupercell] << "]" << endl; //+1 so we start at 1, not 0 (count)
+      output << "degeneracy_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << aurostd::utype2string((*it).getDegeneracy()); //+1 so we start at 1, not 0 (count)
+      pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
     }
     //supercell enthalpy_atom
     isupercell=0;
@@ -1598,6 +2969,98 @@ namespace pocc {
     if(m_Hmix!=AUROSTD_MAX_DOUBLE) pocc_out_ss << enthalpy_tag << "_mix_atom=" << aurostd::utype2string(m_Hmix,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV/at)" << endl;
     if(m_efa!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "entropy_forming_ability=" << aurostd::utype2string(m_efa,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV/at)^{-1}" << endl;
 
+    // ST20250701 Miedema regular solution H_mix
+    if(m_Hmix_miedema!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "Hmix_miedema=" << aurostd::utype2string(m_Hmix_miedema,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV/at)" << endl;
+    //CO20250321 - adding entropy descriptors
+    if(m_S_config_cell!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_cell=" << aurostd::utype2string(m_S_config_cell,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_S_config_atom!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_atom=" << aurostd::utype2string(m_S_config_atom,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_S_config_rfu!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_rfu=" << aurostd::utype2string(m_S_config_rfu,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_S_config_sublattice!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_sublattice=" << aurostd::utype2string(m_S_config_sublattice,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_S_config_species!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_species=" << aurostd::utype2string(m_S_config_species,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    // ST20250602 More HEA descriptors (temperature independent)
+    if(m_S_config_partial_atom != AUROSTD_MAX_DOUBLE) pocc_out_ss << "S_config_partial_atom=" << aurostd::utype2string(m_S_config_partial_atom,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_VEC != AUROSTD_MAX_DOUBLE) pocc_out_ss << "VEC=" << aurostd::utype2string(m_VEC,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) <<  " (e/atom)" << endl;
+    if(m_Omega != AUROSTD_MAX_DOUBLE) pocc_out_ss << "Omega=" << aurostd::utype2string(m_Omega,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+
+    // ST20250602 Delta properties
+    // We write down a list of sublattices (m_pocc_sites) and provide the atoms in that site
+    // and then write the delta properties about that site.
+
+    // write all the overall properties
+    // then all the scalar properties
+    try {
+
+
+      for (uint isite=0; isite<m_nsublattices_disordered; isite++){
+        pocc_out_ss << "[AFLOW_POCC]START_SUBLATTICE=" << isite << endl;
+        pocc_out_ss << "species_sublattice=" << m_nsublattices_disordered_names.at(isite) << endl;
+        // generated by using grep on a part of aflow_pocc.h
+        // write all the sublattice properties
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_electronegativity_Pauling_sublattice      ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_electronegativity_Pearson_sublattice      ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_electronegativity_Ghosh_sublattice        ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_electronegativity_Allen_sublattice        ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radius_Saxena_sublattice                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_Saxena_cell                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_Saxena_atom                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_Saxena_rfu                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_Saxena_sublattice              ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_Saxena_species                 ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radius_PT_sublattice                      ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_PT_cell                        ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_PT_atom                        ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_PT_rfu                         ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_PT_sublattice                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_PT_species                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radius_covalent_PT_sublattice             ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_PT_cell               ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_PT_atom               ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_PT_rfu                ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_PT_sublattice         ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_PT_species            ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radius_covalent_sublattice                ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_cell                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_atom                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_rfu                   ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_sublattice            ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_covalent_species               ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radius_VanDerWaals_PT_sublattice          ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_VanDerWaals_PT_cell            ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_VanDerWaals_PT_atom            ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_VanDerWaals_PT_rfu             ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_VanDerWaals_PT_sublattice      ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radius_VanDerWaals_PT_species         ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radii_Ghosh08_sublattice                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Ghosh08_cell                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Ghosh08_atom                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Ghosh08_rfu                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Ghosh08_sublattice              ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Ghosh08_species                 ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radii_Slatter_sublattice                  ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Slatter_cell                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Slatter_atom                    ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Slatter_rfu                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Slatter_sublattice              ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Slatter_species                 ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_delta_radii_Pyykko_sublattice                   ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Pyykko_cell                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Pyykko_atom                     ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Pyykko_rfu                      ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Pyykko_sublattice               ,isite);
+        POCC_FORMAT_PROPERTY_VECTOR(pocc_out_ss, m_param_geo_radii_Pyykko_species                  ,isite);
+        pocc_out_ss << "[AFLOW_POCC]STOP_SUBLATTICE=" << isite << endl;
+      }
+      pocc_out_ss << "delta_properties_valid_flag=1" << endl;
+    }
+    catch(aurostd::xerror& err){
+      pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);
+      // the script that parses this data should invalidate all delta properties if flag is not set
+      pocc_out_ss << "delta_properties_valid_flag=0" << endl;
+    }
+
+
+    writeCorrelations(pocc_out_ss,false);  //CO20261006
+
     //[CO20200502 - removed unnecessary separation line]pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
     pocc_out_ss << POCC_AFLOWIN_tag << "STOP_TEMPERATURE=ALL" << endl;  //"  (K)"
     pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
@@ -1609,7 +3072,7 @@ namespace pocc {
 
   void POccCalculator::writeResults(double temperature) const { //TEMPERATURE-DEPENDENT
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
-    stringstream message;
+    stringstream message,output;
 
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
@@ -1624,11 +3087,43 @@ namespace pocc {
     //[CO20200502 - removed unnecessary separation line]pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
 
     //supercell probabilities
+    if (LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " m_vlat_distortion_misfit.size()=" << m_vlat_distortion_misfits.size() << endl;
+        cerr << __AFLOW_FUNC__ << " m_vlat_distortion_relax_distance.size()=" << m_vlat_distortion_relax_distances.size() << endl;
+    }
     unsigned long long int isupercell=0;
+    uint padding=70;
     for(std::list<POccSuperCellSet>::const_iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
       isupercell=std::distance(l_supercell_sets.begin(),it);
       //pocc_out_ss << "probability[" << m_ARUN_directories[isupercell] << "]=" << aurostd::utype2string((*it).m_probability,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
-      pocc_out_ss << "probability_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << aurostd::utype2string((*it).m_probability,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  [" << m_ARUN_directories[isupercell] << "]" << endl; //+1 so we start at 1, not 0 (count)
+      output << "probability_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1       << "=" << aurostd::utype2string((*it).m_probability,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM); //+1 so we start at 1, not 0 (count)
+      pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
+      bool supercell_has_misfit=false;
+      uint supercell_index = -1;
+      // for(uint is : m_vlat_distortion_supercells_accounted_for) {
+      for(uint i=0; i<m_vlat_distortion_supercells_accounted_for.size(); i++) {
+        if (isupercell == m_vlat_distortion_supercells_accounted_for.at(i)) {
+          supercell_has_misfit = true;
+          supercell_index = i;
+        }
+      }
+
+      double misfit_value=AUROSTD_MAX_DOUBLE,relax_distance=AUROSTD_MAX_DOUBLE;
+      if (supercell_has_misfit) {
+      // ST20250610 print out the lattice distortion parameters for each supercell
+        misfit_value = m_vlat_distortion_misfits.at(supercell_index);
+        relax_distance = m_vlat_distortion_relax_distances.at(supercell_index);
+        output << "lat_distortion_misfit_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << aurostd::utype2string(misfit_value,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM); //+1 so we start at 1, not 0 (count)
+        pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
+        output << "lat_distortion_relax_distance_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << aurostd::utype2string(relax_distance,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (\\AA)"; //+1 so we start at 1, not 0 (count)
+        pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
+      }
+      else {
+        output << "lat_distortion_misfit_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << "NaN"; //+1 so we start at 1, not 0 (count)
+        pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
+        output << "lat_distortion_relax_distance_supercell_" << std::setfill('0') << std::setw(aurostd::getZeroPadding(l_supercell_sets.size())) << isupercell+1  << "=" << "NaN";
+        pocc_out_ss << aurostd::PaddedPOST(output.str(),padding) << "  [" << m_ARUN_directories[isupercell] << "]" << endl;aurostd::StringstreamClean(output);
+      }
     }
     
     if(m_rdf_all.rows!=0){
@@ -1654,6 +3149,36 @@ namespace pocc {
       pocc_out_ss << "Egap_spin_dn=" << aurostd::utype2string(Egap[1],pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV)" << endl;
     }
     if(Egap_net!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "Egap_net=" << aurostd::utype2string(Egap_net,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV)" << endl;
+    // ST20250602 More HEA descriptors (temperature-dependent)
+    //fix m_Egap_DOS and m_Egap_DOS_net for metals (Egap_DOS==0!)                                                                                                                                               
+    vector<double> Egap_DOS;Egap_DOS.assign(m_Egap_DOS.size(),0.0);
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " m_Egap_DOS.size()=" << m_Egap_DOS.size() << endl;
+      cerr << __AFLOW_FUNC__ << " Egap_DOS.size()=" << Egap_DOS.size() << endl;
+    }
+    double Egap_DOS_net=0.0;
+    for(uint ispin=0;ispin<m_Egap_DOS.size();ispin++){
+      if(m_Egap_DOS[ispin]!=_METALGAP_){Egap_DOS[ispin]=m_Egap_DOS[ispin];}
+    }
+    if(m_Egap_DOS_net!=_METALGAP_){Egap_DOS_net=m_Egap_DOS_net;}
+
+    if(Egap_DOS.size()==2) {
+      pocc_out_ss << "Egap_DOS_spin_up=" << aurostd::utype2string(Egap_DOS[0],pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV)" << endl;
+      pocc_out_ss << "Egap_DOS_spin_dn=" << aurostd::utype2string(Egap_DOS[1],pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV)" << endl;
+    }
+    if(Egap_DOS_net!=AUROSTD_MAX_DOUBLE) pocc_out_ss << "Egap_DOS_net=" << aurostd::utype2string(Egap_DOS_net,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (eV)" << endl;
+    // ST20250602 More HEA descriptors (temperature-dependent)
+    
+    if(m_solubility_parameter != AUROSTD_MAX_DOUBLE) pocc_out_ss << "solubility_parameter=" << aurostd::utype2string(m_solubility_parameter,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << " (GPa * \\AA^3)" << endl;
+    if(m_k2 != AUROSTD_MAX_DOUBLE) pocc_out_ss << "k2=" << aurostd::utype2string(m_k2,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_kcr1 != AUROSTD_MAX_DOUBLE) pocc_out_ss << "kcr1=" << aurostd::utype2string(m_kcr1,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+
+    if(m_lat_distortion_misfit_mean!= AUROSTD_MAX_DOUBLE) pocc_out_ss << "lat_distortion_misfit_mean=" << aurostd::utype2string(m_lat_distortion_misfit_mean,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_lat_distortion_misfit_stdev!= AUROSTD_MAX_DOUBLE) pocc_out_ss << "lat_distortion_misfit_stdev=" << aurostd::utype2string(m_lat_distortion_misfit_stdev,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << endl;
+    if(m_lat_distortion_relax_distance_mean != AUROSTD_MAX_DOUBLE) pocc_out_ss << "lat_distortion_relax_distance_mean=" << aurostd::utype2string(m_lat_distortion_relax_distance_mean,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (\\AA)" << endl;
+    if(m_lat_distortion_relax_distance_stdev != AUROSTD_MAX_DOUBLE) pocc_out_ss << "lat_distortion_relax_distance_stdev=" << aurostd::utype2string(m_lat_distortion_relax_distance_stdev,pocc_precision,true,pocc_roundoff_tol,SCIENTIFIC_STREAM) << "  (\\AA)" << endl;
+
+
     //[CO20200502 - removed unnecessary separation line]pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
     //PLASMONICS
     for(uint ieps=0;ieps<m_veps_plasm.size();ieps++){
@@ -1678,6 +3203,7 @@ namespace pocc {
         pocc_out_ss << POCC_AFLOWIN_tag << "STOP_PLASMONICS_EPS_" << m_veps_plasm[ieps] << endl;
       }
     }
+    writeCorrelations(pocc_out_ss,true);  //CO20261006
     pocc_out_ss << POCC_AFLOWIN_tag << "STOP_TEMPERATURE=" << (*this).getTemperatureString(temperature) << "_K" << endl;  //"  (K)"
     pocc_out_ss << AFLOWIN_SEPARATION_LINE << endl;
 
@@ -1968,6 +3494,7 @@ namespace pocc {
         for(i=0;i<v_indices.size();i++){
           pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"Ignoring "+m_ARUN_directories[v_indices[i]],m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_NOTICE_); 
           m_ARUN_directories.erase(m_ARUN_directories.begin()+v_indices[i]);
+          if(m_vsupercell_titles.size()>v_indices[i]){m_vsupercell_titles.erase(m_vsupercell_titles.begin()+v_indices[i]);}  //CO20261006
 
           //erase
           it=l_supercell_sets.begin();std::advance(it,v_indices[i]);
@@ -2004,12 +3531,16 @@ namespace pocc {
 
     if(!m_initialized){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"POccCalculator failed to initialize");}
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
-
     if(m_ARUN_directories.size() == 0) loadDataIntoCalculator();
     if(!QMVASPsFound()){return;}
     setDFTEnergies();
     setEFA();
 
+
+
+    setOmega(); // ST20250529
+    setVEC(); // ST20250529
+    calculateSupercellCorrelations();  //CO20261006 - from the supercell titles; skipped with a warning if they do not allow it
     vector<double> v_temperatures;
     setTemperatureStringParameters(v_temperatures);
 
@@ -2461,6 +3992,7 @@ namespace pocc {
     energy_analyzer.clear();
     resetHNFMatrices();
     resetSiteConfigurations();
+    n_hnf=0;  //CO20261006 - set by calculateHNF(); was left uninitialized
     hnf_count=0;
     types_config_permutations_count=0;
     total_permutations_count=0;
@@ -2468,9 +4000,61 @@ namespace pocc {
     l_supercell_sets.clear();
     m_convolution=false;
     m_count_unique_fast=false;
+    //CO20261005 - ENUM
+    m_enum_prepared=false;
+    m_hnf_from_list=false;
+    m_hnf_reduce=true;
+    m_ihnf_list=0;
+    m_site_colors.clear();
+    m_vfgroup_site_map.clear();
+    m_vfgroup_site_shift.clear();
+    m_vfgroup_site_inverse.clear();
+    m_vfgroup_Uf.clear();
+    m_vfgroup_Uf_inv.clear();
+    m_rank_values=0;
+    m_rank_order.clear();
+    m_rank_site_count.clear();
+    m_rank_offset.clear();
+    m_rank_key.clear();
+    m_rank_counts.clear();
+    m_rank_total=0;
+    m_xstr_color.clear();
+    m_vhnf_enum.clear();
+    m_vhnf_multiplicity.clear();
+    m_hnf_count_lattice=0;
+    m_enum_group_order.clear();
+    m_enum_rotations.clear();
+    m_enum_orbits.clear();
+    m_enum_superperiodic.clear();
+    m_enum_merged_hnf=0;
+    m_enum_merged_across=0;
+    m_enum_skipped=0;
+    m_vpgroup_enum.clear();
+    m_vhnf_lattice_class.clear();
+    m_enum_fgroup_dropped=0;
+    m_enum_seconds=0.0;
+    m_corr_orbits.clear();  //CO20261006
+    m_corr_site_values.clear();
+    m_corr_site_conc.clear();
+    m_vsupercell_titles.clear();
+    m_vsupercell_corr.clear();
+    m_vsupercell_pair_probabilities.clear();
     m_ARUN_directories.clear();
     m_Hmix=AUROSTD_MAX_DOUBLE;
+    m_Hmix_miedema=AUROSTD_MAX_DOUBLE;
     m_efa=AUROSTD_MAX_DOUBLE;
+    m_S_config_cell=AUROSTD_MAX_DOUBLE;
+    m_S_config_atom=AUROSTD_MAX_DOUBLE;
+    m_S_config_rfu=AUROSTD_MAX_DOUBLE;
+    m_S_config_sublattice=AUROSTD_MAX_DOUBLE;
+    m_S_config_species=AUROSTD_MAX_DOUBLE;
+    m_S_config_partial_atom=AUROSTD_MAX_DOUBLE;
+    m_solubility_parameter=AUROSTD_MAX_DOUBLE;
+    m_vr_star.clear();  //CO20261004
+    m_Omega=AUROSTD_MAX_DOUBLE;
+    m_k2=AUROSTD_MAX_DOUBLE;
+    m_kcr1=AUROSTD_MAX_DOUBLE;
+    m_VEC=AUROSTD_MAX_DOUBLE;
     m_temperature_precision=TEMPERATURE_PRECISION;
     m_zero_padding_temperature=0;
     m_temperatures_int=false;
@@ -2491,6 +4075,71 @@ namespace pocc {
     enumerator_mode.clear();
 
     m_energy_uff_tolerance=DEFAULT_UFF_ENERGY_TOLERANCE;
+    m_nsublattices_disordered=0;  //CO20261015
+    m_nsublattices_disordered_names.clear();
+    m_delta_electronegativity_Pauling_sublattice.clear();
+    m_delta_electronegativity_Pearson_sublattice.clear();
+    m_delta_electronegativity_Ghosh_sublattice.clear();
+    m_delta_electronegativity_Allen_sublattice.clear();
+    m_delta_radius_Saxena_sublattice.clear();
+    m_param_geo_radius_Saxena_cell.clear();
+    m_param_geo_radius_Saxena_atom.clear();
+    m_param_geo_radius_Saxena_rfu.clear();
+    m_param_geo_radius_Saxena_sublattice.clear();
+    m_param_geo_radius_Saxena_species.clear();
+    m_delta_radius_PT_sublattice.clear();
+    m_param_geo_radius_PT_cell.clear();
+    m_param_geo_radius_PT_atom.clear();
+    m_param_geo_radius_PT_rfu.clear();
+    m_param_geo_radius_PT_sublattice.clear();
+    m_param_geo_radius_PT_species.clear();
+    m_delta_radius_covalent_PT_sublattice.clear();
+    m_param_geo_radius_covalent_PT_cell.clear();
+    m_param_geo_radius_covalent_PT_atom.clear();
+    m_param_geo_radius_covalent_PT_rfu.clear();
+    m_param_geo_radius_covalent_PT_sublattice.clear();
+    m_param_geo_radius_covalent_PT_species.clear();
+    m_delta_radius_covalent_sublattice.clear();
+    m_param_geo_radius_covalent_cell.clear();
+    m_param_geo_radius_covalent_atom.clear();
+    m_param_geo_radius_covalent_rfu.clear();
+    m_param_geo_radius_covalent_sublattice.clear();
+    m_param_geo_radius_covalent_species.clear();
+    m_delta_radius_VanDerWaals_PT_sublattice.clear();
+    m_param_geo_radius_VanDerWaals_PT_cell.clear();
+    m_param_geo_radius_VanDerWaals_PT_atom.clear();
+    m_param_geo_radius_VanDerWaals_PT_rfu.clear();
+    m_param_geo_radius_VanDerWaals_PT_sublattice.clear();
+    m_param_geo_radius_VanDerWaals_PT_species.clear();
+    m_delta_radii_Ghosh08_sublattice.clear();
+    m_param_geo_radii_Ghosh08_cell.clear();
+    m_param_geo_radii_Ghosh08_atom.clear();
+    m_param_geo_radii_Ghosh08_rfu.clear();
+    m_param_geo_radii_Ghosh08_sublattice.clear();
+    m_param_geo_radii_Ghosh08_species.clear();
+    m_delta_radii_Slatter_sublattice.clear();
+    m_param_geo_radii_Slatter_cell.clear();
+    m_param_geo_radii_Slatter_atom.clear();
+    m_param_geo_radii_Slatter_rfu.clear();
+    m_param_geo_radii_Slatter_sublattice.clear();
+    m_param_geo_radii_Slatter_species.clear();
+    m_delta_radii_Pyykko_sublattice.clear();
+    m_param_geo_radii_Pyykko_cell.clear();
+    m_param_geo_radii_Pyykko_atom.clear();
+    m_param_geo_radii_Pyykko_rfu.clear();
+    m_param_geo_radii_Pyykko_sublattice.clear();
+    m_param_geo_radii_Pyykko_species.clear();
+
+
+    m_lat_distortion_misfit_stdev= AUROSTD_MAX_DOUBLE;
+    m_lat_distortion_relax_distance_stdev = AUROSTD_MAX_DOUBLE;
+    m_lat_distortion_misfit_mean= AUROSTD_MAX_DOUBLE;
+    m_lat_distortion_relax_distance_mean = AUROSTD_MAX_DOUBLE;
+    m_vlat_distortion_misfits.clear();
+    m_vlat_distortion_relax_distances.clear();
+    m_vlat_distortion_accounted_for_probs.clear();
+    m_vlat_distortion_supercells_accounted_for.clear();
+    m_vmisfit_info.clear();
   }
 
   void POccCalculator::copy(const POccCalculator& b) { // copy PRIVATE
@@ -2518,8 +4167,60 @@ namespace pocc {
     l_supercell_sets.clear();for(std::list<POccSuperCellSet>::const_iterator it=b.l_supercell_sets.begin();it!=b.l_supercell_sets.end();++it){l_supercell_sets.push_back(*it);}
     m_convolution=b.m_convolution;
     m_count_unique_fast=b.m_count_unique_fast;
+    //CO20261005 - ENUM
+    m_enum_prepared=b.m_enum_prepared;
+    m_hnf_from_list=b.m_hnf_from_list;
+    m_hnf_reduce=b.m_hnf_reduce;
+    m_ihnf_list=b.m_ihnf_list;
+    m_site_colors=b.m_site_colors;
+    m_vfgroup_site_map=b.m_vfgroup_site_map;
+    m_vfgroup_site_shift=b.m_vfgroup_site_shift;
+    m_vfgroup_site_inverse=b.m_vfgroup_site_inverse;
+    m_vfgroup_Uf=b.m_vfgroup_Uf;
+    m_vfgroup_Uf_inv=b.m_vfgroup_Uf_inv;
+    m_rank_values=b.m_rank_values;
+    m_rank_order=b.m_rank_order;
+    m_rank_site_count=b.m_rank_site_count;
+    m_rank_offset=b.m_rank_offset;
+    m_rank_key=b.m_rank_key;
+    m_rank_counts=b.m_rank_counts;
+    m_rank_total=b.m_rank_total;
+    m_xstr_color=b.m_xstr_color;
+    m_vhnf_enum=b.m_vhnf_enum;
+    m_vhnf_multiplicity=b.m_vhnf_multiplicity;
+    m_hnf_count_lattice=b.m_hnf_count_lattice;
+    m_enum_group_order=b.m_enum_group_order;
+    m_enum_rotations=b.m_enum_rotations;
+    m_enum_orbits=b.m_enum_orbits;
+    m_enum_superperiodic=b.m_enum_superperiodic;
+    m_enum_merged_hnf=b.m_enum_merged_hnf;
+    m_enum_merged_across=b.m_enum_merged_across;
+    m_enum_skipped=b.m_enum_skipped;
+    m_vpgroup_enum=b.m_vpgroup_enum;
+    m_vhnf_lattice_class=b.m_vhnf_lattice_class;
+    m_enum_fgroup_dropped=b.m_enum_fgroup_dropped;
+    m_enum_seconds=b.m_enum_seconds;
+    m_corr_orbits=b.m_corr_orbits;  //CO20261006
+    m_corr_site_values=b.m_corr_site_values;
+    m_corr_site_conc=b.m_corr_site_conc;
+    m_vsupercell_titles=b.m_vsupercell_titles;
+    m_vsupercell_corr=b.m_vsupercell_corr;
+    m_vsupercell_pair_probabilities=b.m_vsupercell_pair_probabilities;
     m_Hmix=b.m_Hmix;
+    m_Hmix_miedema=b.m_Hmix_miedema;
     m_efa=b.m_efa;
+    m_S_config_cell=b.m_S_config_cell;
+    m_S_config_atom=b.m_S_config_atom;
+    m_S_config_rfu=b.m_S_config_rfu;
+    m_S_config_sublattice=b.m_S_config_sublattice;
+    m_S_config_species = b.m_S_config_species;
+    m_S_config_partial_atom=b.m_S_config_partial_atom;
+    m_solubility_parameter=b.m_solubility_parameter;
+    m_vr_star=b.m_vr_star;  //CO20261004
+    m_Omega=b.m_Omega;
+    m_k2=b.m_k2;
+    m_kcr1=b.m_kcr1;
+    m_VEC=b.m_VEC;
     m_temperature_precision=b.m_temperature_precision;
     m_zero_padding_temperature=b.m_zero_padding_temperature;
     m_temperatures_int=b.m_temperatures_int;
@@ -2540,6 +4241,77 @@ namespace pocc {
     m_veps_plasm.clear();for(uint i=0;i<b.m_veps_plasm.size();i++){m_veps_plasm.push_back(b.m_veps_plasm[i]);}
     m_vxplasm.clear();for(uint i=0;i<b.m_vxplasm.size();i++){m_vxplasm.push_back(b.m_vxplasm[i]);}
     enumerator_mode=b.enumerator_mode;
+
+    // vector descriptors
+    m_delta_electronegativity_Pauling_sublattice      = b.m_delta_electronegativity_Pauling_sublattice;  //CO20261015
+    m_delta_electronegativity_Pearson_sublattice      = b.m_delta_electronegativity_Pearson_sublattice;
+    m_delta_electronegativity_Ghosh_sublattice        = b.m_delta_electronegativity_Ghosh_sublattice;
+    m_delta_electronegativity_Allen_sublattice        = b.m_delta_electronegativity_Allen_sublattice;
+    m_delta_radius_Saxena_sublattice                  = b.m_delta_radius_Saxena_sublattice;
+    m_param_geo_radius_Saxena_cell                    = b.m_param_geo_radius_Saxena_cell;
+    m_param_geo_radius_Saxena_atom                    = b.m_param_geo_radius_Saxena_atom;
+    m_param_geo_radius_Saxena_rfu                     = b.m_param_geo_radius_Saxena_rfu;
+    m_param_geo_radius_Saxena_sublattice              = b.m_param_geo_radius_Saxena_sublattice;
+    m_param_geo_radius_Saxena_species                 = b.m_param_geo_radius_Saxena_species;
+    m_delta_radius_PT_sublattice                      = b.m_delta_radius_PT_sublattice;
+    m_param_geo_radius_PT_cell                        = b.m_param_geo_radius_PT_cell;
+    m_param_geo_radius_PT_atom                        = b.m_param_geo_radius_PT_atom;
+    m_param_geo_radius_PT_rfu                         = b.m_param_geo_radius_PT_rfu;
+    m_param_geo_radius_PT_sublattice                  = b.m_param_geo_radius_PT_sublattice;
+    m_param_geo_radius_PT_species                     = b.m_param_geo_radius_PT_species;
+    m_delta_radius_covalent_PT_sublattice             = b.m_delta_radius_covalent_PT_sublattice;
+    m_param_geo_radius_covalent_PT_cell               = b.m_param_geo_radius_covalent_PT_cell;
+    m_param_geo_radius_covalent_PT_atom               = b.m_param_geo_radius_covalent_PT_atom;
+    m_param_geo_radius_covalent_PT_rfu                = b.m_param_geo_radius_covalent_PT_rfu;
+    m_param_geo_radius_covalent_PT_sublattice         = b.m_param_geo_radius_covalent_PT_sublattice;
+    m_param_geo_radius_covalent_PT_species            = b.m_param_geo_radius_covalent_PT_species;
+    m_delta_radius_covalent_sublattice                = b.m_delta_radius_covalent_sublattice;
+    m_param_geo_radius_covalent_cell                  = b.m_param_geo_radius_covalent_cell;
+    m_param_geo_radius_covalent_atom                  = b.m_param_geo_radius_covalent_atom;
+    m_param_geo_radius_covalent_rfu                   = b.m_param_geo_radius_covalent_rfu;
+    m_param_geo_radius_covalent_sublattice            = b.m_param_geo_radius_covalent_sublattice;
+    m_param_geo_radius_covalent_species               = b.m_param_geo_radius_covalent_species;
+    m_delta_radius_VanDerWaals_PT_sublattice          = b.m_delta_radius_VanDerWaals_PT_sublattice;
+    m_param_geo_radius_VanDerWaals_PT_cell            = b.m_param_geo_radius_VanDerWaals_PT_cell;
+    m_param_geo_radius_VanDerWaals_PT_atom            = b.m_param_geo_radius_VanDerWaals_PT_atom;
+    m_param_geo_radius_VanDerWaals_PT_rfu             = b.m_param_geo_radius_VanDerWaals_PT_rfu;
+    m_param_geo_radius_VanDerWaals_PT_sublattice      = b.m_param_geo_radius_VanDerWaals_PT_sublattice;
+    m_param_geo_radius_VanDerWaals_PT_species         = b.m_param_geo_radius_VanDerWaals_PT_species;
+    m_delta_radii_Ghosh08_sublattice                  = b.m_delta_radii_Ghosh08_sublattice;
+    m_param_geo_radii_Ghosh08_cell                    = b.m_param_geo_radii_Ghosh08_cell;
+    m_param_geo_radii_Ghosh08_atom                    = b.m_param_geo_radii_Ghosh08_atom;
+    m_param_geo_radii_Ghosh08_rfu                     = b.m_param_geo_radii_Ghosh08_rfu;
+    m_param_geo_radii_Ghosh08_sublattice              = b.m_param_geo_radii_Ghosh08_sublattice;
+    m_param_geo_radii_Ghosh08_species                 = b.m_param_geo_radii_Ghosh08_species;
+    m_delta_radii_Slatter_sublattice                  = b.m_delta_radii_Slatter_sublattice;
+    m_param_geo_radii_Slatter_cell                    = b.m_param_geo_radii_Slatter_cell;
+    m_param_geo_radii_Slatter_atom                    = b.m_param_geo_radii_Slatter_atom;
+    m_param_geo_radii_Slatter_rfu                     = b.m_param_geo_radii_Slatter_rfu;
+    m_param_geo_radii_Slatter_sublattice              = b.m_param_geo_radii_Slatter_sublattice;
+    m_param_geo_radii_Slatter_species                 = b.m_param_geo_radii_Slatter_species;
+    m_delta_radii_Pyykko_sublattice                   = b.m_delta_radii_Pyykko_sublattice;
+    m_param_geo_radii_Pyykko_cell                     = b.m_param_geo_radii_Pyykko_cell;
+    m_param_geo_radii_Pyykko_atom                     = b.m_param_geo_radii_Pyykko_atom;
+    m_param_geo_radii_Pyykko_rfu                      = b.m_param_geo_radii_Pyykko_rfu;
+    m_param_geo_radii_Pyykko_sublattice               = b.m_param_geo_radii_Pyykko_sublattice;
+    m_param_geo_radii_Pyykko_species                  = b.m_param_geo_radii_Pyykko_species;
+
+
+    // scalar descriptors
+
+
+    m_nsublattices_disordered = b.m_nsublattices_disordered;
+    m_nsublattices_disordered_names = b.m_nsublattices_disordered_names;
+
+    m_lat_distortion_misfit_stdev= b.m_lat_distortion_misfit_stdev;
+    m_lat_distortion_relax_distance_stdev = b.m_lat_distortion_relax_distance_stdev;
+    m_lat_distortion_misfit_mean= b.m_lat_distortion_misfit_mean;
+    m_lat_distortion_relax_distance_mean = b.m_lat_distortion_relax_distance_mean;
+    m_vlat_distortion_relax_distances = b.m_vlat_distortion_relax_distances;
+    m_vlat_distortion_misfits = b.m_vlat_distortion_misfits;
+    m_vmisfit_info = b.m_vmisfit_info;
+    m_vlat_distortion_accounted_for_probs = b.m_vlat_distortion_accounted_for_probs;
+    m_vlat_distortion_supercells_accounted_for = b.m_vlat_distortion_supercells_accounted_for;
   }
 
   bool POccCalculator::initialize(ostream& oss) {
@@ -3221,10 +4993,17 @@ namespace pocc {
     a_start=A_START;c_start=C_START;f_start=F_START;
     b_start=B_START;d_start=D_START;e_start=E_START;
     v_unique_superlattices.clear();
+    m_ihnf_list=0;  //CO20261005
   }
 
   bool POccCalculator::iterateHNFMatrix(){
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || ENUMERATE_ALL_HNF || XHOST.DEBUG);
+
+    if(m_hnf_from_list){  //CO20261005 - ENUM: HNF matrices reduced by the crystal point group of the colored parent, see setEnumHNFMatrices()
+      if(m_ihnf_list>=m_vhnf_enum.size()){return false;}
+      hnf_mat=m_vhnf_enum[m_ihnf_list++];
+      return true;
+    }
 
     xmatrix<double> _hnf_mat(3,3),duplicate_mat(3,3);
     xmatrix<double> superlattice(3,3), rotated_superlattice(3,3);
@@ -3299,7 +5078,8 @@ namespace pocc {
                   }
 
                   duplicate_H=false;
-                  for(uint i=0;i<v_unique_superlattices.size() && !duplicate_H;i++){
+                  if(!m_hnf_reduce){duplicate_H=(!v_unique_superlattices.empty() && aurostd::isequal(_hnf_mat,hnf_mat));} //CO20261005 - every HNF matrix (setEnumHNFMatrices()): the loops resume on the one returned last, skip only that one
+                  for(uint i=0;i<v_unique_superlattices.size() && !duplicate_H && m_hnf_reduce;i++){  //CO20261005 - m_hnf_reduce==false lists every HNF matrix (setEnumHNFMatrices())
                     if(LDEBUG) {
                       cerr << "SUPERLATTICES OLD " << endl;
                       cerr << v_unique_superlattices[i] << endl;
@@ -3573,16 +5353,227 @@ namespace pocc {
     return true;
   }
 
+  //CO20261006 - START
+  //getNextSiteConfiguration(types_config) visits the distinct permutations of a site in lexicographic order, starting from
+  //the sorted configuration. The two functions below count them and give the rank-th directly, so a configuration can be
+  //reached without visiting the ones before it (the POCC sampling draws from spaces of 1e9 and more).
+  //The multinomial is built one factor at a time, (m+1)/1*(m+2)/2*..., each division exact; aurostd::nCk() goes through
+  //factorials, which overflow above 20.
+  unsigned long long int distinctPermutationsCount(const vector<unsigned long long int>& counts){
+    unsigned long long int total=1,m=0,a=0,b=0,g=0;
+    for(uint group=0;group<counts.size();group++){
+      for(unsigned long long int i=1;i<=counts[group];i++){
+        m++;
+        aurostd::GCD(m,i,g); a=m/g; b=i/g;  //total*m is divisible by i, so total is divisible by b
+        total/=b;
+        if(total>AUROSTD_MAX_ULLINT/a){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Count of site configurations exceeds unsigned long long int",_VALUE_RANGE_);}
+        total*=a;
+      }
+    }
+    return total;
+  }
+
+  vector<unsigned long long int> siteConfigurationCounts(const vector<int>& types_config,vector<int>& types){
+    //types: distinct values of types_config, ascending; return: how many times each occurs
+    vector<int> sorted_config(types_config);
+    std::sort(sorted_config.begin(),sorted_config.end());
+    types.clear();
+    vector<unsigned long long int> counts;
+    for(uint i=0;i<sorted_config.size();i++){
+      if(types.empty()||types.back()!=sorted_config[i]){types.push_back(sorted_config[i]);counts.push_back(0);}
+      counts.back()++;
+    }
+    return counts;
+  }
+
+  unsigned long long int getDistinctPermutationsCount(const vector<int>& types_config){
+    vector<int> types;
+    return distinctPermutationsCount(siteConfigurationCounts(types_config,types));
+  }
+
+  vector<int> getDistinctPermutation(const vector<int>& types_config,unsigned long long int rank){
+    vector<int> types;
+    vector<unsigned long long int> counts=siteConfigurationCounts(types_config,types);
+    if(rank>=distinctPermutationsCount(counts)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Rank exceeds the count of site configurations",_INDEX_BOUNDS_);}
+    vector<int> permutation;
+    unsigned long long int count=0;
+    for(uint position=0;position<types_config.size();position++){
+      for(uint t=0;t<types.size();t++){
+        if(counts[t]==0){continue;}
+        counts[t]--;
+        count=distinctPermutationsCount(counts);  //permutations of the remaining positions that start with types[t] here
+        if(rank<count){permutation.push_back(types[t]);break;}
+        rank-=count;
+        counts[t]++;
+      }
+    }
+    return permutation;
+  }
+
+  vector<vector<int> > POccCalculator::getSiteConfiguration(unsigned long long int site_config_index) const {
+    //getNextSiteConfiguration() goes through v_str_configs one after the other. Within one, it counts like an odometer
+    //over the sites in getConfigOrder() order, the first site turning fastest, each site through its distinct permutations.
+    unsigned long long int index=site_config_index,str_config_count=0;
+    for(uint str_config=0;str_config<v_str_configs.size();str_config++){
+      const vector<POccSiteConfiguration>& site_configs=v_str_configs[str_config].site_configs;
+      vector<vector<int> > v_types_config_start;
+      vector<unsigned long long int> v_counts;
+      str_config_count=1;
+      for(uint site=0;site<site_configs.size();site++){
+        v_types_config_start.push_back(site_configs[site].getStartingTypesConfiguration());
+        v_counts.push_back(getDistinctPermutationsCount(v_types_config_start.back()));
+        if(str_config_count>AUROSTD_MAX_ULLINT/v_counts.back()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Count of site configurations exceeds unsigned long long int",_VALUE_RANGE_);}
+        str_config_count*=v_counts.back();
+      }
+      if(index>=str_config_count){index-=str_config_count;continue;}
+      vector<uint> v_order=getConfigOrder(v_types_config_start);
+      vector<vector<int> > v_types_config_index(v_types_config_start);
+      for(uint i=0;i<v_order.size();i++){
+        v_types_config_index[v_order[i]]=getDistinctPermutation(v_types_config_start[v_order[i]],index%v_counts[v_order[i]]);
+        index/=v_counts[v_order[i]];
+      }
+      return v_types_config_index;
+    }
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Invalid site configuration index ("+aurostd::utype2string(site_config_index)+")",_INDEX_BOUNDS_);
+  }
+  //CO20261006 - STOP
+
   ////simultaneously define and calculate
   //double POccCalculator::getUFFEnergy() {energy_analyzer.setBonds(v_types_config);return energy_analyzer.getUFFEnergy();}
 
   //void POccCalculator::calculateHNF(){p_str.calculateHNF();}               //get n_hnf
+
+  //TL20260204
+  bool POccCalculator::usePOccSampleNumber(string& sample_number_string, unsigned long long int& sample_number) const{
+    sample_number=0;
+    sample_number_string=m_kflags.KBIN_POCC_SAMPLE_NUMBER_STRING;
+    if(XHOST.vflag_pflow.flag("POCC_SAMPLE_NUMBER")){ // Command line flag takes precedence
+      sample_number_string = XHOST.vflag_pflow.getattachedscheme("POCC_SAMPLE_NUMBER");
+    }
+    if(sample_number_string.empty()){
+      sample_number_string = "FULL";
+    }
+    vector<string> tokens;
+    aurostd::string2tokens(sample_number_string,tokens," \t");
+    if(!tokens.empty()){
+      sample_number_string = tokens[0];
+    }
+    string sample_number_upper = aurostd::toupper(sample_number_string);
+    if(sample_number_upper == "FULL"){
+      return false;
+    }
+    if(!aurostd::isfloat(sample_number_string)){
+      stringstream message;
+      message << "Invalid POCC_SAMPLE_NUMBER (expect FULL or integer) [input=" << sample_number_string << "]";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+    }
+    sample_number = aurostd::string2utype<unsigned long long int>(sample_number_string,0);
+    return true;
+  }
+  //TL20260204
+
+  //TL20260205
+  bool POccCalculator::usePOccSampleRate(string& sample_rate_string) const{
+    sample_rate_string=m_kflags.KBIN_POCC_SAMPLE_RATE_STRING;
+    if(XHOST.vflag_pflow.flag("POCC_SAMPLE_RATE")){ // Command line flag takes precedence
+      sample_rate_string = XHOST.vflag_pflow.getattachedscheme("POCC_SAMPLE_RATE");
+    }
+    if(sample_rate_string.empty()){
+      return false; // No rate sampling (commented out or not set)
+    }
+    return true;
+  }
+  //TL20260205
+
+  //TL20260303
+  bool POccCalculator::usePOccSampleHash(string& sample_hash_string, unsigned long long int& sample_hash_hnf, unsigned long long int& sample_hash_site_config) const{
+    sample_hash_string.clear();
+    sample_hash_hnf=AUROSTD_MAX_ULLINT;
+    sample_hash_site_config=AUROSTD_MAX_ULLINT;
+    if(XHOST.vflag_pflow.flag("POCC_SAMPLE_HASH")){
+      sample_hash_string = XHOST.vflag_pflow.getattachedscheme("POCC_SAMPLE_HASH");
+    }else{
+      sample_hash_string = m_kflags.KBIN_POCC_SAMPLE_HASH_STRING;
+    }
+    if(sample_hash_string.empty()){
+      return false;
+    }
+
+    vector<string> tokens;
+    aurostd::string2tokens(sample_hash_string,tokens,",");
+    if(tokens.size()>1){
+      stringstream message;
+      message << "Cannot handle more than one POCC_SAMPLE_HASH specification [input=" << sample_hash_string << "]";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+    }
+    if(tokens.empty()){
+      return false;
+    }
+    sample_hash_string=tokens[0];
+
+    tokens.clear();
+    aurostd::string2tokens(sample_hash_string,tokens," \t");
+    if(tokens.empty()){
+      return false;
+    }
+    sample_hash_string=tokens[0];
+
+    // allow full path/ARUN directory input, e.g. ARUN.POCC_1_H5C1823
+    tokens.clear();
+    aurostd::string2tokens(sample_hash_string,tokens,"/");
+    if(!tokens.empty()){
+      sample_hash_string=tokens.back();
+    }
+    sample_hash_string=aurostd::toupper(sample_hash_string);
+    if(aurostd::substring2bool(sample_hash_string,"ARUN.POCC_")){
+      aurostd::StringSubst(sample_hash_string,"ARUN.POCC_","");
+      tokens.clear();
+      aurostd::string2tokens(sample_hash_string,tokens,"_");
+      if(!tokens.empty()){
+        sample_hash_string=tokens.back();
+      }
+    }
+
+    string::size_type loc_h=sample_hash_string.find("H");
+    string::size_type loc_c=sample_hash_string.find("C");
+    if(loc_h==string::npos || loc_c==string::npos || loc_h>=loc_c){
+      stringstream message;
+      message << "Invalid POCC_SAMPLE_HASH format (expect HnCm or ARUN.POCC_x_HnCm) [input=" << sample_hash_string << "]";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+    }
+    string hnf_str=sample_hash_string.substr(loc_h+1,loc_c-loc_h-1);
+    string site_str=sample_hash_string.substr(loc_c+1);
+    bool valid_hnf=(!hnf_str.empty() && hnf_str.find_first_not_of("0123456789")==string::npos);
+    bool valid_site=(!site_str.empty() && site_str.find_first_not_of("0123456789")==string::npos);
+    if(!valid_hnf || !valid_site){
+      stringstream message;
+      message << "Invalid POCC_SAMPLE_HASH format (expect integer HnCm) [input=" << sample_hash_string << "]";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+    }
+    sample_hash_hnf=aurostd::string2utype<unsigned long long int>(hnf_str);
+    sample_hash_site_config=aurostd::string2utype<unsigned long long int>(site_str);
+    sample_hash_string="H"+hnf_str+"C"+site_str;  // canonical format
+    return true;
+  }
+  //TL20260303
+
+  //TL20260310
+  bool POccCalculator::usePOccSkipSiteConfigurations() const{
+    if(XHOST.vflag_pflow.flag("POCC_SKIP_SITE_CONFIGURATIONS")){
+      return true;
+    }
+    return m_kflags.KBIN_POCC_SKIP_SITE_CONFIGURATIONS;
+  }
+  //TL20260310
 
   void POccCalculator::getTotalPermutationsCount(){
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
     stringstream message;
 
     message << "Getting total number of supercell decoration permutations";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+
+    if(getStructureGenerationAlgo()=="ENUM"){prepareEnumeration();}  //CO20261005 - HNF matrices reduced by the crystal point group of the colored parent
+    else {m_hnf_from_list=false;}  //CO20261005
 
     //unsigned long long int hnf_count=0;
     //unsigned long long int types_config_permutations_count=0;   //per hnf matrix
@@ -3628,24 +5619,32 @@ namespace pocc {
     unsigned long long int str_config_permutations_count;
     unsigned long long int config_permutations_count=0;         //per hnf matrix
     total_permutations_count=0;  //per hnf matrix
-    vector<int> current_config;
     //const vector<StructureConfiguration>& v_str_configs=p_str.v_str_configs;
-    bool getNextSiteConfiguration(vector<int>& types_config);
+    //CO20261006 - the count covers every configuration, also with SAMPLE_NUMBER or SAMPLE_HASH. It used to stop at the
+    //first sites whose configurations reached 100*SAMPLE_NUMBER (or the C index of SAMPLE_HASH), so the sample left the
+    //other sites in their starting configuration. FirstRandomSamplingWholeSpace() draws from all of them, and
+    //getSiteConfiguration() builds a drawn one without visiting the others.
+    unsigned long long int sample_number=0;  //YL20240426 
+    string sample_number_string="";
+    bool use_sample_number = usePOccSampleNumber(sample_number_string, sample_number);  //TL20260204
     for(uint str_config=0;str_config<v_str_configs.size();str_config++){
       str_config_permutations_count=1;
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " v_str_configs[str_config].site_configs.size() = " << v_str_configs[str_config].site_configs.size() << endl;}
       for(uint site=0;site<v_str_configs[str_config].site_configs.size();site++){
-        //for(uint config=0;config<v_str_configs[site].size();config++){
-        config_permutations_count=0;
-        current_config=v_str_configs[str_config].site_configs[site].getStartingTypesConfiguration();
-        //if(config>0){config_permutations_count++;}
-        config_permutations_count++;	//for starting config
-        while(getNextSiteConfiguration(current_config)){config_permutations_count++;}
+        config_permutations_count=getDistinctPermutationsCount(v_str_configs[str_config].site_configs[site].getStartingTypesConfiguration());  //CO20261006 - as many as getNextSiteConfiguration() visits
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " config_permutations_count = " << config_permutations_count << endl;}
+        if(str_config_permutations_count>AUROSTD_MAX_ULLINT/config_permutations_count){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Count of site configurations exceeds unsigned long long int",_VALUE_RANGE_);}  //CO20261006
         str_config_permutations_count*=config_permutations_count;
-        //}
-        //str_config_permutations_count*=config_permutations_count;
+        if(LDEBUG){cerr << __AFLOW_FUNC__ << " str_config_permutations = " << str_config_permutations_count << endl;}
       }
+      if(types_config_permutations_count>AUROSTD_MAX_ULLINT-str_config_permutations_count){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Count of site configurations exceeds unsigned long long int",_VALUE_RANGE_);}  //CO20261006
       types_config_permutations_count+=str_config_permutations_count;
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " types_config_permutations_count = " << types_config_permutations_count << endl;}
     }
+    if(use_sample_number && types_config_permutations_count < sample_number){
+        message << "Permutation configurations=" << types_config_permutations_count <<". Please choose pocc_sample_number less than " << types_config_permutations_count << endl;
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);// YL20240426 when pocc_sample_number less than types_config_permutations_count throw out error message
+    } 
     //cerr << types_config_permutations_count << endl;
     message << "Total count of unique types-configuration permutations = " << types_config_permutations_count;
     pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
@@ -3672,6 +5671,7 @@ namespace pocc {
       cerr << __AFLOW_FUNC__ << "Total count of unique types-configuration permutations = " << types_config_permutations_count << endl;
     }
 
+    if(types_config_permutations_count>0 && hnf_count>AUROSTD_MAX_ULLINT/types_config_permutations_count){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Count of supercell decorations exceeds unsigned long long int",_VALUE_RANGE_);}  //CO20261006
     total_permutations_count=hnf_count*types_config_permutations_count;
 
     message << "Total number of supercell decoration permutations = " <<total_permutations_count;
@@ -4071,7 +6071,6 @@ namespace pocc {
       cerr << __AFLOW_FUNC__ << " psc.m_energy_uff=" << psc.m_energy_uff << endl;
     }
     unsigned long long int hnf_index=0;
-    unsigned long long int site_config_index=0;
     //add an initialization flag for energy_analyzer eventually, and check here
     resetHNFMatrices();
     resetSiteConfigurations();
@@ -4079,12 +6078,8 @@ namespace pocc {
       if(hnf_index!=psc.m_hnf_index){hnf_index++;continue;}
       //hnf_mat set here
       _hnf_mat=hnf_mat;
-      while(getNextSiteConfiguration()){  //sets v_types_config
-        if(site_config_index!=psc.m_site_config_index){site_config_index++;continue;}
-        //v_types_config set here
-        _v_types_config=v_types_config;
-        return;
-      }
+      _v_types_config=getSiteConfiguration(psc.m_site_config_index);  //CO20261006 - built directly; walking up to a sampled index of 1e9 or more took too long
+      return;
     }
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Invalid hnf site configuration indices");
   }
@@ -4301,6 +6296,12 @@ namespace pocc {
   void POccCalculator::calculate(){
     bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
     stringstream message;
+    if(getStructureGenerationAlgo()=="COMPARE"){  //CO20261005 - UFF and ENUM side by side, ENUM result kept
+      if(m_count_unique_fast){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"--pocc_count_unique_fast ignored: the comparison needs the UFF bins",m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);}
+      compareEnumerators();
+      return;
+    }
+    unsigned long long int skip_config_num = 0;//YL20240402 skip_config_num save the total amount of skipped config due to pocc_sampling for the check of if(total_permutations_count!=total_degeneracy)
 
     //starting criteria for HNF matrices
     //xmatrix<double> hnf_mat;                            //really xmatrix of int's, but we rule for int * double in xmatrix, no big deal
@@ -4386,14 +6387,38 @@ namespace pocc {
     unsigned long long int site_config_index;
 
     //get algorithm settings
-    string struct_gen_algo=DEFAULT_POCC_STRUCTURE_GENERATION_ALGO;
+    string struct_gen_algo=getStructureGenerationAlgo();  //CO20261005 - UFF (default) or ENUM
+    //YL20240508
+    unsigned long long int sample_number=0;
+    string sample_number_string="";
+    bool XHOST_POCC_SAMPLE_NUMBER=usePOccSampleNumber(sample_number_string, sample_number);  //TL20260204
+    string sample_rate_string="";  //TL20260205
+    bool XHOST_POCC_SAMPLE_RATE=usePOccSampleRate(sample_rate_string);  //TL20260205
+    string sample_hash_string="";  //TL20260303
+    unsigned long long int sample_hash_hnf=AUROSTD_MAX_ULLINT;
+    unsigned long long int sample_hash_site_config=AUROSTD_MAX_ULLINT;
+    bool XHOST_POCC_SAMPLE_HASH=usePOccSampleHash(sample_hash_string,sample_hash_hnf,sample_hash_site_config);  //TL20260303
+    //YL20240508
+    (void)sample_number;
+    
+    //T20260310 report sampling/hash mode but keep file-writing behavior unchanged unless explicit skip flags are provided
+    if(XHOST_POCC_SAMPLE_NUMBER || XHOST_POCC_SAMPLE_RATE || XHOST_POCC_SAMPLE_HASH) {
+      message << "Sampling/hash mode detected";
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_NOTICE_);
+    }
 
-    if(struct_gen_algo=="UFF"){
+    if(struct_gen_algo=="ENUM"){ //CO20261005 - orbits of the supercell permutation groups
+      if(m_count_unique_fast){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"--pocc_count_unique_fast applies to the UFF enumerator; ENUM counts without UFF energies under --pocc_count_unique",m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);}
+      calculateEnum();
+      skip_config_num=m_enum_skipped;  //sampling: decorations outside the sampled sets
+    }
+    else if(struct_gen_algo=="UFF"){
       POccSuperCell psc;
       vector<POccSuperCell> vpsc;
       vector<POccUFFEnergyAnalyzer> v_energy_analyzer;
       vector<vector<vector<int>>> vv_types_config;
       energy_analyzer.initialize(xstr_pocc,xstr_nopocc,m_species_redecoration,m_p_flags,m_aflags,*p_FileMESSAGE,*p_oss); //p_str,energy_radius);
+      const bool sample_whole_space=(XHOST_POCC_SAMPLE_NUMBER || XHOST_POCC_SAMPLE_HASH);  //CO20261006 - drawn below from every configuration, none enumerated here
       resetHNFMatrices();
       while(iterateHNFMatrix()){
         psc.m_hnf_index = hnf_index;
@@ -4403,13 +6428,57 @@ namespace pocc {
         POccUFFEnergyAnalyzer ea(energy_analyzer);
         ea.getCluster(hnf_mat);
         v_energy_analyzer.push_back(ea);
-        while(getNextSiteConfiguration()){
+        while(!sample_whole_space && getNextSiteConfiguration()){  //CO20261006
           psc.m_site_config_index=site_config_index;
           vpsc.push_back(psc);
           vv_types_config.push_back(v_types_config);
           site_config_index++;
         }
         hnf_index++;
+        if(LDEBUG)
+        {
+           cerr << __AFLOW_FUNC__ << " hnf_index = " << hnf_index << endl;
+           cerr << __AFLOW_FUNC__ << " site_config_index = " << site_config_index << endl;
+        }
+      }
+      if(LDEBUG)
+      {
+         cerr << __AFLOW_FUNC__ << " XHOST_POCC_SAMPLE_RATE = " << XHOST_POCC_SAMPLE_RATE << endl;  //TL20260205
+         cerr << __AFLOW_FUNC__ << " POCC_SAMPLE_RATE_STRING = " << sample_rate_string << endl;  //TL20260205
+         cerr << __AFLOW_FUNC__ << " XHOST_POCC_SAMPLE_NUMBER = " << XHOST_POCC_SAMPLE_NUMBER << endl;
+         cerr << __AFLOW_FUNC__ << " POCC_SAMPLE_NUMBER_STRING = " << sample_number_string << endl;
+      }
+      if(sample_whole_space){  //CO20261006
+        const vector<unsigned long long int> v_indices=FirstRandomSamplingWholeSpace();
+        for(size_t i=0;i<v_indices.size();i++){
+          psc.m_hnf_index=v_indices[i]/types_config_permutations_count;
+          psc.m_site_config_index=v_indices[i]%types_config_permutations_count;
+          psc.m_degeneracy=1;
+          vpsc.push_back(psc);
+          vv_types_config.push_back(getSiteConfiguration(psc.m_site_config_index));
+        }
+        skip_config_num=hnf_count*types_config_permutations_count-vpsc.size();  //FirstRandomSamplingWholeSpace() checked the product
+        message << "Sampled " << vpsc.size() << " of " << hnf_count*types_config_permutations_count << " supercell decorations for the UFF comparison";
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      }
+      else if(XHOST_POCC_SAMPLE_RATE){  //CO20261006 - SAMPLE_NUMBER and SAMPLE_HASH above
+         vector<unsigned long long int> selected_indices_set = FirstRandomSampling(hnf_count, types_config_permutations_count); //get random seed sampling selected derivitive config indices
+         skip_config_num = types_config_permutations_count*hnf_count - selected_indices_set.size();   // calculate total amout of skipped configs
+         vector<POccSuperCell> sampled_vpsc;
+         vector<vector<vector<int>>> sampled_vv_types_config;
+         if(LDEBUG)
+         {
+            cerr << __AFLOW_FUNC__ << " vpsc.size = " << vpsc.size() << endl;
+            cerr << __AFLOW_FUNC__ << " vv_types_config.size = " << vv_types_config.size() << endl;
+            cerr << __AFLOW_FUNC__ << " v_energy_analyzer.size = " << v_energy_analyzer.size() << endl;
+         }
+         for (size_t i=0; i<selected_indices_set.size(); i++){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " selected_indices_set[" << i << "] = " << selected_indices_set[i] << endl;}
+            sampled_vpsc.push_back(vpsc[selected_indices_set[i]]);
+            sampled_vv_types_config.push_back(vv_types_config[selected_indices_set[i]]);
+         }
+         vpsc = sampled_vpsc; // replace the vpsc and vv_types_config by the sampled vpsc and vv_types_config for unique UFF calculations.
+         vv_types_config = sampled_vv_types_config;
       }
       std::mutex m_save, m_job;
       xthread::xThread xt(KBIN::get_NCPUS(m_kflags),1);
@@ -4656,8 +6725,7 @@ namespace pocc {
       //cerr << "probably broken pointers" << endl;
     }
 
-
-    if(DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON){
+    if(DEFAULT_POCC_PERFORM_ROBUST_STRUCTURE_COMPARISON && struct_gen_algo=="UFF"){ //CO20261005 - ENUM needs no structure comparison
       bool DEBUG_RSC=false;
       message << "Calculated " << l_supercell_sets.size() << " unique supercell groups via UFF, now performing robust structure comparison";
       pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);//_LOGGER_COMPLETE_);
@@ -4684,12 +6752,94 @@ namespace pocc {
     int prec=(int)ceil(log10(1.0/m_energy_uff_tolerance));
     for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
       //cerr << "UNIQUE " << std::distance(l_supercell_sets.begin(),it) << endl;
-      message_prec << std::fixed << std::setprecision(prec) << "Structure bin "  << std::distance(l_supercell_sets.begin(),it)+1 << ": energy=" << (*it).getUFFEnergy() << ", " << "degeneracy=" << (*it).getDegeneracy();
+      if(struct_gen_algo=="ENUM" && m_p_flags.flag("POCC_COUNT_UNIQUE")){message_prec << "Structure bin "  << std::distance(l_supercell_sets.begin(),it)+1 << ": degeneracy=" << (*it).getDegeneracy();} //CO20261005 - no UFF energies needed to count
+      else {message_prec << std::fixed << std::setprecision(prec) << "Structure bin "  << std::distance(l_supercell_sets.begin(),it)+1 << ": energy=" << (*it).getUFFEnergy() << ", " << "degeneracy=" << (*it).getDegeneracy();}
       pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message_prec,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
       //cerr << endl;
       total_degeneracy+=(*it).getDegeneracy();
     }
 
+     //YL20240402  for second random_seed sampling
+    if(XHOST_POCC_SAMPLE_RATE || XHOST_POCC_SAMPLE_NUMBER || XHOST_POCC_SAMPLE_HASH){
+        //YL20240419 save all structures after first round sampling in aflow.pocc.xxx_percent_sampled_structures_all.out.xz when turn on pocc_sample_rate
+        //YL20240419 save all structures after first round sampling in aflow.pocc.xxx_sampled_structures_all.out.xz when turn on pocc_sample_number
+        if(!XHOST_POCC_SAMPLE_HASH && DEFAULT_POCC_WRITE_OUT_ALL_SAMPLED_SUPERCELLS && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES")){
+           message << "Writing out " << POCC_ALL_SAMPLED_SUPERCELLS_FILE  << ". Please be patient.";
+           pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+           stringstream all_supercells_ss;
+           string POSCAR_strtag="";
+           POccSuperCell psc;
+           unsigned long long int isupercell=0;
+           for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
+               isupercell=std::distance(l_supercell_sets.begin(),it);
+               if(LDEBUG) {cerr << __AFLOW_FUNC__ << " isupercell=" << isupercell << endl;}
+               const POccSuperCellSet& pscs=(*it);
+               all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+               all_supercells_ss << AFLOW_POCC_TAG << "STRUCTURES_GROUP " << isupercell+1 << "/" << l_supercell_sets.size() << endl;
+               all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+               for(uint i=0;i<pscs.m_psc_set.size();i++){
+                   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " i=" << i << endl;}
+                   psc=pscs.m_psc_set[i];
+                   psc.m_degeneracy=1;
+                   POSCAR_strtag=pocc::getARUNString(isupercell,l_supercell_sets.size(),i,pscs.m_psc_set.size(),pscs.m_psc_set[i].m_hnf_index,pscs.m_psc_set[i].m_site_config_index,true);           
+                   all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+                   all_supercells_ss << AFLOW_POCC_TAG << "STRUCTURE " << i+1 << "/" << pscs.m_psc_set.size() << endl;
+                   all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+                   all_supercells_ss << AFLOW_POCC_TAG << "UFF_ENERGY=" << std::fixed << std::setprecision(15) << psc.m_energy_uff << endl; all_supercells_ss.unsetf(std::ios_base::       floatfield);
+                   all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+                   all_supercells_ss << POSCAR_POCC_series_START_tag << POSCAR_strtag << endl;
+                   all_supercells_ss << createXStructure(psc,n_hnf,hnf_count,types_config_permutations_count,true,PRIMITIVIZE); // << endl;
+                   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " structure created" << endl;}
+                   all_supercells_ss << POSCAR_POCC_series_STOP_tag << POSCAR_strtag << endl;
+                   all_supercells_ss << AFLOWIN_SEPARATION_LINE << endl;
+               }
+           }
+           if(XHOST_POCC_SAMPLE_RATE) {
+              const string& pocc_sample_rate_string_label = aurostd::utype2string<double>(100*setPOccSampleRate(sample_rate_string,0),2) + "_percent_" ; //YL20240419 get first round sampling rate  //TL20260205 use sample_rate_string from helper
+              aurostd::stringstream2file(all_supercells_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+pocc_sample_rate_string_label+POCC_ALL_SAMPLED_SUPERCELLS_FILE);
+           } 
+           if(XHOST_POCC_SAMPLE_NUMBER) {
+              const string& pocc_sample_number_string = sample_number_string + "_";
+              aurostd::stringstream2file(all_supercells_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+pocc_sample_number_string+POCC_ALL_SAMPLED_SUPERCELLS_FILE);
+           } 
+        }
+
+        //YL20240419 save all unique supercell without second round sampling in aflow.pocc.without_sampled_structures_unique.out
+        if(!XHOST_POCC_SAMPLE_HASH && DEFAULT_POCC_WRITE_OUT_WITHOUT_SAMPLED_UNIQUE_SUPERCELLS && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES")){
+           message << "Writing out " << POCC_WITHOUT_SAMPLED_UNIQUE_SUPERCELLS_FILE << ". Please be patient" ;
+           pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+           stringstream unique_derivative_structures_ss;
+           unsigned long long int isupercell=0;
+           for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it)
+           { 
+             isupercell=std::distance(l_supercell_sets.begin(),it);
+             const POccSuperCellSet& pscs=(*it);
+             if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting structure[" << isupercell << "]" << endl;}
+           
+             unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+             unique_derivative_structures_ss << AFLOW_POCC_TAG << "STRUCTURE " << isupercell+1 << "/" << l_supercell_sets.size() << endl;
+             unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+             unique_derivative_structures_ss << AFLOW_POCC_TAG << "UFF_ENERGY=" << std::fixed << std::setprecision(15) << (*it).getUFFEnergy() << endl;      
+             unique_derivative_structures_ss.unsetf(std::ios_base::floatfield);
+             unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+             unique_derivative_structures_ss << POSCAR_POCC_series_START_tag << getARUNString(isupercell) << endl; 
+             unique_derivative_structures_ss << createXStructure(pscs.m_psc_set[0],n_hnf,hnf_count,types_config_permutations_count,true,PRIMITIVIZE);  // instead of xvasp, using pscs.m_psc_set[0] to print out POSCAR
+             unique_derivative_structures_ss << POSCAR_POCC_series_STOP_tag << getARUNString(isupercell) << endl; 
+             unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+
+           }
+           aurostd::stringstream2file(unique_derivative_structures_ss,pocc::POccCalculator::getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_WITHOUT_SAMPLED_UNIQUE_SUPERCELLS_FILE);
+        }
+
+        total_degeneracy += skip_config_num;//add skipped config number to total_degeneracy for the check of if(total_permutations_count!=total_degeneracy)
+        if(XHOST_POCC_SAMPLE_HASH){
+          message << "POCC_SAMPLE_HASH is active: skip second random sampling to preserve target hash in sampled set [POCC_SAMPLE_HASH=" << sample_hash_string << "]";
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_NOTICE_);
+        }else{
+          l_supercell_sets =  SecondRandomSampling(l_supercell_sets);//replace the second round random seed sampling config for DFT calculations to original l_supercell_sets all unique configs with SecondRandomSamplingWithRate.
+        }
+    }
+     //YL20240402 for SecondRandomSamplingWithRate
     if(total_permutations_count!=total_degeneracy){
       throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unexpected degeneracy count (does not match expected total permutations count)");
     }
@@ -4707,6 +6857,49 @@ namespace pocc {
     }
     l_supercell_sets.sort();  //finally sort on indices so the list is always fixed
 
+    if(XHOST_POCC_SAMPLE_HASH){
+      std::list<POccSuperCellSet> filtered_supercell_sets;
+      for(std::list<POccSuperCellSet>::const_iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
+        const POccSuperCellSet& pscs=(*it);
+        uint matched_index=AUROSTD_MAX_UINT;
+        for(uint i=0;i<pscs.m_psc_set.size();i++){
+          if(pscs.m_psc_set[i].m_hnf_index==sample_hash_hnf && pscs.m_psc_set[i].m_site_config_index==sample_hash_site_config){
+            matched_index=i;
+            break;
+          }
+        }
+        if(matched_index!=AUROSTD_MAX_UINT){
+          POccSuperCellSet matched_set=pscs;
+          if(matched_index!=0){
+            std::swap(matched_set.m_psc_set[0],matched_set.m_psc_set[matched_index]);
+          }
+          filtered_supercell_sets.push_back(matched_set);
+        }
+      }
+      if(filtered_supercell_sets.empty()){
+        message << "POCC_SAMPLE_HASH not found among unique supercells [POCC_SAMPLE_HASH=" << sample_hash_string << "]";
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+      }
+      l_supercell_sets=filtered_supercell_sets;
+      message << "POCC_SAMPLE_HASH matched " << l_supercell_sets.size() << " unique supercell(s) [POCC_SAMPLE_HASH=" << sample_hash_string << "]";
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_NOTICE_);
+    }
+    
+    //tests of stupidity - END
+  }
+
+  void POccCalculator::writePreProcessing(const _xvasp& in_xvasp){
+    bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+    stringstream message;
+
+    if(!l_supercell_sets.size()){
+      message << "No supercells found. Please run calculate() to determine unique supercells";
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message);
+    }
+
+    unsigned long long int hnf_index=0;
+    unsigned long long int site_config_index;
+
     if(true && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES")){ //move me so it runs whenever pocc runs (even post-processing)
       message << "Writing out " << POCC_ALL_HNF_MATRICES_FILE;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
       stringstream all_hnf_mat_ss;
@@ -4722,7 +6915,15 @@ namespace pocc {
       aurostd::stringstream2file(all_hnf_mat_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_ALL_HNF_MATRICES_FILE);
     }
 
-    if(true && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES")){ //move me so it runs whenever pocc runs (even post-processing)
+    bool XHOST_POCC_SKIP_SITE_CONFIGURATIONS=usePOccSkipSiteConfigurations(); //TL20260310
+    //CO20261006 - a sampled run draws from every site configuration, which can number 1e9 and more; it does not list them
+    string sample_number_string="",sample_hash_string="";
+    unsigned long long int sample_number=0,sample_hash_hnf=AUROSTD_MAX_ULLINT,sample_hash_site_config=AUROSTD_MAX_ULLINT;
+    if(!XHOST_POCC_SKIP_SITE_CONFIGURATIONS && (usePOccSampleNumber(sample_number_string,sample_number) || usePOccSampleHash(sample_hash_string,sample_hash_hnf,sample_hash_site_config))){
+      XHOST_POCC_SKIP_SITE_CONFIGURATIONS=true;
+      message << "Not writing out " << POCC_ALL_SITE_CONFIGURATIONS_FILE << " for a sampled run (" << types_config_permutations_count << " site configurations)";pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+    }
+    if(true && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES") && !XHOST_POCC_SKIP_SITE_CONFIGURATIONS){ //move me so it runs whenever pocc runs (even post-processing)
       message << "Writing out " << POCC_ALL_SITE_CONFIGURATIONS_FILE;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
       stringstream all_site_configs_ss;
       resetSiteConfigurations();
@@ -4754,7 +6955,7 @@ namespace pocc {
       }
       aurostd::stringstream2file(all_site_configs_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_ALL_SITE_CONFIGURATIONS_FILE);
     }
-
+    
     if(DEFAULT_POCC_WRITE_OUT_ALL_SUPERCELLS && !m_aflags.Directory.empty() && !m_p_flags.flag("POCC_SKIP_WRITING_FILES")){
       message << "Writing out " << POCC_ALL_SUPERCELLS_FILE << ". Please be patient.";
       pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
@@ -4803,7 +7004,68 @@ namespace pocc {
       aurostd::stringstream2file(all_supercells_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_ALL_SUPERCELLS_FILE);
     }
 
-    //tests of stupidity - END
+    //write out unique supercells files while creating ARUN directories
+    message << "Writing out " << POCC_UNIQUE_SUPERCELLS_FILE;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+
+    stringstream unique_derivative_structures_ss;
+    stringstream new_AflowIn_ss;
+    bool original_quiet_flag=XHOST.QUIET;
+    unsigned long long int isupercell=0;
+    //[NO NEED, AVASP_populateXVASP() is now const]_aflags aflags=m_aflags; //make copies
+    _xvasp xvasp=in_xvasp; //[NO NEED, AVASP_populateXVASP() is now const]_kflags kflags=in_kflags;_vflags vflags=in_vflags; //make copies
+
+    for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){
+      isupercell=std::distance(l_supercell_sets.begin(),it);
+      if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting structure[" << isupercell << "]" << endl;}
+
+      //do first so we only need to run getUniqueSuperCell() once
+      xvasp.str.clear(); //DX20191220 - uppercase to lowercase clear
+      xvasp.str=getUniqueSuperCell(isupercell);
+
+      //CO20221024 - CCE flags
+      if(isupercell==0){  //CO20221024 - this is for speed, in the future we might need to remove this if different environments are created with POCC
+        if(m_kflags.KBIN_CCE_CORRECTABLE||XHOST.vflag_control.flag("CCE_CORRECTABLE")){
+          message << "Checking if CCE_CORRECTABLE" << endl;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+          aurostd::xoption cce_flags(m_p_flags);  //CO20221024 - KC, fix is_correctable to take const input&
+          xstructure cce_structure(xvasp.str);  //CO20221024 - KC, fix is_correctable to take const input&
+          _aflags cce_aflags(m_aflags); //CO20221024 - KC, fix is_correctable to take const input&
+          if(!cce::is_correctable(cce_flags,cce_structure,cce_aflags,*p_FileMESSAGE,*p_oss)){return;}
+        }
+      }
+
+      //populate POCC_UNIQUE_SUPERCELLS_FILE
+      unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+      unique_derivative_structures_ss << AFLOW_POCC_TAG << "STRUCTURE " << isupercell+1 << "/" << l_supercell_sets.size() << endl;
+      unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+      unique_derivative_structures_ss << AFLOW_POCC_TAG << "UFF_ENERGY=" << std::fixed << std::setprecision(15) << (*it).getUFFEnergy() << endl; unique_derivative_structures_ss.unsetf(std::ios_base::floatfield);
+      unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+      unique_derivative_structures_ss << POSCAR_POCC_series_START_tag << getARUNString(isupercell) << endl; // ." << ss_pocc_count.str() << endl;
+      unique_derivative_structures_ss << xvasp.str; //getUniqueSuperCell(isupercell);
+      unique_derivative_structures_ss << POSCAR_POCC_series_STOP_tag << getARUNString(isupercell) << endl; // ." << ss_pocc_count.str() << endl;
+      unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
+
+      xvasp.Directory=m_aflags.Directory; //arun_directory;
+      xvasp.AVASP_arun=true;
+      xvasp.AVASP_arun_mode = "POCC"; //CO20181226
+      xvasp.AVASP_arun_runname = getARUNString(isupercell);
+      xvasp.aopts.flag("FLAG::AVASP_SKIP_NOMIX",FALSE); //[CO20191110]high-entropy offers increased solubility over binaries
+
+      XHOST.QUIET=true;
+
+      if(LDEBUG) {
+        cerr << __AFLOW_FUNC__ << " printing xstructure" << endl;
+        cerr << xvasp.str << endl;
+        cerr << __AFLOW_FUNC__ << " printing POSCAR" << endl;
+        cerr << xvasp.POSCAR.str() << endl;
+        cerr << __AFLOW_FUNC__ << " xvasp.str.species.size()=" << xvasp.str.species.size() << endl;
+      }
+
+      AVASP_populateXVASP(m_aflags,m_kflags,m_vflags,xvasp);
+      AVASP_MakeSingleAFLOWIN(xvasp,new_AflowIn_ss,true); //false,-1,false);  //don't write/print and hence don't pthread
+
+      XHOST.QUIET=original_quiet_flag;
+    }
+    aurostd::stringstream2file(unique_derivative_structures_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_UNIQUE_SUPERCELLS_FILE);
   }
 
   unsigned long long int POccCalculator::getUniqueSuperCellsCount() const {return l_supercell_sets.size();}
@@ -5768,317 +8030,281 @@ namespace pocc {
 } // namespace pocc
 
 namespace pocc {
-  /*
-  //--------------------------------------------------------------------------------
-  // class POccStructure
-  //--------------------------------------------------------------------------------
-  //--------------------------------------------------------------------------------
-  // constructor
-  //--------------------------------------------------------------------------------
-  POccStructure::POccStructure(ostream& oss) : xStream(),m_initialized(false) {initialize(oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,kflags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,kflags,oss);}
-  POccStructure::POccStructure(ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,kflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,kflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const aurostd::xoption& pocc_flags,ostream& oss) : xStream(),m_initialized(false) {initialize(pocc_flags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,kflags,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,kflags,oss);}
-  POccStructure::POccStructure(const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(pocc_flags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,kflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,kflags,FileMESSAGE,oss);}
-  POccStructure::POccStructure(const POccStructure& b) {copy(b);} // copy PUBLIC
+  ////--------------------------------------------------------------------------------
+  //// class POccStructure
+  ////--------------------------------------------------------------------------------
+  ////--------------------------------------------------------------------------------
+  //// constructor
+  ////--------------------------------------------------------------------------------
+  //POccStructure::POccStructure(ostream& oss) : xStream(),m_initialized(false) {initialize(oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,kflags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,kflags,oss);}
+  //POccStructure::POccStructure(ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,kflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,aflags,kflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const aurostd::xoption& pocc_flags,ostream& oss) : xStream(),m_initialized(false) {initialize(pocc_flags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,kflags,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,kflags,oss);}
+  //POccStructure::POccStructure(const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(pocc_flags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,kflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) : xStream(),m_initialized(false) {initialize(xstr_pocc,pocc_flags,aflags,kflags,FileMESSAGE,oss);}
+  //POccStructure::POccStructure(const POccStructure& b) {copy(b);} // copy PUBLIC
 
-  POccStructure::~POccStructure() {xStream::free();free();}
+  //POccStructure::~POccStructure() {xStream::free();free();}
 
-  const POccStructure& POccStructure::operator=(const POccStructure& b) {  // operator= PUBLIC
-  if(this!=&b) {copy(b);}
-  return *this;
-  }
+  //const POccStructure& POccStructure::operator=(const POccStructure& b) {  // operator= PUBLIC
+  //if(this!=&b) {copy(b);}
+  //return *this;
+  //}
 
-  void POccStructure::clear() {POccStructure a;copy(a);}  // clear PRIVATE
-  void POccStructure::free() {
-  POccCalculatorTemplate::free();
-  m_initialized=false;
-  m_aflags.clear();
-  m_kflags.clear();
-  xstr_sym.clear(); //DX20191220 - uppercase to lowercase clear
-  n_hnf=0;
-  for(uint site=0;site<m_pocc_sites.size();site++){m_pocc_sites[site].clear();} m_pocc_sites.clear();
-  pocc_atoms_total=0;
-  v_str_configs.clear();
-  }
+  //void POccStructure::clear() {POccStructure a;copy(a);}  // clear PRIVATE
+  //void POccStructure::free() {
+  //POccCalculatorTemplate::free();
+  //m_initialized=false;
+  //m_aflags.clear();
+  //m_kflags.clear();
+  //xstr_sym.clear(); //DX20191220 - uppercase to lowercase clear
+  //n_hnf=0;
+  //for(uint site=0;site<m_pocc_sites.size();site++){m_pocc_sites[site].clear();} m_pocc_sites.clear();
+  //pocc_atoms_total=0;
+  //v_str_configs.clear();
+  //}
 
-  void POccStructure::copy(const POccStructure& b) { // copy PRIVATE
-  POccCalculatorTemplate::copy(b);
-  xStream::copy(b);
-  m_initialized=b.m_initialized;
-  m_aflags=b.m_aflags;
-  m_kflags=b.m_kflags;
-  xstr_sym=b.xstr_sym;
-  n_hnf=b.n_hnf;
-  m_pocc_sites=b.m_pocc_sites;
-  pocc_atoms_total=b.pocc_atoms_total;
-  //[OBSOLETE - inside m_pocc_sites ]vv_pocc_groups.clear(); for(uint i=0;i<vv_pocc_groups.size();i++){vv_pocc_groups[i].clear();}
-  //[OBSOLETE - inside m_pocc_sites ]for(uint i=0;i<b.vv_pocc_groups.size();i++){vv_pocc_groups.push_back(vector<POccUnit>(0));for(uint j=0;j<b.vv_pocc_groups[i].size();j++){vv_pocc_groups[i].push_back(b.vv_pocc_groups[i][j]);}}
-  v_str_configs.clear(); for(uint i=0;i<b.v_str_configs.size();i++){v_str_configs.push_back(b.v_str_configs[i]);}
+  //void POccStructure::copy(const POccStructure& b) { // copy PRIVATE
+  //POccCalculatorTemplate::copy(b);
+  //xStream::copy(b);
+  //m_initialized=b.m_initialized;
+  //m_aflags=b.m_aflags;
+  //m_kflags=b.m_kflags;
+  //xstr_sym=b.xstr_sym;
+  //n_hnf=b.n_hnf;
+  //m_pocc_sites=b.m_pocc_sites;
+  //pocc_atoms_total=b.pocc_atoms_total;
+  ////[OBSOLETE - inside m_pocc_sites ]vv_pocc_groups.clear(); for(uint i=0;i<vv_pocc_groups.size();i++){vv_pocc_groups[i].clear();}
+  ////[OBSOLETE - inside m_pocc_sites ]for(uint i=0;i<b.vv_pocc_groups.size();i++){vv_pocc_groups.push_back(vector<POccUnit>(0));for(uint j=0;j<b.vv_pocc_groups[i].size();j++){vv_pocc_groups[i].push_back(b.vv_pocc_groups[i][j]);}}
+  //v_str_configs.clear(); for(uint i=0;i<b.v_str_configs.size();i++){v_str_configs.push_back(b.v_str_configs[i]);}
 
-  //hnf_table_general_precision=b.hnf_table_general_precision;
-  //hnf_table_iteration_padding=b.hnf_table_iteration_padding;
-  //hnf_table_error_padding=b.hnf_table_error_padding;
-  //hnf_table_column_padding=b.hnf_table_column_padding;
-  //header_max_stoich_error=b.header_max_stoich_error;
-  //header_max_site_error=b.header_max_site_error;
-  }
+  ////hnf_table_general_precision=b.hnf_table_general_precision;
+  ////hnf_table_iteration_padding=b.hnf_table_iteration_padding;
+  ////hnf_table_error_padding=b.hnf_table_error_padding;
+  ////hnf_table_column_padding=b.hnf_table_column_padding;
+  ////header_max_stoich_error=b.header_max_stoich_error;
+  ////header_max_site_error=b.header_max_site_error;
+  //}
 
-  void POccStructure::initialize(ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,aflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _kflags& kflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,kflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,aflags,kflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      m_initialized=false;  //no point
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setAFlags(aflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setKFlags(kflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setAFlags(aflags);
-      setKFlags(kflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
+  //void POccStructure::initialize(ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,aflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _kflags& kflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,kflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,aflags,kflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    m_initialized=false;  //no point
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setAFlags(aflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setKFlags(kflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setAFlags(aflags);
+  //    setKFlags(kflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
 
-  void POccStructure::initialize(const aurostd::xoption& pocc_flags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(pocc_flags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,pocc_flags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,pocc_flags,aflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,pocc_flags,kflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ostream& oss) {
-    xStream::free();
-    ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
-    initialize(xstr_pocc,pocc_flags,aflags,kflags,*_p_FileMESSAGE,oss);
-    f_new_ofstream=true;  //override
-  }
-  void POccStructure::initialize(const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccFlags(pocc_flags);
-      m_initialized=false;  //no point
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccFlags(pocc_flags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccFlags(pocc_flags);
-      setAFlags(aflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccFlags(pocc_flags);
-      setKFlags(kflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
-  void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
-    free();
-    try{
-      setOFStream(FileMESSAGE); f_new_ofstream=false;
-      setOSS(oss);
-      setPOccFlags(pocc_flags);
-      setAFlags(aflags);
-      setKFlags(kflags);
-      setPOccStructure(xstr_pocc);
-      m_initialized=true;
-    }
-    catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
-  }
+  //void POccStructure::initialize(const aurostd::xoption& pocc_flags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(pocc_flags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,pocc_flags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,pocc_flags,aflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,pocc_flags,kflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ostream& oss) {
+  //  xStream::free();
+  //  ofstream* _p_FileMESSAGE=new ofstream();f_new_ofstream=true;
+  //  initialize(xstr_pocc,pocc_flags,aflags,kflags,*_p_FileMESSAGE,oss);
+  //  f_new_ofstream=true;  //override
+  //}
+  //void POccStructure::initialize(const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccFlags(pocc_flags);
+  //    m_initialized=false;  //no point
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccFlags(pocc_flags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccFlags(pocc_flags);
+  //    setAFlags(aflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccFlags(pocc_flags);
+  //    setKFlags(kflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
+  //void POccStructure::initialize(const xstructure& xstr_pocc,const aurostd::xoption& pocc_flags,const _aflags& aflags,const _kflags& kflags,ofstream& FileMESSAGE,ostream& oss) {
+  //  free();
+  //  try{
+  //    setOFStream(FileMESSAGE); f_new_ofstream=false;
+  //    setOSS(oss);
+  //    setPOccFlags(pocc_flags);
+  //    setAFlags(aflags);
+  //    setKFlags(kflags);
+  //    setPOccStructure(xstr_pocc);
+  //    m_initialized=true;
+  //  }
+  //  catch(aurostd::xerror& err){pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_ERROR_);}
+  //}
 
-  void POccStructure::setAFlags(const _aflags& aflags) {m_aflags=aflags;}
-  void POccStructure::setKFlags(const _kflags& Kflags) {m_kflags=Kflags;}
-  */
+  //void POccStructure::setAFlags(const _aflags& aflags) {m_aflags=aflags;}
+  //void POccStructure::setKFlags(const _kflags& Kflags) {m_kflags=Kflags;}
 
-    void POccCalculator::generateStructures(const _xvasp& in_xvasp) {
-      bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
-      stringstream message;
-      //[NO NEED, AVASP_populateXVASP() is now const]_aflags aflags=m_aflags; //make copies
-      _xvasp xvasp=in_xvasp; //[NO NEED, AVASP_populateXVASP() is now const]_kflags kflags=in_kflags;_vflags vflags=in_vflags; //make copies
+  void POccCalculator::generateStructures(const _xvasp& in_xvasp) {
+    bool LDEBUG=(FALSE || _DEBUG_POCC_ || XHOST.DEBUG);
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
 
-      if(!m_initialized){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"POccCalculator failed to initialize");}
-      writePARTCAR();
-      calculateHNF();
-      getTotalPermutationsCount();
-      calculate();
+    if(!m_initialized){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"POccCalculator failed to initialize");}
+    writePARTCAR();
+    calculateHNF();
+    getTotalPermutationsCount();
+    calculate();
 
-      message << "Writing out " << POCC_UNIQUE_SUPERCELLS_FILE;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
-
-      stringstream unique_derivative_structures_ss;
-      stringstream new_AflowIn_ss;
-      bool original_quiet_flag=XHOST.QUIET;
+    //CCE check
+    if(m_kflags.KBIN_CCE_CORRECTABLE||XHOST.vflag_control.flag("CCE_CORRECTABLE")){
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"Checking if disordered system is CCE_CORRECTABLE",m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      aurostd::xoption cce_flags(m_p_flags);  //CO20221024 - KC, fix is_correctable to take const input&
+      _aflags cce_aflags(m_aflags); //CO20221024 - KC, fix is_correctable to take const input&
       unsigned long long int isupercell=0;
-
-      //for(unsigned long long int i=0;i<getUniqueSuperCellsCount();i++)
-      for(std::list<POccSuperCellSet>::iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it)
-      { //CO20200106 - patching for auto-indenting
-        isupercell=std::distance(l_supercell_sets.begin(),it);
-        if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting structure[" << isupercell << "]" << endl;}
-
-        //do first so we only need to run getUniqueSuperCell() once
-        xvasp.str.clear(); //DX20191220 - uppercase to lowercase clear
-        xvasp.str=getUniqueSuperCell(isupercell);
-
-        //populate POCC_UNIQUE_SUPERCELLS_FILE
-        unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
-        unique_derivative_structures_ss << AFLOW_POCC_TAG << "STRUCTURE " << isupercell+1 << "/" << l_supercell_sets.size() << endl;
-        unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
-        unique_derivative_structures_ss << AFLOW_POCC_TAG << "UFF_ENERGY=" << std::fixed << std::setprecision(15) << (*it).getUFFEnergy() << endl; unique_derivative_structures_ss.unsetf(std::ios_base::floatfield);
-        unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
-        unique_derivative_structures_ss << POSCAR_POCC_series_START_tag << getARUNString(isupercell) << endl; // ." << ss_pocc_count.str() << endl;
-        unique_derivative_structures_ss << xvasp.str; //getUniqueSuperCell(isupercell);
-        unique_derivative_structures_ss << POSCAR_POCC_series_STOP_tag << getARUNString(isupercell) << endl; // ." << ss_pocc_count.str() << endl;
-        unique_derivative_structures_ss << AFLOWIN_SEPARATION_LINE << endl;
-
-        xvasp.Directory=m_aflags.Directory; //arun_directory;
-        xvasp.AVASP_arun=true;
-        xvasp.AVASP_arun_mode = "POCC"; //CO20181226
-        xvasp.AVASP_arun_runname = getARUNString(isupercell);
-        xvasp.aopts.flag("FLAG::AVASP_SKIP_NOMIX",FALSE); //[CO20191110]high-entropy offers increased solubility over binaries
-
-        XHOST.QUIET=true;
-
-        if(LDEBUG) {
-          cerr << __AFLOW_FUNC__ << " printing xstructure" << endl;
-          cerr << xvasp.str << endl;
-          cerr << __AFLOW_FUNC__ << " printing POSCAR" << endl;
-          cerr << xvasp.POSCAR.str() << endl;
-          cerr << __AFLOW_FUNC__ << " xvasp.str.species.size()=" << xvasp.str.species.size() << endl;
-        }
-
-        AVASP_populateXVASP(m_aflags,m_kflags,m_vflags,xvasp);
-        AVASP_MakeSingleAFLOWIN(xvasp,new_AflowIn_ss,true); //false,-1,false);  //don't write/print and hence don't pthread
-
-        XHOST.QUIET=original_quiet_flag;
+      xstructure cce_structure(getUniqueSuperCell(isupercell));  //CO20221024 - KC, fix is_correctable to take const input&
+      if(!cce::is_correctable(cce_flags,cce_structure,cce_aflags,*p_FileMESSAGE,*p_oss)){
+        aurostd::string2file("See LOCK file for details.",m_aflags.Directory+"/NOT_CCE_CORRECTABLE");
+        string dname=aurostd::dirname(m_aflags.Directory);
+        string bname=aurostd::basename(m_aflags.Directory);
+        aurostd::execute("bash -c \"cd \'"+dname+"\' && zip -9rmv \'"+bname+"\'.zip \'"+bname+"\'\"");  //no pushd/popd; there's no directory to popd to anymore
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Skipping structure generation as requested");
+        //[throw, do not return, no directory left]return;
       }
-      aurostd::stringstream2file(unique_derivative_structures_ss,getOutputPath()+"/"+POCC_FILE_PREFIX+POCC_UNIQUE_SUPERCELLS_FILE);
     }
+
+    writePreProcessing(in_xvasp);
+  }
 
   // ME20211004
   void POccCalculator::createModuleAflowIns(const _xvasp& xvasp_in, const string& MODULE) {
@@ -6243,6 +8469,10 @@ namespace pocc {
     ///////////////////////////////////////////////////////////////////
 
     calculateSymNonPOccStructure(true); //calculate standard parent structure symmetry, report results
+    
+    setSConfig(); //CO20250321
+    setHmixMiedema(); // ST20250701
+    setDeltaProperties(); //CO20250321
   }
 
   const xmatrix<double>& POccCalculator::getLattice() const {return xstr_sym.lattice;}
@@ -6284,6 +8514,7 @@ namespace pocc {
         pocc_sites.back().v_occupants.push_back(atom);
         pocc_sites.back().v_types.push_back(pocc_atom.type);
         pocc_sites.back().partial_occupation_flag=!aurostd::isequal(pocc_atom.partial_occupation_value,1.0,_AFLOW_POCC_ZERO_TOL_); //if the only other occupant is a vacancy
+        pocc_sites.back().partial_occupation_value=pocc_atom.partial_occupation_value; // ST20250602 it was not assigned before
         pocc_sites.back().m_initialized=true;
       }
     }
@@ -7720,7 +9951,7 @@ namespace pocc {
     uint atom1,atom2,type1,type2;
     UFFParamAtom uffai, uffaj;
     UFFParamBond uffb;
-    uint count=0;
+    //[CO20230626 - clang warning not used]uint count=0;
 
     if(LDEBUG) {cerr << __AFLOW_FUNC__ << " bonding mode = " << (MODE==BOND_MODE ? "bonding" : "non-bonding") << endl;}
 
@@ -7761,7 +9992,7 @@ namespace pocc {
       //cerr << endl;
       //  continue;
       //}
-      count++;
+      //[CO20230626 - clang warning not used]count++;
       //skip anything with a vacancy - END
       //cerr << "atom1=" << atom1 << endl;
       //cerr << "atom2=" << atom2 << endl;
@@ -8362,6 +10593,12 @@ namespace pocc {
 
     //copy over l_supercell_sets
     pcalc.l_supercell_sets.clear();for(std::list<POccSuperCellSet>::const_iterator it=l_supercell_sets.begin();it!=l_supercell_sets.end();++it){pcalc.l_supercell_sets.push_back(*it);}
+    //POSCAR title of the first structure of each group: its HNF matrix and decoration, for the correlation functions  //CO20261006
+    pcalc.m_vsupercell_titles.clear();
+    for(uint i=0;i<m_vPOSCAR_lines.size();i++){
+      if(m_vPOSCAR_lines[i].empty() || m_vPOSCAR_lines[i][0].empty() || m_vPOSCAR_lines[i][0][0]>=m_vcontent.size()){pcalc.m_vsupercell_titles.clear();break;}
+      pcalc.m_vsupercell_titles.push_back(m_vcontent[m_vPOSCAR_lines[i][0][0]]);
+    }
     if(!getARUNDirectories(pcalc.m_ARUN_directories,tryDirectoryLS)){return false;}
     if(LDEBUG){
       for(uint i=0;i<pcalc.m_ARUN_directories.size();i++){cerr << __AFLOW_FUNC__ << " m_ARUN_directories[" << i << "]=" << pcalc.m_ARUN_directories[i] << endl;}

@@ -233,6 +233,66 @@ int main(int _argc,char **_argv) {
       return (ut.runTestSuites(tests)?0:1);
     }
     if(!Arun && aurostd::args2flag(argv,cmds,"--test_smith|--smith_test")) {return (smithTest()?0:1);}  //CO20190601
+    if(!Arun && aurostd::args2flag(argv,cmds,"--test_http")) {
+      cout << aurostd::httpGet(CHAOS_API_URL_DEFAULT + "?species(Fe,O),density(0*),paging(1,5)") << endl; //CO20261006 - the CHAOS API (was /API/aflux/)
+      return 0;
+    }
+
+    if(!Arun && aurostd::args2flag(argv,cmds,"--test_entryLoader")) {   //WJ20231103 START
+      { // ensures that all resources are released as soon as possible
+        vector<aflowlib::_aflowlib_entry> entries;
+        //[CO20260423 - OBSOLETE]const vector<string>& _velements = {"Cu"};
+        aflowlib::EntryLoader el;
+        el.m_out_debug = LDEBUG; // leave this on for testing
+        const aflowlib::EntryLoader::Source source_aflux=aflowlib::EntryLoader::Source::AFLUX; //CO20260930
+        el.setSource(source_aflux);
+        string query = "?species(Fe,O),density(0*),paging(1),stress_tensor(@(1)(0*)),bader_net_charges(@O(*0)),ael_stiffness_tensor(@(1,1)(220*)),format(aflow)"; //Needs format(aflow) and the question mark
+        el.loadAFLUXQuery(query);
+        el.getEntriesFlat(entries);
+        cout << entries.size() << endl;
+      }
+      return 0;
+    }
+    //WJ20231103 STOP
+
+    if(!Arun && aurostd::args2flag(argv,cmds,"--test_qmvasp")) { //CO20230913
+      string directory=".";
+      stringstream straus;aurostd::file2stringstream(directory+"/POSCAR",straus);
+      xstructure xstr(straus);
+      //cerr << xstr << endl;
+      xstr.qm_load(directory);
+      return 0;
+    }
+    if(!Arun && aurostd::args2flag(argv,cmds,"--test_xvasp")) { //CO20230913
+
+      _xvasp xvasp;xvasp.Directory=".";
+      stringstream straus;aurostd::file2stringstream(xvasp.Directory+"/POSCAR",straus);xvasp.str=xstructure(straus,IOVASP_AUTO);
+      _aflags aflags;aflags.Directory=".";
+      ofstream FileMESSAGE;
+      ostream& oss=cout;
+      
+      //aflow.in
+      string AflowIn_file="",AflowIn="";
+      try{KBIN::getAflowInFromAFlags(aflags,AflowIn_file,AflowIn,FileMESSAGE,oss);}
+      catch(aurostd::xerror& err){
+        pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), aflags, FileMESSAGE, oss, _LOGGER_ERROR_);
+      }
+      _kflags kflags=KBIN::VASP_Get_Kflags_from_AflowIN(AflowIn,FileMESSAGE,aflags,oss);
+      _vflags vflags=KBIN::VASP_Get_Vflags_from_AflowIN(AflowIn,FileMESSAGE,aflags,kflags,oss);
+
+      KBIN::XVASP_INCAR_SPIN_FIX_RELAX(xvasp,aflags,vflags,1,true,FileMESSAGE);
+      return 0;
+    }
+    if(!Arun && aurostd::args2flag(argv,cmds,"--test_vaspVersion")) { //CO20230913
+      cerr << __AFLOW_FUNC__ << " getVASPVersion(vasp_std)=" << KBIN::getVASPVersion("vasp_std") << endl;
+      cerr << __AFLOW_FUNC__ << " getVASPVersionDouble(vasp_std)=" << KBIN::getVASPVersionDouble("vasp_std") << endl;
+      cerr << __AFLOW_FUNC__ << " getVASPVersion(vasp_std.6.3.1)=" << KBIN::getVASPVersion("vasp_std.6.3.1") << endl;
+      cerr << __AFLOW_FUNC__ << " getVASPVersionDouble(vasp_std.6.3.1)=" << KBIN::getVASPVersionDouble("vasp_std.6.3.1") << endl;
+      cerr << __AFLOW_FUNC__ << " getVASPVersion(vasp_std.6.4.1)=" << KBIN::getVASPVersion("vasp_std.6.4.1") << endl;
+      cerr << __AFLOW_FUNC__ << " getVASPVersionDouble(vasp_std.6.4.1)=" << KBIN::getVASPVersionDouble("vasp_std.6.4.1") << endl;
+      return 0;
+    }
+
     if(!Arun && aurostd::args2flag(argv,cmds,"--test")) {
 
       if(XHOST.vext.size()!=XHOST.vcat.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"XHOST.vext.size()!=XHOST.vcat.size(), aborting.",_RUNTIME_ERROR_);}
@@ -412,12 +472,12 @@ int main(int _argc,char **_argv) {
       vector<aflowlib::_aflowlib_entry> vdata;
       for(uint i=4;i<BRAVAIS_LATTICES.size();i++) { //HE20220420 switch to global bravais lattices list
         data.clear();
-        data.url2aflowlib("materials.duke.edu:AFLOWDATA/ICSD_WEB/"+BRAVAIS_LATTICES[i]+"/?format=text",cout,FALSE);vdata.push_back(data);
+        data.url2aflowlib(aflowlib::AFLOWLIBServer()+":AFLOWDATA/ICSD_WEB/"+BRAVAIS_LATTICES[i]+"/?format=text",cout,FALSE);vdata.push_back(data); //CO20261006 - the server of this run (--server=)
         cout << "AFLOWLIB " << BRAVAIS_LATTICES[i] << "=" << data.vaflowlib_entries.size() << endl;
         for(uint j=0;j<data.vaflowlib_entries.size();j++) {
           aflowlib::_aflowlib_entry dataj;
-          dataj.url2aflowlib("materials.duke.edu:AFLOWDATA/ICSD_WEB/"+BRAVAIS_LATTICES[i]+"/"+data.vaflowlib_entries.at(j),cout,TRUE);
-          aurostd::StringSubst(dataj.aurl,"aflowlib","materials");
+          dataj.url2aflowlib(aflowlib::AFLOWLIBServer()+":AFLOWDATA/ICSD_WEB/"+BRAVAIS_LATTICES[i]+"/"+data.vaflowlib_entries.at(j),cout,TRUE); //CO20261006
+          //CO20261006 - the entries are read from the server that listed them (the AURL's host was changed to another server)
           if(dataj.aurl!="") {
             xstructure str(dataj.aurl,"CONTCAR.relax.vasp",IOAFLOW_AUTO);
             xEIGENVAL xEIGENVAL;xEIGENVAL.GetPropertiesUrlFile(dataj.aurl,"EIGENVAL.bands"+DEFAULT_KZIP_EXT+"",FALSE);
@@ -617,12 +677,22 @@ int main(int _argc,char **_argv) {
 // ***************************************************************************
 // AFLOW_main
 // ***************************************************************************
-int AFLOW_main(vector<string> &argv) {
+int AFLOW_main(const vector<string> &argv) {
   if(!XHOST.QUIET) cout << aflow::Banner("INTRODUCTION");// << endl;
   KBIN::KBIN_Main(argv);
   // if(!XHOST.QUIET) cout << "MMMMM  AFLOW VERSION " << string(AFLOW_VERSION) << "  " << endl;
   return 0; //1; //CO20180419 - return 0 is normal
 }
+
+// ***************************************************************************
+// aflow::BaseVersion, aflow::ForkYears, aflow::ForkNotice
+// ***************************************************************************
+//CO20261017 - this fork of AFLOW, for the banners and the license preamble (GPL-3.0, section 5a: a modified version says so)
+namespace aflow {
+  string BaseVersion(void) {return string(AFLOW_VERSION).substr(0,string(AFLOW_VERSION).find('+'));}
+  string ForkYears(void) {return string(AFLOW_FORK_FIRST_YEAR)+"-"+string(TODAY).substr(0,4);}
+  string ForkNotice(void) {return string(AFLOW_FORK_NAME)+", built on AFLOW "+BaseVersion()+": changes "+ForkYears()+" by the "+string(AFLOW_FORK_GROUP);}
+} // namespace aflow
 
 // ***************************************************************************
 // aflow::License_aflow
@@ -638,6 +708,7 @@ namespace aflow {
     strstream << "*                                                                         *" << endl;
     strstream << "***************************************************************************" << endl;
     strstream << "Copyright 2003-2023 - AFLOW.ORG consortium" << endl;  //CO20200502 - SC -> AFLOW consortium
+    strstream << ForkNotice() << endl;  //CO20261017
     strstream << endl;
     strstream << "This file is part of AFLOW software." << endl;
     strstream << endl;
@@ -681,6 +752,7 @@ namespace aflow {
     strstream << "******* BEGIN RUNNING MODE *************************************************************************" << endl;
     strstream << tab << x << " --run|--run=multi|--run=N   COMMANDS for running" << endl;
     strstream << tab << x << " --clean|-c                    COMMAND for cleaning  " << endl;
+    strstream << tab << x << " --clean|-c --keep_relax       COMMAND for cleaning that keeps the relaxations and parts for a restart" << endl;  //CO20261006
     strstream << endl;
     strstream << " MODIFIERS" << endl;
     strstream << tab << " --DIRECTORY[=| ]dir|--D[=| ]dir|--d[=| ]dir" << endl;
@@ -707,7 +779,8 @@ namespace aflow {
     strstream << tab << " --machine=beta|beta_openmpi|qrats|qflow|x|conrad|eos|materials|habana|aflowlib|ranger|kraken" << endl;
     strstream << tab << "           marylou|parsons|jellium|ohad|host1" << endl;
     strstream << tab << "           raptor --np=N|diamond --np=N" << endl;
-    strstream << tab << " --machine_name=XXXX " << endl;
+    strstream << tab << " --machine=machine001|machine002|machine003|machine004|machine101|machine102|machine103 (generic templates, MPI settings in .aflow.rc)" << endl;  //CO20261004
+    strstream << tab << " --machine_name=XXXX (which machine this is; printed first in the LOCK, e.g. --machine_name=Lab-Cluster)" << endl;  //CO20261004
     strstream << "******* END RUNNING MODE ***************************************************************************" << endl;
     strstream << endl;
     // --readme=htresources
@@ -825,7 +898,8 @@ namespace aflow {
     if(type=="VERSION" || type=="AFLOW_VERSION") {
       oss << "" << endl;
       oss << "AFLOW VERSION " << string(AFLOW_VERSION) << " Automatic-FLOW [(C) "<<XHOST.Copyright_Years<<" aflow.org consortium]" << endl;
-      oss << "New versions are available here: <http://" << XHOST.AFLOW_MATERIALS_SERVER << "/AFLOW/>" << endl;
+      oss << ForkNotice() << endl;  //CO20261017
+      oss << "New versions are available here: <" << AFLOW_FORK_URL << ">" << endl;  //CO20261017 - was http://AFLOW_MATERIALS_SERVER/AFLOW/
       oss << "" << endl;
       oss << "AFLOW is free software: you can redistribute it and/or modify it under the terms of the" << endl;
       oss << "GNU General Public License as published by the Free Software Foundation, either version 3" << endl;
@@ -847,6 +921,7 @@ namespace aflow {
       oss << "MMMMM  AFLOW VERSION " << string(AFLOW_VERSION) << " Automatic-FLOW for materials discovery - [" << TODAY << "] -" << aflow_get_time_string() << endl;
       //    oss << "MMMMM  AFLOW VERSION " << aurostd::PaddedPOST(string(AFLOW_VERSION),5) <<" - BUILT ["<<TODAY<<"] - (C) " << XHOST.Copyright_Years << "    " << endl;
       oss << "MMMMM  AFLOW.org consortium - High-Throughput ab-initio Computing Project - (C) " << XHOST.Copyright_Years << "    " << endl;
+      oss << "MMMMM  " << ForkNotice() << endl;  //CO20261017
       oss << "MMMMM  ";// << endl;
       oss << "MMMMM  AFLOW is free software: you can redistribute it and/or modify it under the terms of the" << endl;
       oss << "MMMMM  GNU General Public License as published by the Free Software Foundation, either version 3" << endl;
@@ -872,6 +947,8 @@ namespace aflow {
       oss << "*                                                                                                  *" << endl;
       oss << "*                          aflow - Automatic-FLOW for materials discovery                          *" << endl;
       oss << "*                aflow.org consortium - High-Throughput ab-initio Computing Project                *" << endl;
+      oss << "*" << aurostd::PaddedCENTER(string(AFLOW_FORK_NAME)+" - built on AFLOW "+BaseVersion(),100) << "*" << endl;  //CO20261017
+      oss << "*" << aurostd::PaddedCENTER(string(AFLOW_FORK_GROUP)+" - "+ForkYears(),100) << "*" << endl;  //CO20261017
       oss << "*" << aurostd::PaddedCENTER(string("version "+string(AFLOW_VERSION)+" - g++/gcc "+aurostd::utype2string(__GNUC__)+"."+aurostd::utype2string(__GNUC_MINOR__)+"."+aurostd::utype2string(__GNUC_PATCHLEVEL__)+" - built ["+string(TODAY)+"] - (C) " +XHOST.Copyright_Years),100) << "*" << endl;
       oss << "*                                                                                                  *" << endl;
       oss << "****************************************************************************************************" << endl;
@@ -926,13 +1003,27 @@ namespace aflow {
       oss << "*  2021-2023 Simon Divilov (QCA, fitting); 2021-2023 Hagen Eckert (GFA, entry loader, JSON);       *" << endl;
       oss << "*                                                                                                  *" << endl;
       oss << "****************************************************************************************************" << endl;
+      oss << "*                                                                                                  *" << endl;
+      oss << "*" << aurostd::PaddedCENTER(string(AFLOW_FORK_NAME)+" - CONTRIBUTORS",100) << "*" << endl;  //CO20261017
+      oss << "*  2022-2026 Corey Oses (POCC, high-entropy descriptors, CHAOS, convex hull, VASP workflows);      *" << endl;
+      oss << "*  2024-2025 Shao-Yu Tseng (high-entropy descriptors, Miedema mixing enthalpy);                    *" << endl;
+      oss << "*  2024-2026 Matthew Brownrigg (AFLUX, CHAOS API);                                                 *" << endl;
+      oss << "*  2023-2024 Will Shiber (AFLUX, entry loader, GitHub checks);                                     *" << endl;
+      oss << "*  2022-2024 Keith Clark (CCE, entry loader, prototypes); 2024 Yuxiang Liu (POCC sampling);        *" << endl;
+      oss << "*  2023-2026 Tianhao Li (POCC sampling, APL Debye temperatures, prototypes);                       *" << endl;
+      oss << "*  2023-2025 Katie Cariaga (prototype redecoration);                                               *" << endl;
+      oss << "*  2026 Hashan Peiris (DEED, convex hull); 2025 Samridhi Chordia (Egap_DOS);                       *" << endl;
+      oss << "*  2024-2026 Xiao Xu (APL, CCE); 2024-2025 Guotao Qiu (CCE); 2024 Maya Niyogi (entry loader);      *" << endl;
+      oss << "*  2026 Peter Boctor (HTTP)                                                                        *" << endl;
+      oss << "*                                                                                                  *" << endl;
+      oss << "****************************************************************************************************" << endl;
       oss << "*" << aurostd::PaddedCENTER(string("version "+string(AFLOW_VERSION)+" - g++/gcc "+aurostd::utype2string(__GNUC__)+"."+aurostd::utype2string(__GNUC_MINOR__)+"."+aurostd::utype2string(__GNUC_PATCHLEVEL__)+" - built ["+string(TODAY)+"] - (C) " +XHOST.Copyright_Years),100) << "*" << endl;
       oss << "****************************************************************************************************" << endl;
       return oss.str();
     }
     if(type=="BANNER_TINY") {
       // called 63 times
-      oss << "AFLOW VERSION "<<AFLOW_VERSION<<":  [aflow.org consortium - 2003-2023] ";
+      oss << "AFLOW VERSION "<<AFLOW_VERSION<<":  [aflow.org consortium - 2003-2023] [" << AFLOW_FORK_NAME << " - " << ForkYears() << "] ";  //CO20261017
       return oss.str();
     }
     if(type == "EXCEPTIONS") {
@@ -974,7 +1065,7 @@ namespace aflow {
     }
     cerr << XPID << "aflow::Banner type=" << type << " not found..." << endl;
     oss << "aflow::Banner type=" << type << " not found..." << endl;
-    return 0; //CO20180419
+    return string(); //CO20180419 //CO20261017 - string(), not 0 (a null pointer)
     return oss.str();
   }
 } // namespace aflow

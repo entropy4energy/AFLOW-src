@@ -330,6 +330,7 @@ namespace SYM {
   void ReducedRowEchelonForm(xmatrix<double>& M, double& tol); //DX20190215
   bool find_solution_UD(xmatrix<double> M, xvector<double>& SOL, double& tol);  //check if underdetermined system has a solution, and get a particular solution. //DX20190215
   bool checkLinearSystem(vector<xvector<double> >& LHS, vector<double>& RHS, xmatrix<double>& lattice, double& tol); //DX20190215
+  bool solve_underdetermined_modulo_lattice(const vector<xvector<double> >& LHS, const vector<double>& RHS, xvector<double>& SOL, const xmatrix<double>& lattice, bool skew, double tol); //CO20261003
   //WYCKOFF FUNCITONS
   vector<double> system_solve(vector<double> numeric, vector<vector<sdouble> > variable);
   vector<vector<double> > wyckoff_solve(vector<vector<vector<sdouble> > > win, vector<eqatoms> pin);

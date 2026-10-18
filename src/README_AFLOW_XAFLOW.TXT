@@ -4,9 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE EXECUTABLE:                 materials.duke.edu/AFLOW/xaflow
-LATEST VERSION OF THE README:                     materials.duke.edu/AFLOW/README_XAFLOW.TXT
-****************************************************************************************************
 
 XAFLOW README:
 
@@ -21,7 +18,7 @@ N.B. xaflow is a makefile.
 
 Installing xaflow (perform only once):
 1. Download xaflow:
-      wget materials.duke.edu/AFLOW/xaflow
+      wget s4e.ai/AFLOW/xaflow
   - Note that this may require you to first install wget on your machine, 
     if it is not all already available.
   - On mac: brew install wget.

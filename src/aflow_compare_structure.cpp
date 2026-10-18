@@ -22,7 +22,7 @@
 //[OBSOLETE ME20220129 - not used] #warning "The multithread parts of AFLOW-XtalFinder will be not included, since they need gcc 4.4 and higher (C++0x support)."
 //[OBSOLETE ME20220129 - not used] #endif
 
-  static uint DEFAULT_COMPARE_AFLUX_PAGE_SIZE = 75000;  // Appears to be small enough to prevent timeouts while being large enough to limit the number of requests
+  static uint DEFAULT_COMPARE_AFLUX_PAGE_SIZE = AFLUX_PAGE_SIZE_DEFAULT;  //CO20261006 - the CHAOS API's planned largest page (was 75000)
 
 // ***************************************************************************
 // SEE README_AFLOW_COMPARE.TXT FOR THE FULL LIST OF AFLOW COMMANDS
@@ -1213,10 +1213,10 @@ vector<StructurePrototype> XtalFinderCalculator::compare2database(
   vector<string> auids, aurls, compounds;
   for(uint i=0;i<properties_response.size();i++){
     for(uint j=0;j<properties_response[i].size();j++){
-      if(properties_response[i][j].first=="aurl"){
-        aurls.push_back(properties_response[i][j].second);
+      if(properties_response[i][j].first=="aurl" || properties_response[i][j].first=="chaos_path"){  //CO20261008 - chaos_path too
+        aurls.push_back(aflowlib::ChaosPath2AURL(properties_response[i][j].second));
       }
-      if(properties_response[i][j].first=="auid"){
+      if(properties_response[i][j].first=="auid" || properties_response[i][j].first=="chaos_id"){  //CO20261008 - chaos_id too
         auids.push_back(properties_response[i][j].second);
       }
       if(properties_response[i][j].first=="compound"){
@@ -1677,10 +1677,10 @@ namespace compare {
     vector<string> auids, aurls, compounds;
     for(uint i=0;i<properties_response.size();i++){
       for(uint j=0;j<properties_response[i].size();j++){
-        if(properties_response[i][j].first=="aurl"){
-          aurls.push_back(properties_response[i][j].second);
+        if(properties_response[i][j].first=="aurl" || properties_response[i][j].first=="chaos_path"){  //CO20261008 - chaos_path too
+          aurls.push_back(aflowlib::ChaosPath2AURL(properties_response[i][j].second));
         }
-        if(properties_response[i][j].first=="auid"){
+        if(properties_response[i][j].first=="auid" || properties_response[i][j].first=="chaos_id"){  //CO20261008 - chaos_id too
           auids.push_back(properties_response[i][j].second);
         }
         if(properties_response[i][j].first=="compound"){
@@ -2098,10 +2098,11 @@ namespace compare {
 // compare::getTransformationBetweenStructures() //DX20201229
 // ***************************************************************************
 namespace compare {
-  structure_mapping_info getTransformationBetweenStructures(const xstructure& xstr1, const xstructure& xstr2, bool same_species, uint num_proc) { //DX20191108 - remove const & from bools
+  structure_mapping_info getTransformationBetweenStructures(const xstructure& xstr1, const xstructure& xstr2, bool same_species, bool optimize_match, uint num_proc) { //DX20191108 - remove const & from bools
     double misfit_final=AUROSTD_MAX_DOUBLE;
     bool scale_volume=true; //default is true
-    bool optimize_match=false; //default is false
+    // bool optimize_match=false; //default is false
+    // ST20250609 take this from the argument instead, as declared
     structure_mapping_info misfit_info_final = compare::initialize_misfit_struct();
     aflowCompareStructure(xstr1, xstr2, same_species, scale_volume, optimize_match, misfit_final, misfit_info_final, num_proc); //DX20191122 - move ostream to end
     return misfit_info_final;

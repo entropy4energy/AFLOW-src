@@ -13488,8 +13488,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Er_3:PAW_PBE:06Sep2000
     x.species_pp_version.push_back("Er_3:PAW_PBE:06Sep2000");                 // Er_3:PAW_PBE:06Sep2000
     x.species_pp_AUID.push_back("d843969058538e36");                          // Er_3:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_energy.push_back(-123456);//d843969058538e36     // Er_3:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_structure.push_back("N/A_d843969058538e36");     // Er_3:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_energy.push_back(-4.558292);//                   // Er_3:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_structure.push_back("A3");                       // Er_3:PAW_PBE:06Sep2000
     x.vEATOM.push_back(671.8481);                                             // Er_3:PAW_PBE:06Sep2000
     x.vRMAX.push_back(3.703);                                                 // Er_3:PAW_PBE:06Sep2000
     x.vLEXCH.push_back("PE");                                                 // Er_3:PAW_PBE:06Sep2000
@@ -13788,8 +13788,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Gd:PAW_PBE:08Apr2002
     x.species_pp_version.push_back("Gd:PAW_PBE:08Apr2002");                   // Gd:PAW_PBE:08Apr2002
     x.species_pp_AUID.push_back("c0f01c59eb971d30");                          // Gd:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_energy.push_back(-123456);//c0f01c59eb971d30     // Gd:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_structure.push_back("N/A_c0f01c59eb971d30");     // Gd:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_energy.push_back(-14.07795);//                   // Gd:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_structure.push_back("A3");                       // Gd:PAW_PBE:08Apr2002
     x.vEATOM.push_back(3047.6015);                                            // Gd:PAW_PBE:08Apr2002
     x.vRMAX.push_back(2.879);                                                 // Gd:PAW_PBE:08Apr2002
     x.vLEXCH.push_back("PE");                                                 // Gd:PAW_PBE:08Apr2002
@@ -14788,8 +14788,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Nd:PAW_PBE:08Apr2002
     x.species_pp_version.push_back("Nd:PAW_PBE:08Apr2002");                   // Nd:PAW_PBE:08Apr2002
     x.species_pp_AUID.push_back("81811d7c33a85a8b");                          // Nd:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_energy.push_back(-123456);//81811d7c33a85a8b     // Nd:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_structure.push_back("N/A_81811d7c33a85a8b");     // Nd:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_energy.push_back(-7.612845);//                   // Nd:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_structure.push_back("A1");                       // Nd:PAW_PBE:08Apr2002
     x.vEATOM.push_back(1563.009);                                             // Nd:PAW_PBE:08Apr2002
     x.vRMAX.push_back(2.898);                                                 // Nd:PAW_PBE:08Apr2002
     x.vLEXCH.push_back("PE");                                                 // Nd:PAW_PBE:08Apr2002
@@ -15338,8 +15338,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Pm:PAW_PBE:08Apr2002
     x.species_pp_version.push_back("Pm:PAW_PBE:08Apr2002");                   // Pm:PAW_PBE:08Apr2002
     x.species_pp_AUID.push_back("a66df35b1ed2d552");                          // Pm:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_energy.push_back(-123456);//a66df35b1ed2d552     // Pm:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_structure.push_back("N/A_a66df35b1ed2d552");     // Pm:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_energy.push_back(-9.154241);//                   // Pm:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_structure.push_back("A1");                       // Pm:PAW_PBE:08Apr2002
     x.vEATOM.push_back(1870.3302);                                            // Pm:PAW_PBE:08Apr2002
     x.vRMAX.push_back(2.867);                                                 // Pm:PAW_PBE:08Apr2002
     x.vLEXCH.push_back("PE");                                                 // Pm:PAW_PBE:08Apr2002
@@ -15413,8 +15413,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Pr:PAW_PBE:08Apr2002
     x.species_pp_version.push_back("Pr:PAW_PBE:08Apr2002");                   // Pr:PAW_PBE:08Apr2002
     x.species_pp_AUID.push_back("82dbd5ee06192a4c");                          // Pr:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_energy.push_back(-123456);//82dbd5ee06192a4c     // Pr:PAW_PBE:08Apr2002
-    x.species_pp_groundstate_structure.push_back("N/A_82dbd5ee06192a4c");     // Pr:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_energy.push_back(-6.511262);//                   // Pr:PAW_PBE:08Apr2002
+    x.species_pp_groundstate_structure.push_back("A1");                       // Pr:PAW_PBE:08Apr2002
     x.vEATOM.push_back(1294.6661);                                            // Pr:PAW_PBE:08Apr2002
     x.vRMAX.push_back(2.901);                                                 // Pr:PAW_PBE:08Apr2002
     x.vLEXCH.push_back("PE");                                                 // Pr:PAW_PBE:08Apr2002
@@ -16063,8 +16063,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Tb_3:PAW_PBE:06Sep2000
     x.species_pp_version.push_back("Tb_3:PAW_PBE:06Sep2000");                 // Tb_3:PAW_PBE:06Sep2000
     x.species_pp_AUID.push_back("df41de2ac6afa1b3");                          // Tb_3:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_energy.push_back(-123456);//df41de2ac6afa1b3     // Tb_3:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_structure.push_back("N/A_df41de2ac6afa1b3");     // Tb_3:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_energy.push_back(-4.611976);//                   // Tb_3:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_structure.push_back("A3");                       // Tb_3:PAW_PBE:06Sep2000
     x.vEATOM.push_back(640.517);                                              // Tb_3:PAW_PBE:06Sep2000
     x.vRMAX.push_back(3.696);                                                 // Tb_3:PAW_PBE:06Sep2000
     x.vLEXCH.push_back("PE");                                                 // Tb_3:PAW_PBE:06Sep2000
@@ -16188,8 +16188,8 @@
     x.species_pp_type.push_back("PAW_PBE");                                   // Th_s:PAW_PBE:06Sep2000
     x.species_pp_version.push_back("Th_s:PAW_PBE:06Sep2000");                 // Th_s:PAW_PBE:06Sep2000
     x.species_pp_AUID.push_back("78f7995fc479457d");                          // Th_s:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_energy.push_back(-123456);//78f7995fc479457d     // Th_s:PAW_PBE:06Sep2000
-    x.species_pp_groundstate_structure.push_back("N/A_78f7995fc479457d");     // Th_s:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_energy.push_back(-7.269517);//                   // Th_s:PAW_PBE:06Sep2000
+    x.species_pp_groundstate_structure.push_back("A1");                       // Th_s:PAW_PBE:06Sep2000
     x.vEATOM.push_back(630.1587);                                             // Th_s:PAW_PBE:06Sep2000
     x.vRMAX.push_back(3.542);                                                 // Th_s:PAW_PBE:06Sep2000
     x.vLEXCH.push_back("PE");                                                 // Th_s:PAW_PBE:06Sep2000

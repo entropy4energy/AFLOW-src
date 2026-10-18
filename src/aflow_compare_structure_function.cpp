@@ -12,6 +12,7 @@
 #include "aflow_pflow.h"
 #include "aflow_compare_structure.h"
 #include "aflow_symmetry_spacegroup.h"
+#include "aflow_prototypes_jhu.h" //CO20261004
 
 //[OBSOLETE - ME20220128] #undef AFLOW_MULTITHREADS_ENABLE
 
@@ -2626,6 +2627,7 @@ void XtalFinderCalculator::addAFLOWPrototypes2container(
     vector<string> tokens;
     if(aurostd::string2tokens(vlabel[i],tokens,"_")>=4) {
       vector<string> vparameter_values = anrl::getANRLParameters(vlabel[i],"all");
+      const vector<uint> vnumbers = jhuproto::setNumbers(vlabel[i], vparameter_values); //CO20261004 - set number of each parameter set
       for(uint j=0;j<vparameter_values.size();j++){
 
         structure_container structure_tmp;
@@ -2635,8 +2637,7 @@ void XtalFinderCalculator::addAFLOWPrototypes2container(
         }
         //if multiple degrees of freedom, then number scheme is required
         else {
-          stringstream tmp; tmp << vlabel[i] << "-" << std::setw(3) << std::setfill('0') << j+1;
-          structure_tmp.name = tmp.str();
+          structure_tmp.name = vlabel[i] + "-" + aurostd::PaddedNumString(vnumbers[j], 3); //CO20261004 - was j+1
         }
         structure_tmp.stoichiometry = structure_containers[0].stoichiometry;
         structure_tmp.space_group = structure_containers[0].space_group; // same as representative structure (either will be the same, or we are forcing it to be for the ignore_symmetry/ignore_Wyckoff run)
@@ -7157,6 +7158,8 @@ void XtalFinderCalculator::findSimilarTranslationVectors(
     cerr << __AFLOW_FUNC__ << " Number of potential lattice vectors: " << lattice_vecs.size() << endl;
   }
 
+  bool skew=false;  //CO20240519 - this was the default behavior, I recommend updating these functions later to be more robust
+
   // ---------------------------------------------------------------------------
   // check if vectors preserve crystal periodicity
   // if only one LFA atom in unit cell -> lattice point -> vectors=lattice vectors (by definition)
@@ -7166,7 +7169,7 @@ void XtalFinderCalculator::findSimilarTranslationVectors(
     // Removing non-periodic lattice vectors
     vector<xvector<double> > lattice_vecs_periodic;
     for(uint i=0;i<lattice_vecs.size();i++){
-      if(isTranslationVector(xstr,lattice_vecs[i],0.5,false)){
+      if(isTranslationVector(xstr,lattice_vecs[i],0.5,skew)){  //CO20240518 - removing is_frac option
         lattice_vecs_periodic.push_back(lattice_vecs[i]);
       }
     }
@@ -7252,7 +7255,7 @@ bool XtalFinderCalculator::buildSimilarLattices(
 
   // ---------------------------------------------------------------------------
   // compute lenths of possible lattices before-hand (faster than on-the-fly)
-  int store=0;
+  //[CO20230626 - clang warning not used]int store=0;
   vector<double> translations_mod;
   for(uint i=0;i<n_translations;i++){
     translations_mod.push_back(aurostd::modulus(translation_vectors[i]));
@@ -7328,7 +7331,7 @@ bool XtalFinderCalculator::buildSimilarLattices(
                             //DX20201130 clattices.insert(clattices.begin()+placement_index, tmp_clatt); // store Cartesian lattice, alignes with XYZ coordinates
                             latt_devs.insert(latt_devs.begin()+placement_index, tmp_latt_dev);
                           }
-                          store++;
+                          //[CO20230626 - clang warning not used]store++;
                         }
                       }
                     }
@@ -7444,9 +7447,9 @@ namespace compare{
       xmatrix<double> lattice_new = basis_transformation*lattice_original;
 
       if(LDEBUG){
-        cerr << __AFLOW_FUNC__ << " lattice new: " << lattice_new << endl;
-        cerr << __AFLOW_FUNC__ << " lattice ideal: " << lattice_ideal << endl;
-        cerr << __AFLOW_FUNC__ << " basis transformation: " << basis_transformation << endl;
+        cerr << __AFLOW_FUNC__ << " lattice new: " << endl << lattice_new << endl;
+        cerr << __AFLOW_FUNC__ << " lattice ideal: " << endl << lattice_ideal << endl;
+        cerr << __AFLOW_FUNC__ << " basis transformation: " << endl << basis_transformation << endl;
         cerr << __AFLOW_FUNC__ << " det(basis transformation): " << aurostd::det(basis_transformation) << endl;
 
         // ---------------------------------------------------------------------------
@@ -7454,8 +7457,8 @@ namespace compare{
         // transformation
         xmatrix<double> metric_tensor_new = MetricTensor(lattice_new);
         xmatrix<double> metric_tensor_ideal = MetricTensor(lattice_ideal);
-        cerr << __AFLOW_FUNC__ << " metric_tensor_new: " << metric_tensor_new << endl;
-        cerr << __AFLOW_FUNC__ << " metric_tensor_ideal: " << metric_tensor_ideal << endl;
+        cerr << __AFLOW_FUNC__ << " metric_tensor_new: " << endl << metric_tensor_new << endl;
+        cerr << __AFLOW_FUNC__ << " metric_tensor_ideal: " << endl << metric_tensor_ideal << endl;
       }
 
       // ---------------------------------------------------------------------------

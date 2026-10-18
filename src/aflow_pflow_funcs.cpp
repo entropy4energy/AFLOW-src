@@ -2944,7 +2944,7 @@ namespace pflow {
         string s;
         int id=0;
         getline(outcar_inf,s);
-        aurostd::GetNextVal(s,id).c_str(); // remove an "=" sign.
+        aurostd::GetNextVal(s,id); //[CO20231119 - gave warning, I believe we want to run GetNextVal() to update id without converting to c_str()].c_str(); // remove an "=" sign.
         while (id<(int)s.size()) {
           int n=atoi(aurostd::GetNextVal(s,id).c_str());
           num_each_type.push_back(n);
@@ -3758,14 +3758,14 @@ namespace pflow {
     // Run tachyon on datfile.
     ostringstream tachyon_stream;
     tachyon_stream << "tachyon " << "-" << rt_params.shading << " " << datfile << ends;
-    // system(tachyon_stream.str().c_str());
+    // aurostd::execute(tachyon_stream.str().c_str());  //CO20250406
     aurostd::execute(tachyon_stream);
     // Move outfile.tga to user defined name.
     ostringstream mv_stream;
     string tgafile = rt_params.outfile+".tga";
     mv_stream << "mv outfile.tga " << tgafile << ends;
     aurostd::execute(mv_stream);
-    //  system(mv_stream.str().c_str());
+    //  aurostd::execute(mv_stream.str().c_str());  //CO20250406
     return tgafile;
   }
 }
@@ -3780,7 +3780,7 @@ namespace pflow {
     string jpgfile = rt_params.outfile+".jpg";
     convert_stream << XHOST.command("convert") << " " << tgafile << " " << jpgfile << ends;
     aurostd::execute(convert_stream);
-    // system(convert_stream.str().c_str());
+    // aurostd::execute(convert_stream.str().c_str());  //CO20250406
     return jpgfile;
   }
 }
@@ -3838,8 +3838,8 @@ namespace pflow {
     ostringstream encoder_stream;
     encoder_stream << "mpeg_encode " << " " << encfile << ends;
     /*  char* encoder_char = encoder_stream.str().c_str();
-        system(encoder_char);*/
-    system(encoder_stream.str().c_str());
+        aurostd::execute(encoder_char);*/ //CO20250406
+    aurostd::execute(encoder_stream.str().c_str()); //CO20250406
     // Get outfile.mpg name
     string file;
     file = rt_params.outfile+".mpg";
@@ -3906,20 +3906,20 @@ namespace pflow {
                  string num = aurostd::PaddedNumString(is,5);
                  string datname = (rtp.outfile+"_"+num+".dat");
                  mvcmd_dat << "mv " << datfile << " " << datname << ends;
-                 system(mvcmd_dat.str().c_str());
+                 aurostd::execute(mvcmd_dat.str().c_str()); //CO20250406
                  string tganame = (rtp.outfile+"_"+num+".tga");
                  mvcmd_tga << "mv " << tgafile << " " << tganame << ends;
-                 system(mvcmd_tga.str().c_str());
+                 aurostd::execute(mvcmd_tga.str().c_str()); //CO20250406
                  string jpgname = (rtp.outfile+"_"+num+".jpg");
                  mvcmd_jpg << "mv " << jpgfile << " " << jpgname << ends;
-                 system(mvcmd_jpg.str().c_str());
+                 aurostd::execute(mvcmd_jpg.str().c_str()); //CO20250406
                  if(nstr>1) { // Remove dat,tga files if there are a lot of them.
                    ostringstream rmcmd_dat;
                    ostringstream rmcmd_tga;
                    rmcmd_dat << "/bin/rm " << datname << ends;
-                   system(rmcmd_dat.str().c_str());
+                   aurostd::execute(rmcmd_dat.str().c_str()); //CO20250406
                    //	rmcmd_tga << "/bin/rm " << tganame << ends;
-                   //	system(rmcmd_tga.str());
+                   //	aurostd::execute(rmcmd_tga.str());  //CO20250406
                  }
                }
                // Get and print enc file for mpeg encoder.
@@ -5866,7 +5866,7 @@ namespace pflow {
       ostringstream cmd;
       cmd << "cd " << rbdir[im] << ";";
       cmd << "tail -2 OSZICAR | head -1 | awk '{if($1==\"CG\") {print $4;}} {if($1==\"DAV:\") {print $3;}} {if($1==\"RMM:\") {print $3;}}' >> " << tmpfile << ";" 	<< "cd ..;" << ends;
-      system(cmd.str().c_str());
+      aurostd::execute(cmd.str().c_str());  //CO20250406
       ifstream ifaustream(tmpfile.c_str());
       ifaustream >> ener[im];
       aurostd::RemoveFile(tmpfile);
@@ -7757,14 +7757,6 @@ namespace pflow {
     if(partition.m_properties_node.empty()){  //only available if user is root
       partition.m_properties_node=partition.m_name; //default string to search
       //[resort to default]throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Not sure how to define partitions for HOST="+XHOST.hostname,_RUNTIME_ERROR_);
-      if(XHOST.hostname=="qrats.materials.duke.edu"){ //protection, ideally the aflow user would be "root"
-        //hack
-        if(partition.m_name=="priority"){partition.m_properties_node="sharedCompute";}
-        else if(partition.m_name=="debug"){partition.m_properties_node="debug";}
-        else if(partition.m_name=="batch"){partition.m_properties_node="sharedCompute";}
-        else if(partition.m_name=="research"){partition.m_properties_node="sharedCompute";}
-        else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unknown queue="+partition.m_name,_RUNTIME_ERROR_);}
-      }
     }
     return partition_added;
   }
@@ -8105,7 +8097,7 @@ namespace pflow {
         else if(key=="jobs"){
           aurostd::string2tokens(value,tokens,",");
           _node.m_ncpus_occupied=tokens.size();  //easy, this is all we need for now
-          //parse 0/709843.qrats.materials.duke.edu
+          //parse 0/709843.hostname //CO20261002
           for(i=0;i<tokens.size();i++){
             _job.free();
             _job.m_id=getTORQUEIDFromString(tokens[i]);
@@ -8368,7 +8360,7 @@ namespace pflow{
     else {
       tolerance = default_tolerance;
     }
-    if(tolerance < 1e-10){
+    if(abs(tolerance) < _ZERO_TOL_){
       message << "Tolerance cannot be zero (i.e. less than 1e-10): tol=" << tolerance << ".";
       throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_RANGE_);
     }
@@ -8437,14 +8429,8 @@ namespace pflow {
     xstructure str;
     std::map<string, string> meta_data;
 
-    // Quickly match auid to aurl (speedup from 15s to 0.5s compared to single use of AflowlibLocator)
-    if (!auid.empty())
-      aurl = aurostd::execute2string(XHOST.command("aflow_data") + " vLIBS | grep -B1 \"" + auid + "\" | head -n 1");
-    // Fallback if quick search failed
-    if (!auid.empty() && aurl.empty()) {
-      cerr << __AFLOW_FUNC__ << " Quick search failed! Trying standard methode." << endl;
-      aflowlib::AflowlibLocator(auid, aurl, "AFLOWLIB_AUID2AURL");
-    }
+    // the aurl of the auid, from the tables of calculated entries (the list of runs in CHAOS) //CO20261004
+    if (!auid.empty()) aflowlib::AflowlibLocator(auid, aurl, "AFLOWLIB_AUID2AURL");
 
     if (!aurl.empty()) {
       entry.aurl = aurl;

@@ -587,6 +587,10 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="06df93ed854cd141" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-10.233;volume_atom=31.1247;spin_atom=0.0;} // Dy:PAW_PBE_KIN:23Dec2003
   if(AUID=="b7037854f4315aa3" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-4.527491;volume_atom=31.7888;spin_atom=0.0;} // Dy_3:PAW_PBE_KIN:06Sep2000
 
+  // Er //CO20260927
+  // find /common/LIB1/LIB/Er* -name "A_hP2_194_c-001.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  if(AUID=="d843969058538e36" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-4.558292;volume_atom=30.82475;spin_atom=0.0;} // Er_3:PAW_PBE:06Sep2000
+
   // Eu
   if(AUID=="9b801fd8fd52e116" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-10.23775;volume_atom=43.37685;spin_atom=7.26175;} // Eu:PAW_PBE:08Apr2002
   if(AUID=="2453fc28e3c2ebe1" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-10.28213;volume_atom=42.56765;spin_atom=7.243493;} // Eu:PAW_PBE_KIN:23Dec2003
@@ -626,6 +630,10 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="5a3627680584037d" && nKIN) {found=TRUE;groundstate_structure="A11";groundstate_energy=-2.901519;volume_atom=19.96062;spin_atom=0.0;} // Ga_h:PAW_PBE_KIN:09Apr2002
   if(AUID=="567d70c3d85e2c7f" && nKIN) {found=TRUE;groundstate_structure="A11";groundstate_energy=-2.901526;volume_atom=19.96071;spin_atom=0.0;} // Ga_h:PAW_PBE:09Apr2002
   if(AUID=="47e95a8d720b4f46" && nKIN) {found=TRUE;groundstate_structure="A11";groundstate_energy=-2.926373;volume_atom=19.96145;spin_atom=0.0;} // Ga_h:PAW_RPBE:09Apr2002
+
+  // Gd //CO20260927
+  // find /common/LIB1/LIB/Gd* -name "A_hP2_194_c-001.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  if(AUID=="c0f01c59eb971d30" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-14.07795;volume_atom=33.4987;spin_atom=7.686079;} // Gd:PAW_PBE:08Apr2002
 
   // Ge
   if(AUID=="e58c5d01a1b37232" && nKIN) {found=TRUE;groundstate_structure="A4";groundstate_energy=-4.49261;volume_atom=24.1781;spin_atom=0.0;} // Ge:PAW_PBE:05Jan2001
@@ -879,6 +887,11 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="7a3805e4c05d950e" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-11.47372;volume_atom=17.9751;spin_atom=0.0;} // Nb_sv_GW:PAW_PBE_KIN:05Dec2013
   if(AUID=="7b5ec33ec65ced5a" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-11.25399;volume_atom=17.05046;spin_atom=0.0;} // Nb_sv:PAW_LDA_KIN:25May2007
 
+  // Nd //CO20260927
+  // find /common/LIB1/LIB/Nd* -name "A_cF4_225_a.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  // dhcp in experiment; A1 as for La. The LIB1 fcc run is 10.6 meV/atom above the lowest LIB1 run (A_oC8_64_f-003, relaxed to bct).
+  if(AUID=="81811d7c33a85a8b" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-7.612845;volume_atom=30.64983;spin_atom=3.907169;} // Nd:PAW_PBE:08Apr2002
+
   // Ne
   // find /common/LIB1/LIB/Ne* -name "A1" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=8 --file=/tmp/xpot | grep XXX | sort | uniq
   if(AUID=="bf15cfac49144396" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-0.048593;volume_atom=13.7731;spin_atom=0.0;} // Ne:PAW_LDA:07Sep2000
@@ -989,6 +1002,16 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="863baeb4a12a2226" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-5.238536;volume_atom=15.15262;spin_atom=0.2751329;} // Pd_GW:PAW_PBE_KIN:06Mar2008
   if(AUID=="d97ddcc6e311c95c" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-6.524692;volume_atom=14.021;spin_atom=0.0;} // Pd_GW:PAW_LDA_KIN:06Mar2008
   if(AUID=="f8d2ab794f3a7628" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-5.030837;volume_atom=13.95344;spin_atom=0.0;} // Pd_sv_GW:PAW_LDA_KIN:05Dec2013
+
+  // Pm //CO20260927
+  // find /common/LIB1/LIB/Pm* -name "A_cF4_225_a.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  // dhcp in experiment; A1 as for La. The LIB1 fcc run is the lowest LIB1 run.
+  if(AUID=="a66df35b1ed2d552" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-9.154241;volume_atom=34.20258;spin_atom=5.34508;} // Pm:PAW_PBE:08Apr2002
+
+  // Pr //CO20260927
+  // find /common/LIB1/LIB/Pr* -name "A_cF4_225_a.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  // dhcp in experiment; A1 as for La. The LIB1 fcc run is 31.6 meV/atom above the lowest LIB1 run (A_oC8_64_f-003).
+  if(AUID=="82dbd5ee06192a4c" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-6.511262;volume_atom=27.4489;spin_atom=2.402321;} // Pr:PAW_PBE:08Apr2002
 
   // Pt
   // find /common/LIB1/LIB/Pt* -name "A1" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=8 --file=/tmp/xpot | grep XXX | sort | uniq
@@ -1166,6 +1189,11 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="2d534c8fcbaedf16" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-15.3079;volume_atom=17.13619;spin_atom=0.0;} // Ta_sv_GW:PAW_LDA_KIN:23Mar2010
   if(AUID=="bcd3b7b7689d66d7" && nKIN) {found=TRUE;groundstate_structure="A2";groundstate_energy=-14.29729;volume_atom=18.14686;spin_atom=0.0;} // Ta_sv_GW:PAW_PBE_KIN:23Mar2010
 
+  // Tb //CO20261003
+  // find /common/LIB1/LIB/Tb* -name "A_hP2_194_c-001.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  // hcp is the lowest LIB1 run (1.2 meV/atom below the fcc run).
+  if(AUID=="df41de2ac6afa1b3" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-4.611976;volume_atom=32.32435;spin_atom=0.0;} // Tb_3:PAW_PBE:06Sep2000
+
   // Tc
   if(AUID=="fd329b53fcbb5dbd" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-10.2088;volume_atom=14.4754;spin_atom=0.0;} // Tc:GGA:01Apr2000
   if(AUID=="aabb0d26abfc5599" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-10.3047;volume_atom=14.4300;spin_atom=0.0;} // Tc:PAW_PBE:17Jan2003
@@ -1191,6 +1219,10 @@ bool xPOTCAR_EnthalpyReference_AUID(string AUID,string METAGGA,string& groundsta
   if(AUID=="96c99e8488c592ae" && nKIN) {found=TRUE;groundstate_structure="A8";groundstate_energy=-3.14141;volume_atom=34.8509;spin_atom=0.0;} // Te:PAW_PBE:08Apr2002
   if(AUID=="8d2f6568d1d06421" && SCAN) {found=TRUE;groundstate_structure="A8";groundstate_energy=-37.2600;volume_atom=33.9467;spin_atom=0.0;} // Te:PAW_PBE_KIN:SCAN:08Apr2002
   if(AUID=="8d2f6568d1d06421" && nKIN) {found=TRUE;groundstate_structure="A8";groundstate_energy=-3.14191;volume_atom=34.9412;spin_atom=0.0;} // Te:PAW_PBE_KIN:08Apr2002
+
+  // Th //CO20260927
+  // find /common/LIB1/LIB/Th* -name "A_cF4_225_a.A" | sed "s/\/common/aflow --force --lib2raw=&/g" > /tmp/xpot && aflow --multi=sh --np=8 --file=/tmp/xpot | grep XXX | sort | uniq
+  if(AUID=="78f7995fc479457d" && nKIN) {found=TRUE;groundstate_structure="A1";groundstate_energy=-7.269517;volume_atom=32.00791;spin_atom=0.0;} // Th_s:PAW_PBE:06Sep2000
 
   // Ti
   if(AUID=="e97d34c6b4cd62df" && nKIN) {found=TRUE;groundstate_structure="A3";groundstate_energy=-8.53337;volume_atom=15.9367;spin_atom=0.0;} // Ti:LDA:01Apr2000

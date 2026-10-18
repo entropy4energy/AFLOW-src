@@ -1265,6 +1265,108 @@ namespace SYM {
 } //namespace SYM
 
 // ******************************************************************************
+// originShiftMatchesModuloLattice  //CO20261004
+// ******************************************************************************
+// True when (I-W_k)p-t_k is a lattice vector to within tol (Cartesian) for every
+// generator k, with one block of three rows of I-W_k (LHS) and three shifts t_k
+// (RHS) per generator, all in fractional coordinates. The distance to the
+// nearest lattice vector is minimized in Cartesian coordinates for a skewed
+// lattice and in fractional coordinates otherwise. This is the test of the
+// determined case of solve_overdetermined_system() (DX20190613), which
+// solve_underdetermined_modulo_lattice() applies too.
+namespace SYM {
+  static bool originShiftMatchesModuloLattice(const vector<xvector<double> >& LHS, const vector<double>& RHS, const xvector<double>& p, const xmatrix<double>& lattice, bool skew, double tol) {
+    const xmatrix<double> f2c = trasp(lattice);
+    for (uint g = 0; g < LHS.size(); g += 3) {
+      xvector<double> residual;  // (I-W_k)p-t_k, fractional
+      for (int r = 1; r <= 3; r++) { residual(r) = aurostd::scalar_product(LHS[g + r - 1], p) - RHS[g + r - 1]; }
+      double dist = 0.0;
+      if(skew) {
+        xvector<double> origin;
+        dist = aurostd::modulus(SYM::minimizeDistanceCartesianMethod(origin, f2c * residual, lattice));
+      } else {
+        dist = aurostd::modulus(f2c * SYM::minimizeDistanceFractionalMethod(residual));
+      }
+      if(dist > tol) { return false; }
+    }
+    return true;
+  }
+} //namespace SYM
+
+// ******************************************************************************
+// solve_underdetermined_modulo_lattice  //CO20261003
+// ******************************************************************************
+// Origin shift p of an underdetermined system (I-W_k)p = t_k, modulo the
+// lattice, one block of three rows (LHS) and three shifts (RHS) per generator,
+// all in fractional coordinates. solve_overdetermined_system() calls it when
+// its own underdetermined path finds no origin.
+// That path adds whole cells to the first three shifts only, and
+// checkLinearSystem() accepts two equal Cartesian rows with different shifts
+// only when the shifts differ by one Cartesian component of a single lattice
+// vector. A mirror whose translation is exactly half a cell in two directions
+// can need a whole lattice vector there, and then the origin is never found.
+// Seen on the 44-atom POCC cell of LIB4
+// Ca_svCr_pvIK_sv/A2B2C7_cF88_227_c_d_af-001.ABC (ARUN.POCC_1_H0C0): R3m in
+// rhombohedral axes (setting 1, as lib2raw's EDATA asks for) was rejected at
+// every tolerance, the space group came out as 0, and the EDATA text output
+// then threw in aurostd::cos() on the empty standard lattice.
+// Here: take a maximal set of linearly independent rows, fix the free
+// coordinates at 0 (as find_solution_UD() does), try 0, 1 or 2 whole cells on
+// each selected row (as the determined case does), and accept p only when
+// (I-W_k)p-t_k is a lattice vector to within tol (Cartesian) for every
+// generator, the test of the determined case (originShiftMatchesModuloLattice(),
+// CO20261004). See the unit test rhl_mirror_origin_shift.
+namespace SYM {
+  bool solve_underdetermined_modulo_lattice(const vector<xvector<double> >& LHS, const vector<double>& RHS, xvector<double>& SOL, const xmatrix<double>& lattice, bool skew, double tol) {
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    if(LHS.size() == 0 || LHS.size() != RHS.size() || LHS.size() % 3 != 0) { return false; }
+    const double zero_tol = 1e-10;  // the rows are integer-valued; same threshold as the determinant test in solve_overdetermined_system()
+
+    // maximal set of linearly independent rows (at most two, or the system would be determined)
+    vector<uint> selected;
+    for (uint i = 0; i < LHS.size() && selected.size() < 2; i++) {
+      bool independent = false;
+      if(selected.size() == 0) { independent = (aurostd::modulus(LHS[i]) > zero_tol); }
+      else { independent = (aurostd::modulus(aurostd::vector_product(LHS[selected[0]], LHS[i])) > zero_tol); }
+      if(independent) { selected.push_back(i); }
+    }
+
+    // complete to a nonsingular 3x3 system with unit rows (shift 0) on the free coordinates, the last ones first
+    vector<vector<int> > free_choices;
+    if(selected.size() == 2) { free_choices = {{3}, {2}, {1}}; }
+    else if(selected.size() == 1) { free_choices = {{2, 3}, {1, 3}, {1, 2}}; }
+    else { free_choices = {{1, 2, 3}}; }  // all rows zero: only translations to check, p=0
+    xmatrix<double> A;
+    bool nonsingular = false;
+    for (uint c = 0; c < free_choices.size() && !nonsingular; c++) {
+      A.clear();
+      for (uint r = 0; r < selected.size(); r++) {
+        for (int col = 1; col <= 3; col++) { A(r + 1, col) = LHS[selected[r]][col]; }
+      }
+      for (uint f = 0; f < free_choices[c].size(); f++) { A(selected.size() + f + 1, free_choices[c][f]) = 1.0; }
+      nonsingular = (aurostd::abs(aurostd::det(A)) > zero_tol);
+    }
+    if(!nonsingular) { return false; }
+    const xmatrix<double> A_inv = aurostd::inverse(A);
+
+    // 0, 1 or 2 whole cells on each selected row
+    const uint ncells = (selected.size() == 2 ? 9 : (selected.size() == 1 ? 3 : 1));
+    for (uint n = 0; n < ncells; n++) {
+      xvector<double> b;  // zeros on the free coordinates
+      if(selected.size() >= 1) { b(1) = RHS[selected[0]] + double(n % 3); }
+      if(selected.size() == 2) { b(2) = RHS[selected[1]] + double(n / 3); }
+      const xvector<double> p = A_inv * b;
+      if(originShiftMatchesModuloLattice(LHS, RHS, p, lattice, skew, tol)) { //CO20261004 - was a copy of the determined case's test
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " origin shift found modulo the lattice: " << p << endl; }
+        SOL = p;
+        return true;
+      }
+    }
+    return false;
+  }
+} //namespace SYM
+
+// ******************************************************************************
 // solve_overdetermined_system (Solve Overdetermined System)
 // ******************************************************************************
 namespace SYM {
@@ -1349,7 +1451,7 @@ namespace SYM {
       //exists some freedom in selection of origin
       if(!checkLinearSystem(LHS_cart, RHS_cart, lattice,tol)) { //DX20190215
         //cerr << "NULL VECTORS GIVE NONZERO AUGMENTED PART!!!" << endl;
-        return false;
+        return solve_underdetermined_modulo_lattice(LHS, RHS, SOL, lattice, skew, tol); //CO20261003 - was return false
       }
       // Need to check different cells (add integers to RHS) since this is a periodic linear system
       for (uint i = 0; i < 3; i++) {
@@ -1372,7 +1474,7 @@ namespace SYM {
           }
         }
       }
-      return false;
+      return solve_underdetermined_modulo_lattice(LHS, RHS, SOL, lattice, skew, tol); //CO20261003 - was return false
     }
 
     xvector<double> dS;
@@ -1390,39 +1492,7 @@ namespace SYM {
           dS_mod(3) = dS(3) + double(k);
           //Do you need to put a pseudoinverse here (use SVD)
           xvector<double> origin_shift = aurostd::inverse(firstLI) * dS_mod;
-          bool found = true;
-          for (uint ii = 0; ii < LHS_cart.size(); ii += 3) {
-            xvector<double> coord;
-            coord(1) = aurostd::scalar_product(LHS[ii], origin_shift) - RHS[ii]; //DX20200724 - SYM::DotPro to aurostd::scalar_product
-            coord(2) = aurostd::scalar_product(LHS[ii + 1], origin_shift) - RHS[ii + 1]; //DX20200724 - SYM::DotPro to aurostd::scalar_product
-            coord(3) = aurostd::scalar_product(LHS[ii + 2], origin_shift) - RHS[ii + 2]; //DX20200724 - SYM::DotPro to aurostd::scalar_product
-            double min_dist = 1e9; //DX20190613
-            if(skew) {
-              xvector<double> origin;
-              xvector<double> coord_cart = f2c * coord;
-              xvector<double> min_coord_cart = SYM::minimizeDistanceCartesianMethod(origin, coord_cart, lattice); //DX20190613
-              min_dist = aurostd::modulus(min_coord_cart); //DX20190613
-              //DX20190613 [OBSOLETE] if(!SYM::minimizeCartesianDistance(origin, coord_cart, coord, c2f, f2c, tol)) { //DX20190215
-              //DX20190613 [OBSOLETE]   found = false;
-              //DX20190613 [OBSOLETE]   break;
-              //DX20190613 [OBSOLETE] }
-            } else {
-              xvector<double> min_frac_coord = SYM::minimizeDistanceFractionalMethod(coord); //DX20190613
-              min_dist = aurostd::modulus(f2c * min_frac_coord); //DX20190613
-              //DX20190613 [OBSOLETE] SYM::PBC(coord);
-              //DX20190613 [OBSOLETE] if(aurostd::modulus(f2c * coord) > tol) {
-              //DX20190613 [OBSOLETE]   found = false;
-              //DX20190613 [OBSOLETE]   break;
-              //DX20190613 [OBSOLETE] }
-            }
-            //DX20190613 - move loop outside if-statements - START
-            if(min_dist > tol){
-              found = false;
-              break;
-            }
-            //DX20190613 - move loop outside if-statements - END
-          }
-          if(found == true) {
+          if(originShiftMatchesModuloLattice(LHS, RHS, origin_shift, lattice, skew, tol)) { //CO20261004 - the loop over the generators (DX20190613, DX20200724) moved there
             //cerr << "FOUND CART" << endl;
             SOL = origin_shift;
             return true;
@@ -1481,14 +1551,14 @@ namespace SYM {
   vector<int> get_multiplicities(string sg) {
     vector<int> wyckoff_multiplicities;
     int line = 0;
-    int mult_factor = 0;
+    //[CO20230626 - clang warning not used]int mult_factor = 0;
     for (uint i = 0; i < sg.length(); i++) {
       if(sg[i] == 0x0a)
         line++;
       if(line == 2)
         break;
-      if(sg[i] == '(')
-        mult_factor++;
+      if(sg[i] == '('){}
+        //[CO20230626 - clang warning not used]mult_factor++;
     }
     line = 0;
     ostringstream temp;
@@ -5139,8 +5209,8 @@ namespace SYM {
     vector<xvector<double> > tmp_trip;
     vector<vector<xvector<double> > > point_sets;
     char tmpchar;
-    int count = 0;
-    int rotation_ops = 0;
+    //[CO20230626 - clang warning not used]int count = 0;
+    //[CO20230626 - clang warning not used]int rotation_ops = 0;
     for (int i = 0; i < triplets_size; i++) {
       tmp_trip.clear();
       tmp_trip.push_back(expanded_lattice[cmb[0]]);
@@ -5148,7 +5218,7 @@ namespace SYM {
       tmp_trip.push_back(expanded_lattice[cmb[2]]);
       tmpchar = discern_rot_sym(get_mod_angle_tensor(tmp_trip), tol); //DX20190215 - added tol
       if(tmpchar != 'z') {
-        count++;
+        //[CO20230626 - clang warning not used]count++;
         Screw candidate_rotation;
         //Get axis direction
         xvector<double> axis_direction = aurostd::vector_product(tmp_trip[1] - tmp_trip[0], tmp_trip[2] - tmp_trip[0]); //DX20190905 - SYM::CrossPro() -> aurostd::vector_product()
@@ -5241,7 +5311,7 @@ namespace SYM {
             //cerr << tmpchar << endl;
             //cerr << candidate_rotation << endl;
             //cerr << "********************" << endl;
-            rotation_ops++;
+            //[CO20230626 - clang warning not used]rotation_ops++;
           }
         }
       }

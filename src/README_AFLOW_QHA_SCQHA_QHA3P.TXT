@@ -4,8 +4,6 @@
 *                High-Throughput ab-initio Materials Discovery                 *
 *                                                                              *
 ********************************************************************************
-LATEST VERSION OF THE FILE:        materials.duke.edu/AFLOW/README_AFLOW_QHA_SCQHA_QHA3P.TXT
-********************************************************************************
 
 Quasi-harmonic approximation (QHA), QHA-3phonon (QHA3P), and self consistent quasi harmonic (SCQHA)  
 (Gruneisen parameter and Equation of state calculations)
@@ -452,7 +450,7 @@ Direct
 #PBS -N testing
 #PBS -o out.$PBS_JOBID
 #PBS -e err.$PBS_JOBID
-#PBS -M xx@duke.edu
+#PBS -M user@example.edu
 
 AFLOW=“…AFLOW_PATH….”
 

@@ -266,6 +266,9 @@ bool _NEW_is_alphabetic(string alloy_dir) {
   }
   vector<string> vspeciesD,vspeciesP;
   for(uint i=0;i<vaflowlib_entry.size();i++) {
+    if(aurostd::substring2bool(vaflowlib_entry.at(i),"chaos_path=")) {  //CO20261008 - the path as CHAOS writes it, read as the AURL it was
+      vaflowlib_entry.at(i)="aurl="+aflowlib::ChaosPath2AURL(aurostd::substring2string(vaflowlib_entry.at(i),"chaos_path=",1,TRUE));
+    }
     if(aurostd::substring2bool(vaflowlib_entry.at(i),"aurl=")) {
       aurostd::string2tokens(aurostd::substring2string(vaflowlib_entry.at(i),"aurl=",1,TRUE),tokens,"/");
       for(uint j=0;j<tokens.size();j++) if(tokens.at(j)=="3") XATOM_SplitAlloySpecies(tokens.at(j-1),vspeciesD);

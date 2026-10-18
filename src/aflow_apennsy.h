@@ -15,7 +15,7 @@
 #define XGNDSTATE_HOLES 1    // 1 alloys matrix with holes
 #define MAX_NUM_SPECIES 4
 
-#define AFLOWLIB_PROJECT_GNDSTATE        string("materials.duke.edu/AFLOWDATA/LIB2_RAW")
+#define AFLOWLIB_PROJECT_GNDSTATE        (aflowlib::AFLOWLIBServer()+"/AFLOWDATA/LIB2_RAW") //CO20261006 - the server of this run (--server=)
 
 #define APENNSY_INF 1e9
 #define APENNSY_LATEX_DOC_TYPE        "[aps,amssymb]{article}" // "revtex4-1"

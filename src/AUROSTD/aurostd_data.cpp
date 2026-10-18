@@ -20,9 +20,9 @@
 extern "C" {
   // strings used for unittests
   INCTXT(UnitTest, "DATA/unit_test.json");
-  INCBIN(FileNomadLogo, "DATA/NOMAD_LOGO.png");
-  INCBIN(FileAflowLogoFull, "DATA/AFLOW_LOGO_FULL.pdf");
-  INCBIN(FileAflowLogoSkinny, "DATA/AFLOW_LOGO_SKINNY.pdf");
+  INCBIN(FileChaosLogo, "DATA/CHAOS_LOGO.pdf"); //CO20261004 - the CHAOS logo for the convex hull PDF
+  INCBIN(FileS4ELogo, "DATA/S4E_LOGO.pdf"); //CO20261004 - the S4E logo for the convex hull PDF
+  INCBIN(FileS4ELogoSkinny, "DATA/S4E_LOGO_SKINNY.pdf"); //CO20261004 - its letters alone (watermark)
   INCTXT(CCEPython, "DATA/aflow_cce_python.py");
   INCTXT(ChullJupyterPlotter, "DATA/aflow_chull_jupyter_plotter.py");
   INCTXT(ChullJupyterRequirements, "DATA/aflow_chull_jupyter_requirements.txt");
@@ -35,9 +35,9 @@ extern "C" {
 }
 
 static const std::map<std::string, std::pair<char *, unsigned int>> aflow_data_file_list_binary = {
-    {"NOMAD_LOGO.png", {(char *) &afdataFileNomadLogoData[0], afdataFileNomadLogoSize}},
-    {"AFLOW_LOGO_FULL.pdf", {(char *) &afdataFileAflowLogoFullData[0], afdataFileAflowLogoFullSize}},
-    {"AFLOW_LOGO_SKINNY.pdf", {(char *) &afdataFileAflowLogoSkinnyData[0], afdataFileAflowLogoSkinnySize}}
+    {"CHAOS_LOGO.pdf", {(char *) &afdataFileChaosLogoData[0], afdataFileChaosLogoSize}},
+    {"S4E_LOGO.pdf", {(char *) &afdataFileS4ELogoData[0], afdataFileS4ELogoSize}},
+    {"S4E_LOGO_SKINNY.pdf", {(char *) &afdataFileS4ELogoSkinnyData[0], afdataFileS4ELogoSkinnySize}}
 };
 
 static const std::map<std::string, std::string> aflow_data_file_list_text = {

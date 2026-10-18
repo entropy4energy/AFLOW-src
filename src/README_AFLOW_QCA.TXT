@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                       materials.duke.edu/AFLOW/README_AFLOW_QCA.TXT
-****************************************************************************************************
 
 AFLOW-QCA README:
 

@@ -87,7 +87,7 @@ namespace ALIEN {
     // bool KBIN_MPI_LOCAL;KBIN_MPI_LOCAL=MPI;
     string subS,subS1,subS2;
     ostringstream aus;
-    string::iterator pos;
+    //[CO20230626 - clang warning not used]string::iterator pos;
     bool Krun=TRUE;
     _alienflags alienflags;
     _xalien xalien;
@@ -138,7 +138,7 @@ namespace ALIEN {
         aus << "XXXXX  MAKING DIRECTORY = " << xalien.Directory << "  " << Message(__AFLOW_FILE__,aflags) << endl;
         aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
         string str="mkdir "+xalien.Directory;
-        system(str.c_str());
+        aurostd::execute(str.c_str());  //CO20250406
       }
       // ***************************************************************************
       // READY TO RUN

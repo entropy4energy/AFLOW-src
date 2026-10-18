@@ -8,6 +8,7 @@
 #ifndef _AFLOW_ANRL_LIST_CPP // AFLOW_REMOVE_GREP
 #define _AFLOW_ANRL_LIST_CPP // AFLOW_REMOVE_GREP
 #include "aflow.h" // AFLOW_REMOVE_GREP  //CO20200521
+#include "aflow_prototypes_jhu.h" //CO20260930
 
 // ***************************************************************************
 namespace anrl { 
@@ -2001,6 +2002,7 @@ namespace anrl {
     vproto.push_back("A6BC6D_cF56_225_e_a_e_b;4;14;225;6;3;cF56;a,x3,x4;-;C6Cd1N6Pd1;C6Cd1N6Pd1 (ICSD #6093)");
     vproto.push_back("A3BCD3_cF64_225_e_c_ab_e;4;16;225;6;3;cF64;a,x4,x5;-;C6Cs2Mn2N6;C6Cs2Mn2N6 (ICSD #248046)");
 #endif
+    jhuproto::addToANRLList(vproto); //CO20260930 - JHU prototypes
     // done now produce
 
     // FROM PROTO LIST
@@ -2373,7 +2375,7 @@ namespace anrl {
       // ---------------------------------------------------------------------------
       if(anrl_label=="AB_oC8_63_c_c"){
         vparameters.push_back("2.9782,2.64253575985,0.985360284736,0.436,0.14525");
-        vparameters.push_back("1.0.0185797325,1.41421356236,0.707106781182,0.625,0.125"); // Lederer-13
+        vparameters.push_back("1.0185797325,1.41421356236,0.707106781182,0.625,0.125"); // Lederer-13 //CO20261003 - a read 1.0.0185797325; 1.0185797325 as in public AFLOW v4.1
         vparameters.push_back("3.31,1.4441088,1.1389728,0.3174,0.6888");  // 003, binary metal-nitride prototype (ICSD #163951)
       }
       // ---------------------------------------------------------------------------
@@ -2997,7 +2999,7 @@ namespace anrl {
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="AB2_hP24_194_ef_fgh"){
-        vparameters.push_back("4.824,3.28067993367,0.04598,0.84417,0.12514,0.16429");
+        vparameters.push_back("4.824,3.28067993367,0.094,0.84417,0.12514,0.16429"); //CO20261003 - z1 read 0.04598 (Mg-Mg 1.46 Angstrom)
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="AB_hP12_194_df_ce"){
@@ -3021,7 +3023,7 @@ namespace anrl {
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="ABC_cP12_198_a_a_a"){
-        vparameters.push_back("5.881,-0.024,0.39,0.875");
+        vparameters.push_back("5.881,-0.024,0.39,0.625"); //CO20261003 - x3 read 0.875 (Ni-Sb 1.03 Angstrom)
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="A3B_cP16_198_b_a"){
@@ -3840,7 +3842,7 @@ namespace anrl {
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="A5B7_tI24_107_ac_abd"){
-        vparameters.push_back("7.6400197048,0.760471204184,0.0,0.056,0.04,0.22,0.0,0.243,0.29");
+        vparameters.push_back("7.6400197048,0.760471204184,0.0,0.556,0.54,0.22,0.0,0.243,0.29"); //CO20261003 - z2 and z3 read 0.056 and 0.04 (Co-Ge 0.33 Angstrom)
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="AB_tI4_107_a_a"){
@@ -4387,7 +4389,7 @@ namespace anrl {
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="A6B2CD6E_cP64_208_m_ad_b_m_c"){
-        vparameters.push_back("10.3701312618,0.057,0.25,0.23,0.235,0.25,0.458");
+        vparameters.push_back("10.3701312618,0.057,0.25,0.23,0.235,0.25,0.548"); //CO20261003 - z6 read 0.458 (C-N 0.39 Angstrom)
       }
       // ---------------------------------------------------------------------------
       if(anrl_label=="A24BC_cF104_209_j_a_b"){
@@ -10100,6 +10102,9 @@ namespace anrl {
       }
 #endif
     }
+    const uint nlibrary=vparameters.size(); //CO20261004 - the library's sets, numbered 1 to 999 by position
+    if(library=="all" || library==""){jhuproto::addParameters(anrl_label,vparameters);} //CO20260930 - JHU prototypes
+    vector<uint> vnumbers=jhuproto::setNumbers(anrl_label,nlibrary); vnumbers.resize(vparameters.size()); //CO20261004 - set number of each position
     if(library=="" && !keep_original_lattice_parameter){
       //DX 20190314 - loop over parameters - START
       for(uint p=0;p<vparameters.size();p++){
@@ -10111,15 +10116,23 @@ namespace anrl {
     }
     if(library != "all"){
       if(library=="" && choice!=-1){
-        if((uint)choice<vparameters.size()){
-          vector<string> tmp; tmp.push_back(vparameters[choice]);
+        //CO20261004 START - JHU sets (1001 and up) are looked up by number, the library's sets by position
+        int index=-1;
+        if((uint)choice+1>=jhuproto::FIRST_SET){
+          const int ijhu=jhuproto::setIndex(anrl_label,(uint)choice+1);
+          if(ijhu>=0){index=(int)nlibrary+ijhu;}
+        }
+        else if((uint)choice<nlibrary){index=choice;}
+        //CO20261004 STOP
+        if(index>=0){ //CO20261004 - was (uint)choice<vparameters.size()
+          vector<string> tmp; tmp.push_back(vparameters[index]); //CO20261004 - was vparameters[choice]
           vparameters.clear();
           vparameters=tmp;
         }
         else{
-          message << "anrl::getANRLParameters(): ERROR - " << anrl_label << " does not have more than " << vparameters.size() << " choice(s):";
+          message << "anrl::getANRLParameters(): ERROR - " << anrl_label << " has no preset parameter set " << std::setw(3) << std::setfill('0') << choice+1 << "; its " << vparameters.size() << " set(s):" << endl; //CO20261004
           for(uint i=0;i<vparameters.size();i++){
-            message << "  " << anrl_label << "-" << std::setw(3) << std::setfill('0') << i+1 << " : " << vparameters[i] << endl;
+            message << "  " << anrl_label << "-" << std::setw(3) << std::setfill('0') << vnumbers[i] << " : " << vparameters[i] << endl; //CO20261004
           }
           throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _VALUE_RANGE_); //DX 20191118 - exit to throw
         }
@@ -10132,9 +10145,9 @@ namespace anrl {
         // (cannot auto-assign when more than one choice, e.g., -001 or -002)
         message << "anrl::getANRLParameters(): ERROR - " << anrl_label << " has " << vparameters.size() << " preset parameter set(s): " << endl;
         for(uint i=0;i<vparameters.size();i++){
-          message << "  " << anrl_label << "-" << std::setw(3) << std::setfill('0') << i+1 << " : " << vparameters[i] << endl;
+          message << "  " << anrl_label << "-" << std::setw(3) << std::setfill('0') << vnumbers[i] << " : " << vparameters[i] << endl; //CO20261004
         }
-        message << "Rerun command and specify the parameters or the preset suffix, e.g., aflow --proto=" << anrl_label << "-" << std::setw(3) << std::setfill('0') << 1; //DX 20190826 - changed "./aflow" to "aflow"
+        message << "Rerun command and specify the parameters or the preset suffix, e.g., aflow --proto=" << anrl_label << "-" << std::setw(3) << std::setfill('0') << (vnumbers.empty()?1:vnumbers[0]); //DX 20190826 - changed "./aflow" to "aflow" //CO20261004 - first set number
         throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__, message, _VALUE_ERROR_); //DX 20191118 - exit to throw
       }
     }

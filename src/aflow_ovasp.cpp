@@ -977,7 +977,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"magnetization"))
       if(aurostd::substring2bool(vcontent.at(iline),"(z)")) {
-        mline=iline+4;
+        mline=iline+4;  //CO20231105 - +4 assumes an empty line, string2vectorstring() removes these by default
+        if(!aurostd::RemoveWhiteSpacesFromTheFrontAndBack(vcontent.at(iline+1)).empty()){mline-=1;} //CO20231105 - string2vectorstring() treats the newlines as one character, reduce the line number
         found_magz_line=true;
         break;
       } 
@@ -997,7 +998,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"magnetization"))
       if(aurostd::substring2bool(vcontent.at(iline),"(y)")) {
-        mline=iline+4;
+        mline=iline+4;  //CO20231105 - +4 assumes an empty line, string2vectorstring() removes these by default
+        if(!aurostd::RemoveWhiteSpacesFromTheFrontAndBack(vcontent.at(iline+1)).empty()){mline-=1;} //CO20231105 - string2vectorstring() treats the newlines as one character, reduce the line number
         found_magy_line=true;
         break;
       } 
@@ -1016,7 +1018,8 @@ bool xOUTCAR::GetProperties(const stringstream& stringstreamIN,bool QUIET) {
   for(int iline=(int)vcontent.size()-1;iline>=0;iline--)  // NEW FROM THE BACK
     if(aurostd::substring2bool(vcontent.at(iline),"magnetization"))
       if(aurostd::substring2bool(vcontent.at(iline),"(x)")) {
-        mline=iline+4;
+        mline=iline+4;  //CO20231105 - +4 assumes an empty line, string2vectorstring() removes these by default
+        if(!aurostd::RemoveWhiteSpacesFromTheFrontAndBack(vcontent.at(iline+1)).empty()){mline-=1;} //CO20231105 - string2vectorstring() treats the newlines as one character, reduce the line number
         found_magx_line=true;
         break;
       } 
@@ -5866,7 +5869,7 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
     /////////////////////////////////////////////////////////////////////////////
     // Spin Loop
     vector<int> index_of_extremas_zero;  
-    int number_of_records = 0;
+    //[CO20230626 - clang warning not used]int number_of_records = 0;
     for(int spin_idx=0; spin_idx<ispin; spin_idx++) {
       // fit_data.size(): number of effective masses detected
       vector<vector<kEn_st> > fit_data = fit_data_all.at(spin_idx);
@@ -5972,7 +5975,7 @@ bool GetEffectiveMass(xOUTCAR& xoutcar, xDOSCAR& xdoscar, xEIGENVAL& xeigenval, 
         xoutcar.carrier_spin.push_back(spin_idx);
         xoutcar.extrema_cart_coord.push_back(tempvector);
         xoutcar.effective_mass_axes.push_back(tempvector);
-        number_of_records++;
+        //[CO20230626 - clang warning not used]number_of_records++;
         double dos_mass  = 1.0;
         double cond_mass = 0.0;
         // diagonalized eff mass tensor

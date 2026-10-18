@@ -1932,14 +1932,14 @@ vector<vector<xstructure> > Partial2Xstr_Fivefold_Occupied(xstructure xstr, int 
 
 
   vector<vector<xstructure> > vec_vec_xstr_fivefold;
-  int total=0;
+  //[CO20230626 - clang warning not used]int total=0;
   for (uint k=0; k<vec_vec_xstr.size();k++) {  //2-D vector
     vector<xstructure> vec_xstr=vec_vec_xstr.at(k);
     vector<xstructure> vec_new_xstr;
     for (uint i=0; i<vec_xstr.size();i++) {
       xstructure xstr_tmp = vec_xstr.at(i);
       for (uint j=0; j<formated_final_num.size();j++) {
-        total++;
+        //[CO20230626 - clang warning not used]total++;
         vector<int> vec_int = formated_final_num.at(j);
         xstructure new_xstr = XstrSubstitute(xstr_tmp, vec_int, element_name);
         vec_new_xstr.push_back(new_xstr);
@@ -2030,14 +2030,14 @@ vector<vector<xstructure> > Partial2Xstr_Fourfold_Occupied(xstructure xstr, int 
 
 
   vector<vector<xstructure> > vec_vec_xstr_fourfold;
-  int total=0;
+  //[CO20230626 - clang warning not used]int total=0;
   for (uint k=0; k<vec_vec_xstr.size();k++) {  //2-D vector
     vector<xstructure> vec_xstr=vec_vec_xstr.at(k);
     vector<xstructure> vec_new_xstr;
     for (uint i=0; i<vec_xstr.size();i++) {
       xstructure xstr_tmp = vec_xstr.at(i);
       for (uint j=0; j<formated_final_num.size();j++) {
-        total++;
+        //[CO20230626 - clang warning not used]total++;
         vector<int> vec_int = formated_final_num.at(j);
         xstructure new_xstr = XstrSubstitute(xstr_tmp, vec_int, element_name);
         vec_new_xstr.push_back(new_xstr);
@@ -2125,14 +2125,14 @@ vector<vector<xstructure> > Partial2Xstr_Triple_Occupied(xstructure xstr, int nH
 
 
   vector<vector<xstructure> > vec_vec_xstr_triple;
-  int total=0;
+  //[CO20230626 - clang warning not used]int total=0;
   for (uint k=0; k<vec_vec_xstr.size();k++) {  //2-D vector
     vector<xstructure> vec_xstr=vec_vec_xstr.at(k);
     vector<xstructure> vec_new_xstr;
     for (uint i=0; i<vec_xstr.size();i++) {
       xstructure xstr_tmp = vec_xstr.at(i);
       for (uint j=0; j<formated_final_num.size();j++) {
-        total++;
+        //[CO20230626 - clang warning not used]total++;
         vector<int> vec_int = formated_final_num.at(j);
         xstructure new_xstr = XstrSubstitute(xstr_tmp, vec_int, element_name);
         vec_new_xstr.push_back(new_xstr);

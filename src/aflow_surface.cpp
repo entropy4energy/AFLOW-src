@@ -340,7 +340,7 @@ namespace surface {
         }
       }
       //  cout << grid_close_atoms_cpos.size() << " " << grid_far_atoms_cpos.size() << endl;
-      int matches=0;
+      //[CO20230626 - clang warning not used]int matches=0;
       afound=0.0;
       for(uint iat_close=0;iat_close<grid_close_atoms_cpos.size();iat_close++) {
         rrr1=*grid_close_atoms_cpos.at(iat_close);
@@ -371,7 +371,7 @@ namespace surface {
                 if(PlaneDistance(rrr,a,b,c,d)<eps) {
                   if(!isrhombus) afound+=surface::PointInTriangleContribution(rrr,v1,v2,v3);   // 1st triangle
                   if(isrhombus)  afound+=surface::PointInRhombusContribution(rrr,v1,v2,v3,v4); // rhombus
-                  matches++;
+                  //[CO20230626 - clang warning not used]matches++;
                 }
               }
             }
@@ -1265,7 +1265,8 @@ namespace slab {
     //   int const SearchMax=20+ NumFilledLayers + NumEmptyLayers;  
     // [-SearchMax to SearchMax]^3 number of tested sites in lattice=12 + NumFilledLayers + NumEmptyLayers
 
-    int NumSitesInPlane[NumFilledLayers+1], LayerBasis[3], Layer0Basis[3], t1=0, t2=0, VECTOR[3], NumLayers, NumBasisSitesInSlab,Layer, l[4], Sum_Int, Element, ElementSite;
+    vector<int> NumSitesInPlane(NumFilledLayers+1); //CO20261017 - vector, not a variable-length array (a C++ extension)
+    int LayerBasis[3], Layer0Basis[3], t1=0, t2=0, VECTOR[3], NumLayers, NumBasisSitesInSlab,Layer, l[4], Sum_Int, Element, ElementSite;
     double DET=0.0, s[3], fractpart[3], intpart, Layer0BasisCosAngle=1, Layer0BasisCosAngleCurrent, LastCandidateCoord3, CurrCandidateCoord3, hkl_Length;
     xvector<double> SiteCartCoord(3), RS(3), AbsValueSlab_Basis(3), SiteDirectCoordWRTslab(3), hkl_CartCoord(3), SiteDirectCoord(3);
     xmatrix<double> MATRIX(3,3),INVERSE_MATRIX(3,3);

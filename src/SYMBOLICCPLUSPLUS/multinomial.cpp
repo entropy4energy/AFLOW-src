@@ -58,7 +58,7 @@ namespace symbolic { //DX20200825
       typename std::list<std::pair<T,int> >::iterator i = p2.u.begin();
       typename std::list<std::pair<T,int> >::iterator j = p2.m.begin();
       for(;i!= p2.u.end();i++) i->first = -(i->first);
-      for(;j!= p2.v.end();j++) j->first = -(j->first);
+      for(;j!= p2.m.end();j++) j->first = -(j->first);  //CO20250405 - changing v to m; not sure what v is
       return p2;
     }
 

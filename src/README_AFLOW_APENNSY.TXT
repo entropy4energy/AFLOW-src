@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                        materials.duke.edu/AFLOW/README_AFLOW_APENNSY.TXT
-****************************************************************************************************
 
  APENNSY MODE (SC 2009-2014: the pennsy project)
   aflow --apennsy ... then --help OR

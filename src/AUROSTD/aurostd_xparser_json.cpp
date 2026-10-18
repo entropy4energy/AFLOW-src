@@ -83,7 +83,7 @@ namespace aurostd {
 
   /// @brief converts a JSON::object into a string
   /// @param json_format if `true` add encapsulate strings in `"` (default: `true`)
-  /// @param escape_unicode if `true` escape unicode in strings - `αβγ` becomes `\u03b1\u03b2\u03b3` (default: `true`)
+  /// @param escape_unicode if `true` escape unicode in strings - `αβγ` becomes `\\u03b1\\u03b2\\u03b3` (default: `true`)
   /// @return JSON formatted string
   ///
   /// @authors
@@ -150,7 +150,7 @@ namespace aurostd {
 
   /// @brief save JSON::object to file
   /// @param file_path path to save to
-  /// @param escape_unicode if `true` escape unicode in strings - `αβγ` becomes `\u03b1\u03b2\u03b3` (default: `true`)
+  /// @param escape_unicode if `true` escape unicode in strings - `αβγ` becomes `\\u03b1\\u03b2\\u03b3` (default: `true`)
   /// @authors
   /// @mod{HE,20221110,created}
   void JSON::object::saveFile(const std::string & file_path, const bool escape_unicode) const {
@@ -301,7 +301,7 @@ namespace aurostd {
 
   /// @brief converting constructor: set the content of this JSON::object based on a xmatrix
   template<class utype> JSON::object::object(const xmatrix<utype> & content) {
-    this->template fromXmatrix(content);
+    this->template fromXmatrix<utype>(content); //CO20250406 - adding utype
   }
   // template instantiation for xmatrix types
   template JSON::object::object(const xmatrix<int> &);
@@ -339,7 +339,7 @@ namespace aurostd {
 
   /// @brief converting constructor: set the content of this JSON::object based on a map
   template<class utype> JSON::object::object(const std::map<std::string, utype> & content) {
-    this->template fromMap(content);
+    this->template fromMap<utype>(content); //CO20250406 - adding utype
   }
   // template instantiation for map types (key is always a sting in JSON)
   template JSON::object::object(const std::map<std::string, int> &);
@@ -416,7 +416,7 @@ namespace aurostd {
 
   ///@brief assignment operator for numbers
   template<class utype> void JSON::object::operator=(const utype content){
-    this->template fromNumber(content);
+    this->template fromNumber<utype>(content);  //CO20250406 - adding utype
   }
   // template instantiation for number types
   template void JSON::object::operator=(const char);
@@ -807,7 +807,7 @@ namespace aurostd {
         throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "JSON xmatrix conversion failed: sub element is not a LIST: " + (std::string) *this, _VALUE_ILLEGAL_);
       std::shared_ptr <JSON::List> row = std::static_pointer_cast<JSON::List>(so.obj);
       rows++;
-      cols_v.template emplace_back(row->size());
+      cols_v.template emplace_back<size_t>(row->size());  //CO20250406 - adding size_t
     }
     if (std::adjacent_find(cols_v.begin(), cols_v.end(), std::not_equal_to<size_t>()) == cols_v.end()) cols = cols_v[0];
     else
@@ -900,7 +900,7 @@ namespace aurostd {
   ///@brief checks if JSON::object_tpe::LIST, JSON::object_tpe::DICTIONARY or JSON::object_tpe::STRING is empty
   bool JSON::object::empty(){
     if ((type == object_types::DICTIONARY) || (type == object_types::LIST) || (type == object_types::STRING)) {
-      return not bool(this);
+      return !bool(*this);  //CO20231119 - originally "return not bool(this)", this gave warning: 'nonnull' argument 'this' compared to NULL [-Wnonnull-compare]
     } else {
       throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "empty is just allowed for a JSON DICTIONARY, LIST, or STRING", _VALUE_ILLEGAL_);
     }
@@ -1032,9 +1032,17 @@ namespace aurostd {
   }
 
   ///@brief escape characters to JSON
+  ///@note the remaining control characters U+0000 to U+001F are written as `\\u00XX`, since JSON does not allow them raw //CO20261004
   std::string JSON::char_escape(const char16_t c){
     switch(c){
-      default: return "";
+      default: {
+        if (c < 0x20) { //CO20261004 - control characters were passed through raw, giving invalid JSON
+          std::stringstream escaped;
+          escaped << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (uint) c;
+          return escaped.str();
+        }
+        return "";
+      }
       case('"'): return "\\\"";
       case('\\'): return "\\\\";
       case('/'): return "\\/";
@@ -1055,7 +1063,23 @@ namespace aurostd {
   std::string JSON::escape(const std::string & raw, const bool unicode) {
     std::stringstream out;
     if (unicode) {
+      // CO20260913 - std::wstring_convert and std::codecvt_utf8_utf16 are
+      // deprecated in C++17 and still the only portable conversion in the
+      // standard library; there is no replacement to move to yet.  Contain the
+      // warning here rather than disabling -Wdeprecated-declarations globally.
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
       std::u16string utf16 = std::wstring_convert < std::codecvt_utf8_utf16 < char16_t >, char16_t > {}.from_bytes(raw.data());
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
       for (char16_t c: utf16) {
         if (c < 0x80) {
           if (char_escape(c).empty()) out << (char) c;

@@ -275,6 +275,15 @@ namespace aurostd {
 
   void xoption::scheme2scheme(char c,const string& s) { //CO20210805 - const&
     for(uint i=0;i<vxscheme.size();i++) {
+      //CO20260913 - PRESERVED is a MODIFIER in these comma lists, never a scheme
+      //in its own right, and it must not be matched on its first character.  The
+      //documented form that aflow itself writes (aflow_avasp.cpp) is
+      //[VASP_FORCE_OPTION]PREC=<SCHEME>,PRESERVED; without this guard the 'P'
+      //rule for PHONONS matches the token "PRESERVED", so PREC=ACCURATE,PRESERVED
+      //silently resolves to PHONONS, which aflow_ivasp.cpp then treats as
+      //"PREC=PHONONS overrides ALGO" and forces ALGO=NORMAL.  .preserved is set
+      //separately in options2entry() and is unaffected by skipping the token here.
+      if(vxscheme.at(i)=="PRESERVED"){continue;}
       if(vxscheme.at(i).at(0)==c ||
           vxscheme.at(i).at(0)==aurostd::tolower(c) ||
           vxscheme.at(i).at(0)==aurostd::toupper(c)) {

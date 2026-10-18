@@ -325,6 +325,7 @@ namespace makefile {
 
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " directory=" << directory << endl;}
 
+    if(!aurostd::IsDirectory(directory+"/DATA")){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,directory+"/DATA not found",_VALUE_ILLEGAL_);}  //check that DATA exists (fast check that ANY object files exist)
     if(!aurostd::IsDirectory(directory+"/AUROSTD")){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,directory+"/AUROSTD not found",_VALUE_ILLEGAL_);}  //check that AUROSTD exists (fast check that ANY object files exist)
     if(!aurostd::FileExist(directory+"/aflow.h")){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,directory+"/aflow.h not found",_VALUE_ILLEGAL_);} //check we are in an aflow directory
     //[not a good idea, circular flow of information]if(!aurostd::FileExist(directory+"/aflow.o")){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,directory+"/aflow.o not found",_VALUE_ILLEGAL_);}  //check that aflow.o exists (fast check that ANY object files exist)
@@ -370,6 +371,18 @@ namespace makefile {
     vmt_required.push_back(mt_required);
 
     //SC variables - hack
+    //CO20240519 - DATA
+    string var_vtxt_DATA="DATA_TXT";
+    vector<string> vtxt_DATA;
+    dir=directory+"/DATA";
+    trimPath(dir);
+    aurostd::DirectoryLS(dir,vtxt_DATA);
+    std::sort(vtxt_DATA.begin(),vtxt_DATA.end());
+    for(uint i=0;i<vtxt_DATA.size();i++){
+      vtxt_DATA[i]=dir+"/"+vtxt_DATA[i];
+      trimPath(vtxt_DATA[i]);
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " vtxt_DATA[i=" << i << "]=" << vtxt_DATA[i] << endl;}
+    }
     //AUROSTD
     string var_vcpp_aurostd="AUROSTD_CPPS",var_vhpp_aurostd="AUROSTD_HPPS";
     vector<string> vcpp_aurostd,vhpp_aurostd;
@@ -385,7 +398,7 @@ namespace makefile {
     //[GET vcpp_aurostd and vhpp_aurostd FROM aurostd.cpp dependencies, close the loop]    else if(vfs[j].size()>2 && vfs[j].find(".h")==vfs[j].size()-2){vhpp_aurostd.push_back(file);}
     //[GET vcpp_aurostd and vhpp_aurostd FROM aurostd.cpp dependencies, close the loop]  }
     //[GET vcpp_aurostd and vhpp_aurostd FROM aurostd.cpp dependencies, close the loop]}
-    for(i=0;i<vvdependencies.back().size();i++){
+    for(i=0;i<vvdependencies.back().size();i++){  //populate vcpp_aurostd and vhpp_aurostd
       const string& dep=vvdependencies.back()[i];
       if(dep.find("AUROSTD")!=string::npos && dep.size()>4 && dep.find(".cpp")==dep.size()-4){vcpp_aurostd.push_back(dep);}
       else if(dep.find("AUROSTD")!=string::npos && dep.size()>2 && dep.find(".h")==dep.size()-2){vhpp_aurostd.push_back(dep);}
@@ -539,6 +552,8 @@ namespace makefile {
       //[not a good idea, circular flow of information]if(!aurostd::FileExist(obj_file)){continue;}  //since we can only run this code once aflow is compiled, we can check that the obj_file is a real target or not
       //[CO20200521 - OBSOLETE, we already injected vfiles[i] above]vvdependencies[i].insert(vvdependencies[i].begin(),vfiles[i]); //put .cpp at the front of dependencies for $<
       if(obj_file.find("aurostd.o")!=string::npos){ //exception for aurostd.o
+        vvdependencies[i].push_back("$("+var_vtxt_DATA+")"); //must do manually since it is not an explicit dependence
+        //[CO20240519 - not automatic]updateDependenciesVariable(vtxt_DATA,var_vtxt_DATA,vvdependencies[i]);
         updateDependenciesVariable(vcpp_aurostd,var_vcpp_aurostd,vvdependencies[i]);
         updateDependenciesVariable(vhpp_aurostd,var_vhpp_aurostd,vvdependencies[i]);
       }
@@ -564,6 +579,7 @@ namespace makefile {
     //[CO20200521 - OBSOLETE]if(!aurostd::WithinList(vfile_obj,"aflow_aflowrc.cpp")){vfile_obj.push_back("aflow_aflowrc.cpp");}  //safety
 
     //make some variable replacements before printing
+    updateDependenciesVariable(vtxt_DATA,var_vtxt_DATA,vdep_aflowh);
     updateDependenciesVariable(vcpp_aurostd,var_vcpp_aurostd,vdep_aflowh);
     updateDependenciesVariable(vhpp_aurostd,var_vhpp_aurostd,vdep_aflowh);
 
@@ -591,6 +607,7 @@ namespace makefile {
 
     stringstream makefile_definitions_ss;
     //MAIN DEPENDENCIES START
+    if(vtxt_DATA.size()){makefile_definitions_ss << var_vtxt_DATA << "=" << aurostd::joinWDelimiter(vtxt_DATA," ") << endl;} //CO variables - hack
     if(vcpp_aurostd.size()){makefile_definitions_ss << var_vcpp_aurostd << "=" << aurostd::joinWDelimiter(vcpp_aurostd," ") << endl;} //SC variables - hack
     if(vhpp_aurostd.size()){makefile_definitions_ss << var_vhpp_aurostd << "=" << aurostd::joinWDelimiter(vhpp_aurostd," ") << endl;} //SC variables - hack
 #if COMPILE_SYMBOLIC

@@ -4,8 +4,6 @@
 *                            High-Throughput ab-initio Computing Project                           *
 *                                                                                                  *
 ****************************************************************************************************
-LATEST VERSION OF THE FILE:                              materials.duke.edu/AFLOW/aflow_aconvasp.pdf
-****************************************************************************************************
 
  AFLOW POSTPROCESSING MODE (formerly called aconvasp/aqe)
   aflow --help [-h]
@@ -81,6 +79,9 @@ LATEST VERSION OF THE FILE:                              materials.duke.edu/AFLO
          --bader (default: DEFAULT_VASP_FORCE_OPTION_BADER)
          --spin_remove_relax_1 (default: DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1)
          --spin_remove_relax_2 (default: DEFAULT_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2)
+         --recycle_spin (default: DEFAULT_VASP_FORCE_OPTION_RECYCLE_SPIN)
+         --magmom=2x-3_4x5_8x0
+         --magmom_mult=2 (default: DEFAULT_VASP_FORCE_OPTION_MAGMOM_MULTIPLIER)
          --kscheme=[M | G] (default: DEFAULT_KSCHEME in .aflow.rc) --kscheme_static=[M | G] (default: DEFAULT_KSCHEME_STATIC in .aflow.rc)
 	       --kppra=NNNN (default: DEFAULT_KPPRA in .aflow.rc) --kppra_static=NNNN (default: DEFAULT_KPPRA_STATIC in .aflow.rc) --bands_grid=NNNN (default: DEFAULT_BANDS_GRID in .aflow.rc)
          --enmax_multiply=NNNN (default: DEFAULT_VASP_PREC_ENMAX_HIGH in .aflow.rc, DEFAULT_VASP_PREC_ENMAX_ACCURATE  in .aflow.rc)
@@ -188,6 +189,17 @@ LATEST VERSION OF THE FILE:                              materials.duke.edu/AFLO
         With --spin_remove_relax_1 _2, the user can indicate when to avoid a spin-polarized calculation if
         the system's magnetic moment is negligible.
        
+     RECYCLE_SPIN
+        The user can recycle the final spin configuration of the previous run (magnetization in OUTCAR)
+        as the starting configuration for the next run (MAGMOM in INCAR).
+
+      MAGMOM
+        Specify the starting magnetic configuration for the run (MAGMOM in INCAR).
+
+      MAGMOM_MULT
+        Specify the multiplication factor for the starting spins (MAGMOM in INCAR).
+        It is recommended by VASP to start with a larger initial magnetic moment than expected.
+
      KPOINTS SPECIFICATION
         With --kppra=NNN the user can specify a NNN number of kpoints per reciprocal atom.
         Input KPPRA (6,000-10,000 recommended) is the lower bound of the product of the 
@@ -848,6 +860,8 @@ LATTICES = (the ones with "")
 
   aflow --clean --DIRECTORY=DIRECTORY
         Cleans the directory, like aflow --clean --DIRECTORY=DIRECTORY
+        With --keep_relax, the relaxations, parts and fix logs stay for a
+        restart (see README_AFLOW.TXT).
 
   aflow --clean_all < LIST_DIRECTORIES
         Cleans all the directories. Be careful !
@@ -1164,6 +1178,18 @@ LATTICES = (the ones with "")
  	      [AFLOW_APL]TP
        See README_APL, especially 3). for more details.
 
+  aflow --derived_properties [--aflow_db=file] [--derived_file=file] [--np=N]
+        Computes the hull distance (distance_hull, eV/atom) of every entry of the
+        database and the DEED (deed, (eV/atom)^-1) of every POCC parent, and patches
+        them into the database. POCC supercells and parents are left out of the hulls
+        and measured against the hull of ordered structures (signed: negative below it);
+        DEED=sqrt(EFA/distance_hull) for a parent with a positive distance. The values
+        are kept in --derived_file (default: the database file with _derived.jsonl in
+        place of .db), one line per AUID with the inputs they came from. A run computes
+        only the hulls that new, changed or removed entries can move, the largest
+        systems only, N at a time, and patches every value the database does not hold.
+        Run it after --update_database: after a rebuild it patches all the values back.
+
   aflow --diff=POSCAR1,POSCAR2
         Gives the difference in energy of the two structures within the PARTIAL OCCUPATION force field.
  
@@ -1322,6 +1348,10 @@ LATTICES = (the ones with "")
   aflow --extract_poscar | --xposcar aflow.in
         Extract to stdout the poscar embedded in the aflow.in file.
         Useful for scripting (SC200902).
+  aflow --extract_poscar_instance |--extract_poscar_direct |--yposcar [aflow.in]
+        Extract to stdout the poscar embedded in the aflow.in file directly without processing.
+        Name is optional, defaults to aflow.in if not given.
+        Useful for scripting (documented ST20240418)
   aflow --extract_potcar | --xpotcar aflow.in
         Extract to stdout the potcar embedded in the aflow.in file.
         Useful for scripting (SC200902).
@@ -2923,23 +2953,23 @@ LATTICES = (the ones with "")
         Give the list of prototypes from the ICSD database included in the code.   
         If N is passed, then it returns ONLY the N-ary compounds.
 	If the ICSD_AFLOW_LIBRARY is not available, the code switches to downloading
-        information from the server=aflowlib.duke.edu database.
-        You can force downloading from different servers:
-        --server=aflowlib.duke.edu
-        --server=materials.duke.edu
-        --server=default (switches to aflowlib.duke.edu)
+        information from the server=s4e.ai database.
+        The server can be given explicitly:
+        --server=s4e.ai
+        --server=default (switches to s4e.ai)
+        --server=aflowlib.duke.edu (the legacy AFLOW server; also --server=aflowlib)
 
   aflow [--server=XXXXXXXX] [--vasp|--qe|--abinit|--aims] --proto_icsd=label                                  
         Returns the prototype labeled with the string label, from the             
         ICSD database.                                                            
         Example: aflow --proto_icsd=Ba1Ga4_ICSD_659522
-        Example: aflow --aflowlib.duke.edu --proto_icsd=Ba1Ga4_ICSD_659522
+        Example: aflow --server=s4e.ai --proto_icsd=Ba1Ga4_ICSD_659522
 	If the ICSD AFLOW_LIBRARY is not available, the code switches to downloading
-        information from the  server=aflowlib.duke.edu database.
-        You can force downloading from different servers:
-        --server=aflowlib.duke.edu
-        --server=materials.duke.edu
-        --server=default (switches to aflowlib.duke.edu)
+        information from the  server=s4e.ai database.
+        The server can be given explicitly:
+        --server=s4e.ai
+        --server=default (switches to s4e.ai)
+        --server=aflowlib.duke.edu (the legacy AFLOW server; also --server=aflowlib)
         The label can be of this type:
         --proto_icsd=ICSD_number.{ABC}[:speciesA*[:speciesB*]..[:volumeA*[:volumeB*].. | :volume]]"
         --proto_icsd=label_ICSD_number"
@@ -3642,6 +3672,7 @@ LATTICES = (the ones with "")
   aflow --update_database [--patchfiles=file1,file2,...]
         Fetches new entries and rebuilds the AFLOW database file if new entries are available.
         --patchfiles can be used to patch the AFLOW database using jsonl files (see --patch_database).
+        Run aflow --derived_properties after it for the hull distances and DEED.
 
   aflow --vasp                                                                     
         Transforms the GEOMETRICAL (or whicever is the input file format) to a        
@@ -3870,7 +3901,7 @@ FROZSL MODE
 
 ******************************************************************************************
 
- APENNSY MODE (this routines are available only in duke.edu domine)
+ APENNSY MODE (these routines are available only where the AFLOW libraries are installed)
   aflow --xfixX system structure
         Repairs the convex-hull calculation by removing
         $(vAFLOW_PROJECTS_DIRS.at(XHOST_LIBRARY_LIB2))/LIB/RAW/system/structure
@@ -3892,7 +3923,7 @@ FROZSL MODE
         It works only on AFLOW_MATERIALS_SERVER (defined in aflow_aflowrc.cpp).
         With "--force" it overwrites the old raw files if they exist.
    
- LIBN MODE (this routines are available only in duke.edu domine)
+ LIBN MODE (these routines are available only where the AFLOW libraries are installed)
         Scripts for the production/mantenance of the LIB* libraries.
         The "all" works  only if 'pwd' = $(vAFLOW_PROJECTS_DIRS.at(XHOST_LIBRARY_LIB*))
   aflow [--force] --lib2raw=directory

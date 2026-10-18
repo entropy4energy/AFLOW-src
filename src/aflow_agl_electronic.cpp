@@ -49,6 +49,9 @@ namespace AGL_functions {
     AGL_dos_pressures AGL_dos_pressure;
     // [OBSOLETE] vector<AGL_dos_pressures> AGL_dos_pressure_list;
     double sumdos, sumidos;
+    vector<string> vlock_variants_aelagl; //CO20240409
+    aurostd::string2tokens(DEFAULT_FILE_AFLOWLOCK_VARIANTS_AELAGL,vlock_variants_aelagl,","); //CO20240409
+    string FileLockName=""; //CO20240409
     for(uint idVaspRun = 0; idVaspRun < vaspRuns.size(); idVaspRun++) {
       skipdir = false;
       aurostd::StringstreamClean(aus);
@@ -106,13 +109,25 @@ namespace AGL_functions {
       } else if( aurostd::FileExist(dirrunname.at(idVaspRun) + ".tar.xz") ) {
         aurostd::execute( string("tar -xf ") + dirrunname.at(idVaspRun) + ".tar.xz" );
       } // Extract all...
+      
+      for(uint ilock=0;ilock<vlock_variants_aelagl.size();ilock++){ //CO20240409
+        //CO20240409 - it seems vaspRuns[idVaspRun].Directory is an OBSOLETE setting, we check both anyway
+        if(aurostd::FileExist(aurostd::CleanFileName(vaspRuns[idVaspRun].Directory+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+        if(aurostd::FileExist(aurostd::CleanFileName(dirrunname.at(idVaspRun)+"/"+vlock_variants_aelagl[ilock]))){FileLockName=vlock_variants_aelagl[ilock];break;}  //CO20240409
+      } //CO20240409
 
       // If the LOCK file is missing, then it is probably a corrupted run
       // Do not accept it and wait for the new run
       if( !aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_ )  && !aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_ ) &&
           !(((XHOST.ARUN_POSTPROCESS || AGL_data.postprocess) &&
-              ((aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) || (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/LOCK")) ||
-               (aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) || (aurostd::FileExist( dirrunname.at(idVaspRun) + "/LOCK")))))) {
+              (
+               (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+FileLockName)) ||  //CO20240409
+               //[CO20240409 - OBSOLETE](aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/agl.LOCK")) || 
+               (aurostd::FileExist( vaspRuns.at(idVaspRun).Directory + "/"+_AFLOWLOCK_)) ||
+               (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+FileLockName)) ||  //CO20240409
+               //[CO20240409 - OBSOLETE](aurostd::FileExist( dirrunname.at(idVaspRun) + "/agl.LOCK")) || 
+               (aurostd::FileExist( dirrunname.at(idVaspRun) + "/"+_AFLOWLOCK_))
+               )))) {
         aurostd::StringstreamClean(aus);
         aus <<  _AGLSTR_WARNING_ + "The " << _AFLOWLOCK_ << " file in " << vaspRuns.at(idVaspRun).Directory << " directory is missing." << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
@@ -362,37 +377,45 @@ namespace AGL_functions {
           if (AGL_data.AGL_edos_properties.at(i).dosval.at(below_EF) < AGL_data.AGL_edos_properties.at(i).dosval.at(above_EF)) {
             dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(below_EF);
             vallower = below_EF;
+            if(below_EF > 0){ //CO20260123 - protection against underfill
             uint j = below_EF - 1;
             while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dvallower) && (j > 0)) {
               vallower = j;
               dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
               j--;
             }
+            }
             dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(above_EF);
             valupper = above_EF;
-            j = above_EF - 1;
+            if(above_EF > 0){ //CO20260123 - protection against underfill
+            uint j = above_EF - 1;
             while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) > dvalupper) && (j > 0)) {
               valupper = j;
               dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
               j--;
             }
+            }
           } else {
             dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(below_EF);
             vallower = below_EF;
+            if(below_EF > 0){ //CO20260123 - protection against underfill
             uint j = below_EF - 1;
             while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) > dvallower) && (j > 0)) {
               vallower = j;
               dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
               j--;
             }
+            }
             dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(above_EF);
             valupper = above_EF;
-            j = above_EF - 1;
+            if(above_EF > 0){ //CO20260123 - protection against underfill
+            uint j = above_EF - 1;
             while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dvalupper) && (j > 0)) {
               valupper = j;
               dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
               j--;
             }
+          }
           }
           energtofit.clear();
           dostofit.clear();
@@ -479,15 +502,17 @@ namespace AGL_functions {
         } else {
           dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(min_EF);
           vallower = min_EF;
+          if(min_EF > 0){ //CO20260123 - protection against underfill
           uint j = min_EF - 1;
           while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) > dvallower) && (j > 0)) {
             vallower = j;
             dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
             j--;
           }
+          }
           dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(min_EF);
           valupper = min_EF;
-          j = min_EF + 1;
+          uint j = min_EF + 1;
           while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dvalupper) && (j < AGL_data.AGL_edos_properties.at(i).dosval.size())) {
             valupper = j;
             dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
@@ -495,12 +520,14 @@ namespace AGL_functions {
           }
           dcondlower = AGL_data.AGL_edos_properties.at(i).dosval.at(min_EF);
           condlower = min_EF;
+          if(min_EF > 0){ //CO20260123 - protection against underfill
           j = min_EF - 1;
           while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dcondlower) && (j > 0)) {
             condlower = j;
             dcondlower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
             j--;
           }	  
+          }
           dcondupper = AGL_data.AGL_edos_properties.at(i).dosval.at(min_EF);
           condupper = min_EF;
           j = min_EF + 1;
@@ -523,13 +550,15 @@ namespace AGL_functions {
         if (AGL_data.AGL_edos_properties.at(i).dosval.at(below_EF) < egap_tol) {
           // Search below Fermi level for valence band edge
           valbandedge = below_EF;
+          if(below_EF > 0){ //CO20260123 - protection against underfill
           uint j = below_EF - 1;
           while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < egap_tol) && (j > 0)) {
             valbandedge = j;
             j--;
           }
+          }
           condbandedge = below_EF;
-          j = above_EF;
+          uint j = above_EF;
           while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < egap_tol) && (j < AGL_data.AGL_edos_properties.at(i).dosval.size())) {
             condbandedge = j;
             j++;
@@ -638,11 +667,13 @@ namespace AGL_functions {
         aus << _AGLSTR_MESSAGE_ + "Electronic DOS gap: valence band region edge = " << dvallower << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET); 
         vallower = valbandedge;
+        if(valbandedge > 0){ //CO20260123 - protection against underfill
         uint j = valbandedge - 1;
         while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) > dvallower) && (j > 0)) {
           vallower = j;
           dvallower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
           j--;
+        }
         }
         aurostd::StringstreamClean(aus);
         aus << _AGLSTR_MESSAGE_ + "Electronic DOS gap: valence band region edge = " << dvallower << endl;
@@ -653,7 +684,7 @@ namespace AGL_functions {
         aurostd::StringstreamClean(aus);
         aus << _AGLSTR_MESSAGE_ + "Electronic DOS gap: valence band region edge = " << dvalupper << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-        j = valbandedge + 1;
+        uint j = valbandedge + 1;
         while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dvalupper) && (j < AGL_data.AGL_edos_properties.at(i).dosval.size())) {
           valupper = j;
           dvalupper = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
@@ -669,11 +700,13 @@ namespace AGL_functions {
         aurostd::StringstreamClean(aus);
         aus << _AGLSTR_MESSAGE_ + "Electronic DOS gap: conduction band region edge = " << dcondlower << endl;
         aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
+        if(condbandedge > 0){ //CO20260123 - protection against underfill
         j = condbandedge - 1;
         while ((AGL_data.AGL_edos_properties.at(i).dosval.at(j) < dcondlower) && (j > 0)) {
           condlower = j;
           dcondlower = AGL_data.AGL_edos_properties.at(i).dosval.at(j);
           j--;
+        }
         }
         aurostd::StringstreamClean(aus);
         aus << _AGLSTR_MESSAGE_ + "Electronic DOS gap: conduction band region edge = " << dcondlower << endl;

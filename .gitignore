@@ -41,8 +41,6 @@ src/apennsy
 src/aflow_data_calculated.cpp
 src/aflow_data_stokes.cpp
 src/aflow_data_nist.cpp
-src/aflow_matlab_funcs.cpp
-src/aflow_gnuplot_funcs.cpp
 src/aflowlib_webapp_entry.cpp
 src/aflowlib_webapp_bands.cpp
 src/aflow_chull_jupyter.cpp
@@ -74,3 +72,6 @@ src/compile_output*.txt
 
 # old Makefiles
 Makefile.aflow.OLD
+
+# generated documentation
+doc/out

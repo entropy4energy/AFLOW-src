@@ -469,7 +469,7 @@ void debint (double& y, double& Deb) {
   //    Evaluate Debye integral
   double eps=1e-12;
   double cero=0.0;
-  int maxnl=100;
+  const int maxnl=100; //CO20261017 - const: x and w are fixed-size arrays, not variable-length ones
   double x[maxnl],w[maxnl];
   double debye, debye0, xabs, sum;
   int i, nl;

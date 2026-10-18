@@ -331,10 +331,7 @@ bool APENNSY_Parameters::LoadLibrary(_aflags &aflags) {
           string aurl;	
           // [OBSOLETE] aflowlib::TokenExtractAFLOWLIB(plug.entry,"aurl=",aurl);
           aurl=plug.aurl;
-          aurl=aurostd::RemoveSubString(aurl,"nietzsche.mems.duke.edu:");aurl=aurostd::RemoveSubString(aurl,"nietzsche:");
-          aurl=aurostd::RemoveSubString(aurl,"materials.duke.edu:");aurl=aurostd::RemoveSubString(aurl,"materials:");
-          aurl=aurostd::RemoveSubString(aurl,"aflowlib.mems.duke.edu:");
-          aurl=aurostd::RemoveSubString(aurl,"aflowlib.duke.edu:");aurl=aurostd::RemoveSubString(aurl,"aflowlib:");
+          aurl=aflowlib::AURLStripHost(aurl); //CO20261002
           aurl=aurostd::StringSubst(aurl,"/LIB/","/RAW/");
           aurl=aurostd::StringSubst(aurl,"AFLOWDATA/LIB2_RAW/","/common/LIB2/RAW/");
           // PRE

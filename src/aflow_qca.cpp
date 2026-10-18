@@ -420,7 +420,7 @@ namespace qca {
         aurostd::sort(elements_xc);
         alloyname_PBE = "";
         for (size_t i = 0; i < elements_xc.size(); i++) {alloyname_PBE += AVASP_Get_PseudoPotential_PAW_PBE(elements_xc[i]);}
-        aflowurl = "aflowlib.duke.edu:AFLOWDATA/LIB" + aurostd::utype2string<uint>(ialloy) + "_RAW/" + alloyname_PBE;
+        aflowurl = aflowlib::AFLOWLIBServer() + ":AFLOWDATA/LIB" + aurostd::utype2string<uint>(ialloy) + "_RAW/" + alloyname_PBE; //CO20261006 - the server of this run (--server=)
         if (plattice == "fcc") {
           if (ialloy == 2) {
             for (uint i = 1; i < 30; i++) {

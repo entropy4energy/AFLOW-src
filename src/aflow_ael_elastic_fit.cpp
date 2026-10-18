@@ -796,8 +796,8 @@ namespace AEL_functions {
       aus << endl;
     }
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-    aurostd::cematrix eltens(elastic_const);
-    aurostd::cematrix eltenshalf(elastic_const_half);
+    //[CO20260120 - OBSOLETE]aurostd::cematrix eltens(elastic_const);
+    //[CO20260120 - OBSOLETE]aurostd::cematrix eltenshalf(elastic_const_half);
     // OBSOLETE aurostd::StringstreamClean(aus);
     // OBSOLETE aus << _AELSTR_MESSAGE_ + "Elastic tensor (cematrix) = " << endl;
     // OBSOLETE aus << eltens << endl;
@@ -820,8 +820,8 @@ namespace AEL_functions {
     aurostd::StringstreamClean(aus);
     aus << _AELSTR_MESSAGE_ + "Inverting elastic tensor" << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);
-    elastic_const_inv = eltens.InverseMatrix();
-    elastic_const_half_inv = eltenshalf.InverseMatrix();
+    elastic_const_inv = aurostd::inverse(elastic_const); //[CO20260120 - OBSOLETE]eltens.InverseMatrix();
+    elastic_const_half_inv = aurostd::inverse(elastic_const_half); //[CO20260120 - OBSOLETE]eltenshalf.InverseMatrix();
     aurostd::StringstreamClean(aus);
     aus << _AELSTR_MESSAGE_ + "Storing compliance tensor" << endl;
     aurostd::PrintMessageStream(FileMESSAGE,aus,XHOST.QUIET);

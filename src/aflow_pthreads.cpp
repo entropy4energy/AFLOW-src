@@ -621,18 +621,22 @@ namespace AFLOW_PTHREADS {
         vdirs2tmp.clear();
         for(j=0;j<size && izip*size+j<vdirs_size;j++){vdirs2tmp.push_back(vdirs[izip*size+j]);}
         tmpfile=aurostd::TmpFileCreate("multi_zip");vtmpfiles.push_back(tmpfile);
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " tmpfile[izip=" << izip << "]=" << tmpfile << endl;}
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " tmpfile[izip=" << izip << "]=" << tmpfile << endl;
+          cerr << __AFLOW_FUNC__ << " vdirs2tmp=" << endl << aurostd::joinWDelimiter(vdirs2tmp,"\n") << endl;
+        }
         aurostd::vectorstring2file(vdirs2tmp,tmpfile);
         if(aurostd::FileEmpty(tmpfile)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Tmp file empty: "+tmpfile,_FILE_CORRUPT_);}
         aurostd::StringstreamClean(zero_padding);
         zero_padding << std::setfill('0') << std::setw(aurostd::getZeroPadding(numzips)) << izip+ishift;
         zip_name=prefix+"_"+zero_padding.str()+"_of_"+aurostd::utype2string(numzips)+".zip"; //SC20200303 //CO20211103
         vzip_names.push_back(zip_name); //CO20220207
-        command << "cat " << tmpfile << " | ";
-        command << "zip -0rmv ";  //-9rmv
+        command << "cat \"" << tmpfile << "\" | ";
+        command << "zip -0rmv \"";  //-9rmv
         command << zip_name;
-        command << " -@"; //https://unix.stackexchange.com/questions/508247/argument-list-too-long-when-zipping-large-list-of-certain-files-in-a-folder
-        command << " | grep " << _AFLOWIN_;
+        command << "\" -@"; //https://unix.stackexchange.com/questions/508247/argument-list-too-long-when-zipping-large-list-of-certain-files-in-a-folder
+        //[CO20250914]command << " | grep " << _AFLOWIN_;
+        command << " | grep -i -E \'" << _AFLOWIN_ << "|warn|error\' | grep -iv \'aflow\\.error\'";
         vcommands.push_back(command.str());aurostd::StringstreamClean(command);
       }
     }
@@ -648,7 +652,8 @@ namespace AFLOW_PTHREADS {
         while(i<vdirs_size && j<size){
           command << " " << vdirs[i++];j++;
           if(command.str().size()>=_AFLOW_MAX_ARGV_ || i>=vdirs_size || j>=size){
-            command << " | grep " << _AFLOWIN_;
+            //[CO20250914]command << " | grep " << _AFLOWIN_;
+            command << " | grep -i -E \'" << _AFLOWIN_ << "|warn|error\' | grep -iv \'aflow\\.error\'";
             vcommands.push_back(command.str());aurostd::StringstreamClean(command);
             break;
           }

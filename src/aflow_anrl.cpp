@@ -14,6 +14,7 @@
 #include "aflow_compare_structure.h"
 #include "aflow_pflow.h"
 #include "aflow_anrl.h"
+#include "aflow_prototypes_jhu.h" //CO20260930
 
 #define _DEBUG_ANRL_ false //DX20200625
 
@@ -481,6 +482,14 @@ namespace anrl {
       bool print_element_names, bool print_atomic_numbers){  //CO20190520 - removed pointers for bools and doubles, added const where possible //DX20190829 - added recalculate_symmetry //DX20191031 - removed reference
     // determine anrl label, parameters, and parameter values of the input structure
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
+
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
+    
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " xstr=" << endl << xstr << endl;
+      cerr << __AFLOW_FUNC__ << " tolerance=" << tolerance << endl;
+      cerr << __AFLOW_FUNC__ << " input_setting=" << input_setting << endl;
+    }
 
     ostringstream oss;
     stringstream message;
@@ -1702,6 +1711,8 @@ namespace anrl {
     // New prototype-matches should be investigated with XtalFinder and
     // only reported here if we wish to keep the equivalent prototypes.
 
+    if(jhuproto::moleculesInBox(labels_matched)){return true;} //CO20260930 JHU molecules in a box differ only in bond length
+
     uint nlabels_matched = labels_matched.size();
 
     // ---------------------------------------------------------------------------
@@ -1957,12 +1968,22 @@ namespace anrl {
 
     bool LDEBUG=(FALSE || XHOST.DEBUG || _DEBUG_ANRL_);
 
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
+    
+    if(LDEBUG){
+      cerr << __AFLOW_FUNC__ << " _xstr" << endl << _xstr << endl;
+      cerr << __AFLOW_FUNC__ << " label_input=" << label_input << endl;
+      cerr << __AFLOW_FUNC__ << " label_and_params_calculated=" << label_and_params_calculated << endl;
+      cerr << __AFLOW_FUNC__ << " tolerance_sym_input=" << tolerance_sym_input << endl;
+    }
+
     xstructure xstr = _xstr; // copy
 
     // ---------------------------------------------------------------------------
     // set symmetry tolerance
     double tolerance_sym = tolerance_sym_input;
     if(tolerance_sym == AUROSTD_MAX_DOUBLE){ tolerance_sym = SYM::defaultTolerance(xstr); }
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " tolerance_sym=" << tolerance_sym << endl;}
 
     // ---------------------------------------------------------------------------
     // determine label from structure (reverse process)
@@ -2179,6 +2200,7 @@ namespace anrl {
       scale_volume_by_species = false;
       parameters=""; // clear the hack
     }
+    if(parameters.empty() && jhuproto::keepLatticeParameter(label_anrl)){keep_anrl_lattice_parameter=true;} //CO20260930 - e.g., a molecule in a fixed box
 
     // -------------------------------------------------------------------------
     // if no parameters given 
@@ -2476,6 +2498,9 @@ namespace anrl {
     str.lattice = lattice_primitive;
     str.atoms = atoms_primitive_cell;
     str.dist_nn_min = SYM::minimumDistance(str); //DX20210114 - calculate dist_nn_min before default tolerance, defaultTolerance will use dist_nn_min
+    if(abs(str.dist_nn_min)< _ZERO_TOL_){ //CO20240605
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Structure generated has overlapping atoms, bad parameters provided",_RUNTIME_ERROR_);
+    }
     str.sym_eps = SYM::defaultTolerance(str); // need sym_eps for AddAtom later (otherwise it breaks for systems like A12B6C_cF608_210_4h_2h_e)
     str.sym_eps_calculated = true; //DX20200929
 
@@ -3517,6 +3542,7 @@ namespace anrl {
       keep_anrl_lattice_parameter=true;
       parameters=""; // clear the hack
     }
+    if(parameters.empty() && jhuproto::keepLatticeParameter(label_anrl)){keep_anrl_lattice_parameter=true;} //CO20260930 - e.g., a molecule in a fixed box
 
     // -------------------------------------------------------------------------
     // check if scaling factor is negative; signifies automatic volume scaling
@@ -3897,7 +3923,7 @@ namespace anrl {
     }
     // ---------------------------------------------------------------------------
     // 72 // ./aflow --proto=AB_oC8_63_c_c --params=2.9782,2.64253575985,0.985360284736,0.436,0.14525
-    // Lederer-13 // ./aflow --proto=AB_oC8_63_c_c --params=1.0.0185797325,1.41421356236,0.707106781182,0.625,0.125
+    // Lederer-13 // ./aflow --proto=AB_oC8_63_c_c --params=1.0185797325,1.41421356236,0.707106781182,0.625,0.125
     if(vlabel.at(ifound)=="AB_oC8_63_c_c") {
       PrototypeANRL_AB_oC8_63_c_c(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
@@ -4637,7 +4663,7 @@ namespace anrl {
       PrototypeANRL_A_hP2_194_c(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
     // ---------------------------------------------------------------------------
-    // 219 // ./aflow --proto=AB2_hP24_194_ef_fgh --params=4.824,3.28067993367,0.04598,0.84417,0.12514,0.16429
+    // 219 // ./aflow --proto=AB2_hP24_194_ef_fgh --params=4.824,3.28067993367,0.094,0.84417,0.12514,0.16429
     if(vlabel.at(ifound)=="AB2_hP24_194_ef_fgh") {
       PrototypeANRL_AB2_hP24_194_ef_fgh(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
@@ -4662,7 +4688,7 @@ namespace anrl {
       PrototypeANRL_A4B_cI40_197_cde_c(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
     // ---------------------------------------------------------------------------
-    // 224 // ./aflow --proto=ABC_cP12_198_a_a_a --params=5.881,-0.024,0.39,0.875
+    // 224 // ./aflow --proto=ABC_cP12_198_a_a_a --params=5.881,-0.024,0.39,0.625
     if(vlabel.at(ifound)=="ABC_cP12_198_a_a_a") {
       PrototypeANRL_ABC_cP12_198_a_a_a(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
@@ -5667,7 +5693,7 @@ namespace anrl {
       PrototypeANRL_A3BC3D_tP64_106_3c_c_3c_c(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
     // ---------------------------------------------------------------------------
-    // 139 // ./aflow --proto=A5B7_tI24_107_ac_abd --params=7.6400197048,0.760471204184,0.0,0.056,0.04,0.22,0.0,0.243,0.29
+    // 139 // ./aflow --proto=A5B7_tI24_107_ac_abd --params=7.6400197048,0.760471204184,0.0,0.556,0.54,0.22,0.0,0.243,0.29
     if(vlabel.at(ifound)=="A5B7_tI24_107_ac_abd") {
       PrototypeANRL_A5B7_tI24_107_ac_abd(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
@@ -6373,7 +6399,7 @@ namespace anrl {
       PrototypeANRL_A3B_cP16_208_j_b(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }
     // ---------------------------------------------------------------------------
-    // 276 // ./aflow --proto=A6B2CD6E_cP64_208_m_ad_b_m_c --params=10.3701312618,0.057,0.25,0.23,0.235,0.25,0.458
+    // 276 // ./aflow --proto=A6B2CD6E_cP64_208_m_ad_b_m_c --params=10.3701312618,0.057,0.25,0.23,0.235,0.25,0.548
     if(vlabel.at(ifound)=="A6B2CD6E_cP64_208_m_ad_b_m_c") {
       PrototypeANRL_A6B2CD6E_cP64_208_m_ad_b_m_c(web,str,parameters,vproto.at(ifound),print_mode,LDEBUG);
     }

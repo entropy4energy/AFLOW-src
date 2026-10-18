@@ -19,6 +19,14 @@
 //ME20190219 - Define the checksum algorithm used for APL hibernate files
 #define APL_CHECKSUM_ALGO  string("Fletcher32")
 
+//CO20240618 - moving from apl_kphonons
+#define _ASTROPT_APL_OLD_ string("[AFLOW_PHONONS]") //CO20170601, ensure backwards compatibility (we ALWAYS support LEGACY)
+#define _ASTROPT_APL_ string("[AFLOW_APL]") //CO20170601
+#define _ASTROPT_QHA_ string("[AFLOW_QHA]") //CO20170601
+#define _ASTROPT_AAPL_ string("[AFLOW_AAPL]") //CO20170601
+//temporary directory for storing QHA files
+#define _STROPT_ string("[VASP_FORCE_OPTION]") //ME20181226
+
 // ***************************************************************************
 
 // Interface
@@ -40,6 +48,7 @@ namespace apl {
   void subtractZeroStateForces(vector<_xinput>&, _xinput&);  // ME20190114
 
   bool APL_Get_AflowInName(string& AflowInName, const string& directory_LIB); //ME20210927
+  bool AAPL_Get_AflowInName(string& AflowInName, const string& directory_LIB); //CO20240618
 }
 
 // ***************************************************************************
@@ -764,6 +773,7 @@ namespace apl {
 
       double getStepDOS(const vector<double>&);
       double getScalingFactor(const ThermalPropertiesUnits&);
+      double getFrequencyMoment(const vector<double>&, const vector<double>&, double);
 
     public:
       ThermalPropertiesCalculator(ostream& oss=std::cout);
@@ -803,6 +813,8 @@ namespace apl {
       double getVibrationalEntropy(double, double, double, ThermalPropertiesUnits=apl::kB);
       double getIsochoricSpecificHeat(double, ThermalPropertiesUnits=apl::kB);
       double getIsochoricSpecificHeat(double, const vector<double>&, const vector<double>&, ThermalPropertiesUnits=apl::kB);
+      double getDebyeTemperature();
+      double getDebyeWallerTemperature();
 
       void writePropertiesToFile(string, filetype ft=txt_ft);
       void addToAPLOut(stringstream&);

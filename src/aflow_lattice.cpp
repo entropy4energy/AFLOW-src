@@ -705,7 +705,7 @@ namespace LATTICE {
     // get volume of original structure and volume tolerance
     double volume_orig=det(lattice_original); // volume
     double amin=min(aurostd::modulus(lattice_original(1)),aurostd::modulus(lattice_original(2)),aurostd::modulus(lattice_original(3)));
-    double volume_eps = eps*amin*amin*amin; //DX20211016 - this volume_eps is used to see if volumes are similar
+    double volume_eps = 3.0*(eps/amin)*(amin*amin*amin); //[CO20240518 - trying error propagation instead, the formula to the right doesn't make sense since eps is not a percentage, so units are wrong] //eps*amin*amin*amin; //DX20211016 - this volume_eps is used to see if volumes are similar
     double volume_tmp = AUROSTD_MAX_DOUBLE, volume_tmp_abs = AUROSTD_MAX_DOUBLE;
     //DX20210316 [OTHER POSSIBILITY] double tol_vol=0.1;
     //DX20210316 [OTHER POSSIBILITY] double volume_eps=tol_vol*volume_orig;
@@ -987,7 +987,11 @@ namespace LATTICE {
     if(LDEBUG) cerr << XPID << "LATTICE::Standard_Lattice_Structure: [1]" << endl;
     if(LDEBUG){ cerr << XPID << "LATTICE::Standard_Lattice_Structure: structure BEFORE primitivization:" << str_sp << endl; }
     //DX20210406 [OBSOLETE] str_sp.GetPrimitive(0.005);
-    str_sp.GetPrimitive(); //DX20210406 - new/fast get primitive function
+    try{str_sp.GetPrimitive();} //DX20210406 - new/fast get primitive function
+    catch(aurostd::xerror& err){  //CO20240519 - with AAPL distorted supercells, some tolerances yield bad supercell-atom counts, try changing tolerances
+      pflow::logger(err.whereFileName(), err.whereFunction(), err.what(), cout, _LOGGER_WARNING_);
+      return false;
+    }
     if(LDEBUG) cerr << XPID << "LATTICE::Standard_Lattice_Structure: [2]" << endl;
     if(LDEBUG){ cerr << XPID << "LATTICE::Standard_Lattice_Structure: structure AFTER primitivization:" << str_sp << endl; }
     str_sp.FixLattices();

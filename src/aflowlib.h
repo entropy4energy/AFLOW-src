@@ -14,13 +14,14 @@
 
 #include "aflow.h"
 #include "SQLITE/aflow_sqlite.h"
+#include <set>  //CO20261004
 //[OBSOLETE] [KY] #include "aflow_contrib_kesong.h" //CO20180515
 
 using std::vector;
 using std::string;
 
 #define NOSG string("NNN #0")
-#define CHMODWEB FALSE
+#define CHMODWEB true //[CO20230530]FALSE
 #define INF 1E9
 #define ENERGY_ATOM_ERROR_meV 50
 #define PRESSURE_ZERO_ENTHALPY_ENERGY _FLOAT_TOL_ //1e-6
@@ -47,10 +48,12 @@ namespace aflowlib {
       _aflowlib_entry(const _aflowlib_entry& b);                // constructor copy
       _aflowlib_entry(const string& file);                      // constructor from file
       const _aflowlib_entry& operator=(const _aflowlib_entry &b); // copy
+      bool operator==(const _aflowlib_entry& other) const;      //WJ20230814
       // CONTROL
       string entry;vector<string> ventry;                       // ventry split by "|"
       string auid;deque<string> vauid;                          // AFLOW UNIQUE IDENTIFIER // AFLOW UNIQUE IDENTIFIER SPLIT
-      string aurl;deque<string> vaurl;                          // AFLOW RESEARCH LOCATOR and TOKENS
+      string aurl;deque<string> vaurl;                          // AFLOW RESEARCH LOCATOR and TOKENS; written as chaos_path (aflowlib::AURL2ChaosPath) //CO20261008
+      string pocc_system;                                       // chaos_id of the POCC system a supercell (ARUN.POCC_*) belongs to //CO20261008
       string system_name;                                       //ME20190125 - system_name of the calculation
       string keywords;deque<string> vkeywords;                  // keywords inside
       string aflowlib_date;vector<string> vaflowlib_date;       // CONTAINS 2 DATES: [0]=lock_date, [1]=lib2raw_date
@@ -76,10 +79,17 @@ namespace aflowlib {
       string compound;
       double density;
       double density_orig; //DX20190124 - add original crystal info
+      double distance_hull; // database-wide convex-hull distance (eV/atom) //HP20260820
+      double deed;          // database-wide DEED descriptor ((eV/atom)^-1) //HP20260820
       string dft_type;vector<string> vdft_type;
       double eentropy_cell,eentropy_atom;
       double Egap,Egap_fit;
-      string Egap_type;  
+      string Egap_type;
+      // Dec 13, 2025 - SAMRIDHI_CHORDIA: Add Egap_DOS fields for density-of-states bandgaps
+      double Egap_DOS,Egap_DOS_fit;  // Egap from DOS (individual calculations)
+      double Egap_DOS_net;            // POCC ensemble-averaged DOS bandgap
+      string Egap_DOS_type;           // Direct/indirect gap type from DOS
+      // Dec 13, 2025 - END SAMRIDHI_CHORDIA
       double energy_cell,energy_atom,energy_atom_relax1;
       double energy_cutoff;
       double delta_electronic_energy_convergence;
@@ -241,6 +251,29 @@ namespace aflowlib {
       double energy_zero_point_atom_apl;
       double heat_capacity_Cv_cell_apl_300K;
       double heat_capacity_Cv_atom_apl_300K;
+
+      // ST20251031 HEA properties
+      // temperature dependent
+      double lat_distortion_misfit_mean_0K;
+      double lat_distortion_misfit_stdev_0K;
+      double lat_distortion_relax_distance_mean_0K;
+      double lat_distortion_relax_distance_stdev_0K;
+      double solubility_parameter_0K;
+      double lat_distortion_misfit_mean_300K;
+      double lat_distortion_misfit_stdev_300K;
+      double lat_distortion_relax_distance_mean_300K;
+      double lat_distortion_relax_distance_stdev_300K;
+      double solubility_parameter_300K;
+      // sublattice dependent
+      vector<string> species_sublattice;
+      vector<double> delta_electronegativity_Pearson_sublattice;
+      vector<double> delta_radius_covalent_PT_sublattice;
+      // global
+      double param_geo_radius_covalent_PT_atom;
+      double S_config_atom;
+      double S_config_partial_atom;
+      double VEC;
+      double Hmix_miedema;
       // QHA  //AS20200831
       double gruneisen_qha; //AS20200831
       double gruneisen_qha_300K; //AS20200903
@@ -287,12 +320,20 @@ namespace aflowlib {
       void SetByHash(const uint64_t key_hash, const std::string & content); // set a class member to content based on crc64 keyword hash // HE20220404
       uint file2aflowlib(const string& file,ostream& oss=std::cout);       // load from file
       uint url2aflowlib(const string& url,ostream& oss,bool=TRUE); // load from the web (VERBOSE)
-      string aflowlib2string(string="out", bool=false);          //ME20210408 - added PRINT_NULL
+      string aflowlib2string(string="out", bool=false, const std::map<string,string>& json_keys=std::map<string,string>());          //ME20210408 - added PRINT_NULL; CO20261007 - json_keys
       string aflowlib2file(string file,string="out");            //
       string POCCdirectory2MetadataAUIDjsonfile(const string& directory,uint salt=0);           //CO20200624 - get contents of auid_metadata.json 
       bool directory2auid(const string& directory);                                         // from directory and AURL gives AUID and VAUID
       double enthalpyFormationCell(int T=300) const;                                        //CO20200624 - CCE correction added
       double enthalpyFormationAtom(int T=300) const;                                        //CO20200624 - CCE correction added
+      // POCC classification and parent provenance belong to the entry that owns the metadata.
+      bool hasPoccChildren() const;
+      bool isPoccParent() const;
+      bool isPoccChild() const;
+      bool isPoccChildOf(const _aflowlib_entry& parent) const;
+      string getPoccParentAurlKey() const;
+      bool hasMatchingPoccAurl(const string& other_aurl) const;
+      string getPoccParentRelativePath(const string& filesystem_collection="RAW") const;
       void correctBadDatabase(bool verbose=true,ostream& oss=cout);                         //CO20171202 - apennsy fixes
       void correctBadDatabase(ofstream& FileMESSAGE,bool verbose=true,ostream& oss=cout);   //CO20171202 - apennsy fixes
       bool ignoreBadDatabase() const;                                                       //CO20171202 - apennsy fixes
@@ -303,6 +344,16 @@ namespace aflowlib {
       vector<string> getSpecies() const;                                                          //CO20221110 - extracts species from restapi
       vector<string> getSpeciesAURL(ostream& oss) const;                                          //CO20210201 - extracts species from aurl
       vector<string> getSpeciesAURL(ofstream& FileMESSAGE,ostream& oss) const;                    //CO20210201 - extracts species from aurl
+      bool equalTo(const string& compProp, const uint& pos, const double& val);                                 //WJ20230803 add comparator functions
+      bool equalTo(const string& compProp, const uint& pos1, const uint& pos2, const double& val);              //WJ for 2D tensor
+      bool greaterThan(const string& compProp, const uint& pos, const double& val);                             //WJ20230803 add comparator functions
+      bool greaterThan(const string& compProp, const uint& pos1, const uint& pos2, const double& val);          //WJ for 2D tensor
+      bool lessThan(const string& compProp, const uint& pos, const double& val);                                //WJ20230803 add comparator functions
+      bool lessThan(const string& compProp, const uint& pos1, const uint& pos2, const double& val);             //WJ for 2D tensor
+      bool greaterThanOrEqual(const string& compProp, const uint& pos, const double& val);                      //WJ20230803 add comparator functions
+      bool greaterThanOrEqual(const string& compProp, const uint& pos1, const uint& pos2, const double& val);   //WJ for 2D tensor
+      bool lessThanOrEqual(const string& compProp, const uint& pos, const double& val);                         //WJ20230803 add comparator functions
+      bool lessThanOrEqual(const string& compProp, const uint& pos1, const uint& pos2, const double& val);      //WJ for 2D tensor
       //ML stoich features
       void getStoichFeatures(vector<string>& vheaders,const string& e_props=_AFLOW_XELEMENT_PROPERTIES_ALL_);
       void getStoichFeatures(vector<string>& vheaders,vector<double>& vfeatures,bool vheaders_only=false,const string& e_props=_AFLOW_XELEMENT_PROPERTIES_ALL_);
@@ -310,6 +361,9 @@ namespace aflowlib {
       void free();                                               // free space
       void copy(const _aflowlib_entry& b);                       //
       void LoadCleanup();
+      static string normalizePoccAurlForParentMatch(const string& input_aurl);
+      static string getPoccParentAurlKey(const string& input_aurl);
+      static string getPoccParentRelativePath(const string& input_aurl,const string& filesystem_collection);
   };
 }
 
@@ -368,7 +422,6 @@ namespace aflowlib {  //CO20210302
 //      string Domain;
 //      bool establish();
 //    public:
-//      //DX20210615 [OBSOLETE] APIget( string a_Summons="", string a_API_Path="/search/API/?", string a_Domain="aflowlib.duke.edu" ): PORT(80), Summons(a_Summons), API_Path(a_API_Path), Domain(a_Domain) {}; //CO20181226
 //      APIget( string a_Summons="", string a_API_Path="/API/aflux/?", string a_Domain="aflow.org" ): PORT(80), Summons(a_Summons), API_Path(a_API_Path), Domain(a_Domain) {}; //CO20181226 //DX20210615 - updated domain name
 //      void reset( string a_Summons="#", string a_API_Path="", string a_Domain="" );
 //      friend ostream& operator<<( ostream& output, APIget& a );
@@ -376,6 +429,17 @@ namespace aflowlib {  //CO20210302
 //}
 
 namespace aflowlib {  //CO20201220
+  string AURLStripHost(const string& aurl); //CO20261002 - "host:AFLOWDATA/X" -> "AFLOWDATA/X", any host
+  string AURLPath(const string& aurl);      //CO20261002 - "host:AFLOWDATA/X" -> "X"
+  string AURL2ChaosPath(const string& aurl);       //CO20261008 - "host:AFLOWDATA/LIBn_WEB/X" -> "LIBn/X"; anything else unchanged
+  string ChaosPath2AURL(const string& chaos_path); //CO20261008 - "LIBn/X" -> "s4e.ai:AFLOWDATA/LIBn_WEB/X"; anything else unchanged
+  string ChaosPathPoccSystem(const string& chaos_path); //CO20261008 - the POCC system of a supercell's path, "" if not a supercell
+  string AFLOWLIBServerFromOption(const string& value); //CO20261003 - the host a --server= value names, "" if refused
+  string AFLOWLIBServer(); //CO20261006 - the AFLOWLIB server of this run (--server=), s4e.ai otherwise
+  std::string AFLUXPageQuery(const std::string& query, uint page, uint page_size); //CO20261002 - paging(0) -> paging(page,page_size), "" if bounded //CO20261004 - any paging term, encoded result, "" if none
+  bool AFLUXPagingAll(const std::string& query); //CO20261004 - paging(0) in format(aflow), as AFLUX's parser reads the query's paging and format terms
+  std::string AFLUXValueList(const std::vector<std::string>& values); //CO20261003 - AUIDs or AURLs for auid(...)/aurl(...): ':'-joined, no quotes
+  std::vector<std::string> AFLUXValueBatches(const std::vector<std::string>& values, size_t max_length); //CO20261004 - AFLUXValueList() of each batch shorter than max_length
   ////////////////////////////////////////////////////////////////////////////////
   //merge vector entries lists
   //3-vec
@@ -415,6 +479,90 @@ namespace aflowlib {
   vector<vector<std::pair<string,string> > > getPropertiesFromAFLUXResponse(const string& response); //DX20190206 - get properties from AFLUX response
   string getSpaceGroupMatchbook(const vector<uint>& space_groups, uint relaxation_step); //DX20200929
   string getSpaceGroupMatchbook(uint space_group_number, uint relaxation_step, bool only_one_sg=true); //DX20200929
+}
+
+// ***************************************************************************
+// aflowlib::ChaosRuns - the runs already in CHAOS //CO20261004
+// ***************************************************************************
+// Generators write and start only runs that are not in CHAOS yet. The runs of a
+// chemical system are read with one AFLUX query to CHAOS (the CHAOS API key that
+// aurostd::httpGet sends to s4e.ai), or from a list file written by aflow --chaos_runs on a machine
+// that reaches CHAOS. A run is named as its --aflow_proto argument,
+// PROTOTYPE:El1:El2... (elements in alphabetical order), with :LDAU2 for the +U
+// run: the record's prototype is the run folder name without :LDAU2 (LIB2RAW),
+// and the +U run has :LDAU2 in its aurl. The run is read from the aurl, whose
+// last directory is the run folder. CHAOS refuses a field named without
+// parentheses and the $ prefix (?help(queries)), so the query names aurl(*).
+// //CO20261004
+#define CHAOS_API_URL_DEFAULT string("https://s4e.ai/API/chaos/")
+// entries per page when an AFLUX query is sent as pages (the entry loader, ChaosRuns, the structure
+// comparison): the CHAOS API is to answer pages of at most 500 entries //CO20261006
+#define AFLUX_PAGE_SIZE_DEFAULT 500
+// The list of runs in CHAOS (CO20261004): written on the CHAOS server from the CHAOS database
+// once a day, copied to each machine and put in place with aflow --chaos_runs_update
+// --chaos_runs_url=FILE as $CHAOS_RUNS_LIST or ~/.s4e/chaos_runs.txt. "complete <UTC time>"
+// says when it was written (aflow uses it while it is at most CHAOS_RUNS_MAX_AGE_HOURS old,
+// $CHAOS_RUNS_MAX_AGE_HOURS) and "end N" counts its entries. --aflow_proto and KBIN check new
+// runs against it (aflowlib::ChaosCheckDirectory): a run is matched by its system and run
+// folders, SYSTEM/RUN as in the aurl (Ni_pvO/AB_cF8_225_a_b.AB:LDAU2), or by its run name.
+#define CHAOS_RUNS_MAX_AGE_HOURS_DEFAULT 48.0
+namespace aflowlib {
+  class ChaosRuns {
+    public:
+      ChaosRuns();
+      string url;                  //AFLUX endpoint of CHAOS
+      std::set<string> systems;    //systems read, El1,El2,... in alphabetical order
+      std::set<string> runs;       //PROTOTYPE:El1:El2...[:LDAU2]
+      static string systemName(const vector<string>& elements);  //El1,El2,... sorted
+      static string runName(const string& prototype,const vector<string>& elements,bool ldau);
+      static string runFromAURL(const string& aurl,const vector<string>& elements);  //"" without a run folder
+      static string summons(const vector<string>& elements,uint page,uint page_size);  //AFLUX query of one system
+      std::set<string> paths;      //SYSTEM/RUN folders of the entries, as in the aurl //CO20261004
+      bool complete;               //a list of every run in CHAOS (written from the CHAOS database)
+      long long complete_time;     //when that list was written, UTC seconds since 1970 (0 = unknown)
+      long long entries_read;      //entry lines (aurl=..., path ...) read from files
+      long long entries_end;       //the count on the list's "end N" line, -1 without one
+      static string pathFromAURL(const string& aurl);  //last two folders of the aurl, "" if fewer
+      static string pathFromDirectory(const string& directory);  //last two folders, "" if fewer
+      static vector<string> elementsFromSystemFolder(const string& folder);  //Mg_pvO -> Mg,O
+      static string defaultListFile();  //$CHAOS_RUNS_LIST, else ~/.s4e/chaos_runs.txt
+      static double maxAgeHours();      //$CHAOS_RUNS_MAX_AGE_HOURS, else CHAOS_RUNS_MAX_AGE_HOURS_DEFAULT
+      static string listURL();          //$CHAOS_RUNS_LIST_URL, else "" (no default: the list is copied from the CHAOS server)
+      bool hasSystem(const vector<string>& elements) const;  //true for any system in a complete list
+      bool hasRun(const string& run_name) const;
+      bool hasPath(const string& path) const;
+      void addAURL(const string& aurl,const vector<string>& elements);  //the run and the path of one entry
+      double ageHours() const;  //age of a complete list, <0 if unknown
+      bool readListFile(const string& file,string& problem);  //a complete list, fresh enough; problem says why not
+      uint addAFLUXResponse(const string& response,const vector<string>& elements);  //runs added
+      void query(const vector<string>& elements);  //one system; throws if CHAOS cannot be read
+      void queryMissing(const vector<vector<string> >& vsystems);  //the systems not read yet
+      void readFile(const string& file);
+      void writeFile(const string& file) const;
+      string toString() const;
+  };
+  void ChaosRunsCommand(const aurostd::xoption& vpflow);  //aflow --chaos_runs
+  // the check of new runs (CO20261004)
+  enum ChaosCheck {CHAOS_CHECK_NEW=0,CHAOS_CHECK_IN=1,CHAOS_CHECK_UNKNOWN=2};
+  ChaosCheck ChaosCheckDirectory(const string& directory,const vector<string>& elements,string& reason);
+  void ChaosCheckReset();  //forget the list read by ChaosCheckDirectory (unit tests, long runs)
+  bool ChaosCheckDisabled();  //--no_chaos_check, or while a ChaosCheckSuspended lives
+  //CO20261009 - the check of new runs is off while one lives: LIB2LIB post-processes an entry
+  //that is in CHAOS by design, through KBIN::RUN_Directory(), which checks CHAOS
+  class ChaosCheckSuspended {
+    public:
+      ChaosCheckSuspended();
+      ~ChaosCheckSuspended();
+      ChaosCheckSuspended(const ChaosCheckSuspended&)=delete;
+      ChaosCheckSuspended& operator=(const ChaosCheckSuspended&)=delete;
+  };
+  bool ChaosCheckApplies(const string& directory);  //a LIBn or AFLOWDATA folder in the path
+  void ChaosRunsUpdate(const aurostd::xoption& vpflow);  //aflow --chaos_runs_update
+  //AFLOW's tables of calculated entries (the "vLIBS" tables) from the list of runs in CHAOS: aurl,
+  //auid and loop of every entry, and the SYSTEM/RUN folders of each library (vlibrary[0..9] LIB0
+  //to LIB9, vlibrary[10] ICSD); returns the number of entries, problem says what is wrong with
+  //the list (missing, stale, cut short) //CO20261004
+  uint ChaosCalculatedEntries(const string& file,vector<string>& vaurl,vector<string>& vauid,vector<string>& vloop,vector<vector<string> >& vlibrary,string& problem);
   // [OBSOLETE] uint WEB_Aflowlib_Entry_PHP(string options,ostream& oss); //SC20200327
   uint WEB_Aflowlib_Entry(string options,ostream& oss); 
   // [OBSOLETE] uint WEB_Aflowlib_Entry_PHP3(string options,ostream& oss);  //SC20190813
@@ -484,12 +632,21 @@ namespace aflowlib {
   void XFIX_LIBRARY_ALL(string LIBRARY_IN,vector<string>);
   // void LIB2RAW_LIBRARY_ALL(string LIBRARY_IN);
   string LIB2RAW_CheckProjectFromDirectory(const string& directory);
-  bool LIB2RAW_ALL(string options,bool overwrite);
+  bool LIB2RAW_ALL(const vector<string>& argv,string options,bool overwrite);
   bool LIB2RAW_FileNeeded(string directory_LIB,string fileLIB,string directory_RAW,string fileRAW,vector<string> &vfiles,const string& MESSAGE);
   // [OBSOLETE] bool LIB2RAW(vector<string> argv,bool overwrite);
   void CleanDirectoryLIB(string& directory);  //CO20200624
   void setAURL(aflowlib::_aflowlib_entry& aflowlib_data,const string& directory_LIB,bool LOCAL=false);
-  bool LIB2RAW(const string& options,bool overwrite,bool LOCAL=false);
+  bool LIB2RAW(const vector<string>& argv,const string& options,bool overwrite,bool LOCAL=false);
+  //CO20260929 - phonon and elastic child runs, for which LIB2RAW() does not run Bader; see the comment above the function
+  //in aflowlib_libraries.cpp and the unit test lib2raw_bader_children
+  bool LIB2RAW_isBaderSkippedChild(const string& directory_LIB,string& child_prefix);
+  bool LIB2RAW_isBaderSkippedChild(const string& directory_LIB);
+  // POSCAR.orig from aflow.in and the KT20230504 patch (aflowlib_libraries.cpp; unit test poscar_orig_repair) //CO20260930
+  string LIB2LIB_POSCARorigFromAflowIn(const string& aflowin);  //CO20261004 - the text of aflow.in, was the LIB directory
+  bool LIB2LIB_POSCARorigReadable(const string& directory_LIB);
+  void LIB2LIB_patchPOSCARorig(const string& directory_LIB, const string& aflowin, stringstream& patched_aflowin_ss);
+  bool VASP2OUTL(const vector<string>& argv,const string& options,bool flag_FORCE,bool LOCAL=true); // MB20241120
   bool XPLUG_CHECK_ONLY(const vector<string>& argv); //CO20200501
   bool XPLUG_CHECK_ONLY(const vector<string>& argv,deque<string>& vdirsOUT,deque<string>& vzips,deque<string>& vcleans); //CO20200501
   bool XPLUG(const vector<string>& argv);  //CO20200501
@@ -508,7 +665,7 @@ namespace aflowlib {
   bool LIB2RAW_Loop_LOCK(const string& directory_LIB,const string& directory_RAW,vector<string> &vfiles,aflowlib::_aflowlib_entry& data,const string& MESSAGE);
   bool LIB2RAW_Loop_POCC(const string& directory_LIB,const string& directory_RAW,vector<string> &vfiles,aflowlib::_aflowlib_entry& data,const string& MESSAGE);  //CO20200624
   bool LIB2RAW_Loop_PATCH(const string& directory_LIB,const string& directory_RAW,vector<string> &vfiles,aflowlib::_aflowlib_entry& data,const string& MESSAGE);
-  bool LIB2LIB(const string& options,bool overwrite,bool LOCAL=false); //CT20181212
+  bool LIB2LIB(const vector<string>& argv,const string& options,bool overwrite,bool LOCAL=false); //CT20181212
 }
 
 namespace aflowlib {
@@ -676,6 +833,15 @@ namespace aflowlib {
       vector<string> getTables(const string& where="");
       vector<string> getTables(sqlite3*, const string& where="");
 
+      //CO20261008 START - the identifier and the run's path as CHAOS names them (chaos_id, chaos_path); a
+      //database built before calls them auid and aurl, with tables auid_00 to auid_ff
+      string idColumn();                          //chaos_id, or auid in a database built before
+      string pathColumn();                        //chaos_path, or aurl in a database built before
+      string tableOf(const string& id);           //the table that holds an identifier, "" if it has no prefix
+      static string tableName(int i, const string& id_column="chaos_id");  //chaos_id_00 ... chaos_id_ff
+      static string normalizeEntryJSON(const string& line, const std::map<string,string>& pocc_systems=std::map<string,string>());  //auid, aurl -> chaos_id, chaos_path; adds pocc_system
+      //CO20261008 STOP
+
       vector<string> getColumnNames(const string&);
       vector<string> getColumnNames(sqlite3*, const string&);
       vector<string> getColumnTypes(const string&);
@@ -683,10 +849,12 @@ namespace aflowlib {
 
       vector<vector<string> > getRows(const string&, const string& where="");
       vector<vector<string> > getRows(sqlite3*, const string&, const string& where="");
-      vector<vector<string> > getRowsMultiTables(const string& where="");
-      vector<vector<string> > getRowsMultiTables(sqlite3*, const string& where="");
-      vector<vector<string> > getRowsMultiTables(const vector<string>&, const string& where="");
-      vector<vector<string> > getRowsMultiTables(sqlite3*, const vector<string>&, const string& where="");
+      //vector<vector<string> > getRowsMultiTables(const string& where="", const string& keywords = ""); //WJ20230807 Commented out
+      vector<vector<string> > getRowsMultiTables(sqlite3*, const string& where= "", const string& keywords = ""); //WJ20230807 added keywords
+      vector<vector<string> > getRowsMultiTables(const vector<string>&, const string& where= "", const string& keywords = ""); //WJ20230807 added keywords
+      //CO20260930 - removed getRowsMultiTables(sqlite3*,vector<string>,where): declared without a definition
+      vector<vector<string> > getRowsMultiTables(const string& where = "", const string& keywords = "", const string& order_by =""); //WJ20230807 added keywords, order_by
+      vector<vector<string> > getRowsMultiTables(sqlite3* cursor, const vector<string>& tables, const string& where = "", const string& keywords = "", const string& order_by = ""); //WJ20230807 added keywords, order_by
       string getValue(const string&, const string&, const string& where="");
       string getValue(sqlite3*, const string&, const string&, const string& where="");
       std::vector<std::string> getValuesMultiTable(const std::string & col, const std::string & where); //HE20220405
@@ -700,6 +868,8 @@ namespace aflowlib {
       vector<string> getSetMultiTables(sqlite3*, const vector<string>&, const string&, bool distinct=false, const string& where="", int limit=0);
 
       void transaction(bool);
+      static string getAuidTable(const string& auid);  //CO20261004
+      string getDatabaseFile() const;  //CO20261007
 
     private:
       void free();
@@ -724,6 +894,8 @@ namespace aflowlib {
       bool closeTmpFile(bool force_copy=false, bool keep=false, bool nocopy=false);
 
       void rebuildDB();
+      std::map<string,string> pocc_systems;  //CO20261008 - chaos_path of each POCC system -> its chaos_id, read before the tables are built
+      void readPoccSystems();                //CO20261008
       void buildTable(int, const vector<string>&, const vector<string>&);
       void populateTable(const string&, const vector<string>&, const vector<string>&, const vector<vector<string> >&);
 
@@ -762,6 +934,7 @@ namespace aflowlib {
       EntryLoader(std::ofstream& FileMESSAGE,std::ostream& oss=cout);
       EntryLoader(const EntryLoader& b);
       //constructors - STOP
+      static std::string sqliteFile(const std::string& aflow_db_file);  //CO20261007
       ~EntryLoader();
       const EntryLoader& operator=(const EntryLoader& other);
       void clear();
@@ -795,6 +968,23 @@ namespace aflowlib {
 
       std::string m_aflux_server;         ///< server that provides the AFLUX API
       std::string m_aflux_path;           ///< base path including AFLUX API version
+      uint m_aflux_version;               ///< AFLUX API version // MB20240814
+      
+      //WJ2023310125 BEGIN
+      std::string m_auid_prefix;
+      std::string m_aurl_path;
+      std::string m_aflux_server_list;     
+      std::string m_aflux_path_list;      
+      std::vector<std::string> m_aflux_server_vector;
+      std::vector<std::string> m_aflux_path_vector;
+      std::vector<std::string> m_aflux_atomic_filter_keywords;
+      std::vector<std::string> m_aflux_atomic_filter_params;
+      std::vector<std::string> m_aflux_tensor_filter_keywords;
+      std::vector<std::string> m_aflux_tensor_filter_params;
+      std::map<std::string,std::string> m_aflux_special_filter_map;
+      bool m_printNull;
+      //WJ2023310125 END
+
       std::string m_aflux_collection;     ///< collection to use for queries
       /// default AFLUX API directives to set format and disable paging
       std::map<std::string, std::string> m_aflux_directives;
@@ -837,6 +1027,7 @@ namespace aflowlib {
 
       // Direct entry loader
       void loadSqliteWhere(const std::string & where);
+      void loadSqliteWhere(const std::string & where, const std::vector<std::string>& keywords, const std::string& order_by); //WJ20231103
       void loadAFLUXQuery(const std::string & query);
       void loadAFLUXMatchbook(const std::map<std::string, std::string> & matchbook);
       void loadRestAPIQueries(const std::vector<std::string> & queries, bool full_url=false);
@@ -856,6 +1047,7 @@ namespace aflowlib {
       std::vector<std::string> getRawSqliteWhere(const std::string & where) const;
       std::vector<std::string> getRawAFLUXMatchbook(const std::map<std::string, std::string> & matchbook);
       std::vector<std::string> getRawAFLUXQuery(const std::string & query);
+      bool getAFLUXPages(const std::string & query, bool page_all, std::vector<std::string> & lines, int & status); //CO20261002 //CO20261004 - page_all
       std::string getRawRestAPIQuery(const std::string &query, bool full_url=false);
 
       // xstructure loaders
@@ -874,6 +1066,9 @@ namespace aflowlib {
       void getEntriesTwoLayer(std::vector<std::vector<aflowlib::_aflowlib_entry>> & result) const;
       void getEntriesThreeLayer(std::vector<std::vector<vector<aflowlib::_aflowlib_entry>>> & result) const;
 
+      // AFLUX
+      string cleanAFLUXquery(const string& query); //WJ2023310125
+      bool applyCPPFiltersToSingleEntry(const aflowlib::_aflowlib_entry& entry); //WJ2023310125
 
     private:
       //NECESSARY private CLASS METHODS - START

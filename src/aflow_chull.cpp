@@ -14,6 +14,9 @@
 #include "aflow.h"
 #include "aflow_chull.h"
 #include "aflow_compare_structure.h"
+#include "aflow_pocc.h"
+#include <set>  //CO20261004
+
 
 //[CO20220630 - OBSOLETE]// Some parts are written within the C++0x support in GCC, especially std::thread,
 //[CO20220630 - OBSOLETE]// which is implemented in gcc 4.4 and higher. For multithreads with std::thread see:
@@ -30,16 +33,17 @@
 #define _DEBUG_CHULL_ false  //CO20190116
 
 #define _AFLOW_CHULL_PRINT_LOGO_1 TRUE
-#define _AFLOW_CHULL_PRINT_LOGO_2 FALSE
+#define _AFLOW_CHULL_PRINT_LOGO_2 TRUE  //CO20261004 - the CHAOS logo
 
 // DEFINITIONS
-const std::string AFLOW_WEB = string("http://" + AFLOWLIB_MATERIALS_SERVER);
-const std::string NOMAD_WEB = string("http://www.nomad-coe.eu/");
+const std::string AFLOW_WEB = string("https://" + AFLOWLIB_MATERIALS_SERVER);
+const std::string CHAOS_WEB = string("https://s4e.ai/chaos.html");  //CO20261004 - the CHAOS page (the address in the CHAOS QR code)
 const std::string ENTRY_PAGE_URL_PREFIX = string(AFLOW_WEB + "/material/?id=");  //"/material.php?id="
 const std::string AFLOW_HULL_ENDPOINT_STRING = "aflow_hull_endpoint";
 const std::string LATEX_DEFAULT_COLORS = "blue,green,red,brown,cyan,lime,magenta,olive,orange,pink,purple,teal,violet,darkgray,gray,lightgray,black,white,yellow"; //putting favorites near beginning, not so good ones in the back
 const std::string LATEX_DVIPS_COLORS = "Apricot,Aquamarine,Bittersweet,Black,Blue,BlueGreen,BlueViolet,BrickRed,Brown,BurntOrange,CadetBlue,CarnationPink,Cerulean,CornflowerBlue,Cyan,Dandelion,DarkOrchid,Emerald,ForestGreen,Fuchsia,Goldenrod,Gray,GreenGreen,Yellow,JungleGreen,Lavender,LimeGreen,Magenta,Mahogany,Maroon,Melon,MidnightBlue,Mulberry,NavyBlue,OliveGreen,Orange,OrangeRed,Orchid,Peach,Periwinkle,PineGreen,Plum,ProcessBlue,Purple,RawSienna,Red,RedOrange,RedViolet,Rhodamine,RoyalBlue,RoyalPurple,RubineRed,Salmon,SeaGreen,Sepia,SkyBlue,SpringGreen,Tan,TealBlue,Thistle,Turquoise,Violet,VioletRed,White,WildStrawberry,Yellow,YellowGreen,YellowOrange";  //contains defaults and more
 const std::string LATEX_COLORS_TO_AVOID = "black,white,yellow,darkgray,gray,lightgray";
+const std::string CHULL_DEED_LATEX_COLOR_MAP = "rgb(0pt)=(1,0.644,0); rgb(63pt)=(0,0,1)";
 
 // USAGE FLAGS
 //[CO20180819 - MOVED TO AFLOWRC]const bool IGNORE_BAD_DATABASE = true;        //skip bad entries
@@ -71,6 +75,1022 @@ const double LATEX_LEFT_MARGIN_LETTER_STD = 0.5;  //inches
 const double LATEX_RIGHT_MARGIN_LETTER_STD = 0.5;  //inches
 const double LATEX_TABCOLSEP_STD = 6;  //pt
 const double LATEX_ARRAYRULEWIDTH_STD = .4;  //pt
+
+namespace chull {
+  // Owns the PGFPlots table syntax shared by the standard CHULL and DEED
+  // renderers. It is intentionally file-local because it formats output only.
+  class ChullPlotTableWriter {
+    public:
+      typedef std::pair<std::string,std::string> AxisColumn;
+
+      static std::vector<AxisColumn> getAxes(const vector<string>& elements,uint dimension,const string& value_column,bool reverse_axes) {
+        std::vector<AxisColumn> axes;
+        if(dimension==2){
+          if(elements.size()!=2){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Binary plot requires two elements");}
+          axes.push_back(AxisColumn("x",elements[reverse_axes?0:1]));
+          axes.push_back(AxisColumn("y",value_column));
+        }else if(dimension==3){
+          if(elements.size()!=3){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Ternary plot requires three elements");}
+          axes.push_back(AxisColumn("x",elements[1]));
+          axes.push_back(AxisColumn("y",elements[0]));
+          axes.push_back(AxisColumn("z",elements[2]));
+        }else{throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Plot dimension out of scope");}
+        return axes;
+      }
+
+      static string beginTable(const std::vector<AxisColumn>& axes,const std::vector<string>& columns) {
+        stringstream ss;
+        ss << "] table [";
+        for(uint i=0,fl_size_i=axes.size();i<fl_size_i;i++){
+          if(i){ss << ",";}
+          ss << axes[i].first << "=" << axes[i].second;
+        }
+        ss << "]{" << endl;
+        for(uint i=0,fl_size_i=columns.size();i<fl_size_i;i++){ss << aurostd::PaddedPOST(columns[i],30);}
+        ss << endl;
+        return ss.str();
+      }
+
+      static string formatRow(const std::vector<string>& values) {
+        stringstream ss;
+        for(uint i=0,fl_size_i=values.size();i<fl_size_i;i++){ss << aurostd::PaddedPOST(values[i],30);}
+        ss << endl;
+        return ss.str();
+      }
+  };
+
+  // DEEDPlotter owns only DEED-specific field, marker, and legend formatting;
+  // ConvexHull retains the standard CHULL document, axis, and real-facet pipeline.
+  class DEEDPlotter {
+    public:
+      DEEDPlotter(const DEEDPlotConfig& config,const vector<string>& elements,const vector<ChullPoint>& points) : m_config(config), m_elements(elements), m_points(points) {}
+
+      struct CartesianPoint {
+        double x;
+        double y;
+        CartesianPoint() : x(0.0), y(0.0) {}
+        CartesianPoint(double x_in,double y_in) : x(x_in), y(y_in) {}
+      };
+
+      struct Composition {
+        xvector<double> stoich; //CO20260930 composition as fractions
+        double deed;
+        Composition() : stoich(), deed(0.0) {}
+      };
+
+      struct Marker {
+        uint point_index;
+        xvector<double> stoich; //CO20260930 composition as fractions
+        double deed;
+        std::string structure_key;
+        std::string symbol;
+        Marker() : point_index(AUROSTD_MAX_UINT), stoich(), deed(0.0), structure_key(), symbol() {}
+      };
+
+      struct InterpolatedNode {
+        xvector<double> stoich; //CO20260930 composition as fractions
+        double deed;
+        InterpolatedNode() : stoich(), deed(0.0) {}
+      };
+
+      CartesianPoint stoichToCartesian(const xvector<double>& stoich) const {
+        if(stoich.rows!=3){return CartesianPoint();}
+        double b=stoich[stoich.lrows+1];
+        double c=stoich[stoich.lrows+2];
+        return CartesianPoint(b+0.5*c,(sqrt(3.0)/2.0)*c);
+      }
+
+      double squaredDistance2D(const CartesianPoint& a,const CartesianPoint& b) const {
+        double dx=a.x-b.x;
+        double dy=a.y-b.y;
+        return dx*dx+dy*dy;
+      }
+
+      bool isNearTriangleBorder(const xvector<double>& stoich) const {
+        const double thickness=m_config.getBorderWhiteBandThickness();
+        if(stoich.rows!=3 || thickness<=ZERO_TOL){return false;}
+        double minimum_component=std::min(stoich[stoich.lrows],std::min(stoich[stoich.lrows+1],stoich[stoich.lrows+2]));
+        return minimum_component<thickness-ZERO_TOL;
+      }
+
+      double getTriangleBorderDistance(const xvector<double>& stoich) const {
+        if(stoich.rows!=3){return 0.0;}
+        return std::min(stoich[stoich.lrows],std::min(stoich[stoich.lrows+1],stoich[stoich.lrows+2]));
+      }
+
+      double getNearestDEEDDistance(const std::vector<Composition>& data_points,const CartesianPoint& cart_point) const {
+        if(data_points.empty()){return 0.0;}
+        double min_dist2=AUROSTD_MAX_DOUBLE;
+        for(uint i=0,fl_size_i=data_points.size();i<fl_size_i;i++){
+          CartesianPoint sample_point=stoichToCartesian(data_points[i].stoich);
+          min_dist2=std::min(min_dist2,squaredDistance2D(sample_point,cart_point));
+        }
+        if(min_dist2==AUROSTD_MAX_DOUBLE){return 0.0;}
+        return sqrt(std::max(0.0,min_dist2));
+      }
+
+      double interpolateIDW(const std::vector<Composition>& data_points,const CartesianPoint& cart_point) const {
+        const double power=m_config.getInterpolationIDWPower();
+        double weighted_sum=0.0;
+        double total_weight=0.0;
+        for(uint i=0,fl_size_i=data_points.size();i<fl_size_i;i++){
+          CartesianPoint sample_point=stoichToCartesian(data_points[i].stoich);
+          double dist2=squaredDistance2D(sample_point,cart_point);
+          if(dist2<=ZERO_TOL*ZERO_TOL){return data_points[i].deed;}
+          double weight=1.0/pow(dist2,0.5*power);
+          weighted_sum+=weight*data_points[i].deed;
+          total_weight+=weight;
+        }
+        if(total_weight<=ZERO_TOL){return 0.0;}
+        return weighted_sum/total_weight;
+      }
+
+      double getEdgeWhiteBlendFactor(const xvector<double>& stoich,const CartesianPoint& cart_point,const std::vector<Composition>& data_points) const {
+        const double white_band_thickness=m_config.getBorderWhiteBandThickness();
+        if(white_band_thickness<=ZERO_TOL){return 0.0;}
+        double border_distance=getTriangleBorderDistance(stoich);
+        if(border_distance>=white_band_thickness-ZERO_TOL){return 0.0;}
+        double border_factor=std::max(0.0,std::min((white_band_thickness-border_distance)/white_band_thickness,1.0));
+        if(border_factor<=ZERO_TOL || data_points.empty()){return border_factor;}
+        double support_radius=(sqrt(3.0)/2.0)*white_band_thickness;
+        if(support_radius<=ZERO_TOL){return border_factor;}
+        double nearest_data_distance=getNearestDEEDDistance(data_points,cart_point);
+        double unsupported_fraction=std::max(0.0,std::min(nearest_data_distance/support_radius,1.0));
+        return border_factor*unsupported_fraction;
+      }
+
+      double getDataDistanceWhiteFadeFactor(const std::vector<Composition>& data_points,const CartesianPoint& cart_point) const {
+        const double fade_radius=m_config.getDataDistanceWhiteFadeRadius();
+        const double max_opacity=m_config.getDataDistanceWhiteFadeMaxOpacity();
+        if(fade_radius<=ZERO_TOL || max_opacity<=ZERO_TOL || data_points.empty()){return 0.0;}
+        double nearest_data_distance=getNearestDEEDDistance(data_points,cart_point);
+        double opacity=std::max(0.0,std::min(nearest_data_distance/fade_radius,1.0));
+        return opacity*std::max(0.0,std::min(max_opacity,1.0));
+      }
+
+      std::string buildPlotRow(const xvector<double>& stoich,double deed_value) const {
+        std::vector<string> values;
+        for(int i=stoich.lrows;i<=stoich.urows;i++){
+          values.push_back(aurostd::utype2string(stoich[i],FULL_PRECISION));
+        }
+        values.push_back(aurostd::utype2string(deed_value,CHULL_PRECISION));
+        return ChullPlotTableWriter::formatRow(values);
+      }
+
+      std::string buildSurfacePlotHeader() const {
+        std::stringstream ss;
+        ss << "\\addplot3[" << std::endl;
+        ss << "patch," << std::endl;
+        ss << "patch type=triangle," << std::endl;
+        ss << "shader=interp," << std::endl;
+        ss << "draw=none," << std::endl;
+        ss << "point meta=\\thisrow{DEED}," << std::endl;
+        std::vector<string> columns=m_elements;
+        columns.push_back("DEED");
+        ss << ChullPlotTableWriter::beginTable(ChullPlotTableWriter::getAxes(m_elements,3,"DEED",false),columns);
+        return ss.str();
+      }
+
+      std::string buildMarkerPlotHeader(const std::string& mark,bool display_color_gradient,bool use_fixed_colors) const {
+        std::stringstream ss;
+        ss << "\\addplot3+[" << std::endl;
+        ss << "only marks," << std::endl;
+        ss << "mark=" << mark << "," << std::endl;
+        ss << "mark size=" << m_config.getMarkerSizePt() << "," << std::endl;
+        ss << "line width=" << m_config.getMarkerLineWidthPt() << "pt," << std::endl;
+        if(display_color_gradient && m_config.getMarkerUseColormap() && !use_fixed_colors){
+          ss << "point meta=\\thisrow{DEED}," << std::endl;
+          ss << "scatter/use mapped color={draw=" << m_config.getMarkerDrawColor() << ",fill=mapped color,solid}," << std::endl;
+        }else{
+          ss << "mark options={draw=" << m_config.getMarkerDrawColor() << ",fill=" << m_config.getMarkerFillColor() << ",solid}," << std::endl;
+        }
+        std::vector<string> columns=m_elements;
+        columns.push_back("DEED");
+        ss << ChullPlotTableWriter::beginTable(ChullPlotTableWriter::getAxes(m_elements,3,"DEED",false),columns);
+        return ss.str();
+      }
+
+      std::string buildAxisCoordinate(const xvector<double>& stoich) const {
+        std::stringstream ss;
+        ss << "(axis cs:";
+        ss << aurostd::utype2string(stoich[stoich.lrows+1],FULL_PRECISION) << ",";
+        ss << aurostd::utype2string(stoich[stoich.lrows],FULL_PRECISION) << ",";
+        ss << aurostd::utype2string(stoich[stoich.lrows+2],FULL_PRECISION) << ")";
+        return ss.str();
+      }
+
+      std::string buildWhiteOverlayTriangle(const xvector<double>& stoich_a,const xvector<double>& stoich_b,const xvector<double>& stoich_c,double opacity) const {
+        std::stringstream ss;
+        ss << "\\path[fill=white,fill opacity=" << aurostd::utype2string(opacity,FULL_PRECISION) << ",draw=none] ";
+        ss << buildAxisCoordinate(stoich_a) << " -- ";
+        ss << buildAxisCoordinate(stoich_b) << " -- ";
+        ss << buildAxisCoordinate(stoich_c) << " -- cycle;" << std::endl;
+        return ss.str();
+      }
+
+      std::string buildVertexPlotHeader() const {
+        std::stringstream ss;
+        ss << "\\addplot3+[" << std::endl;
+        ss << "only marks," << std::endl;
+        ss << "mark=*," << std::endl;
+        ss << "mark size=" << m_config.getVertexMarkerSizePt() << "," << std::endl;
+        ss << "line width=" << m_config.getVertexLineWidthPt() << "pt," << std::endl;
+        ss << "mark options={draw=" << m_config.getVertexDrawColor() << ",fill=" << m_config.getVertexFillColor() << ",solid}," << std::endl;
+        std::vector<string> columns=m_elements;
+        columns.push_back("DEED");
+        ss << ChullPlotTableWriter::beginTable(ChullPlotTableWriter::getAxes(m_elements,3,"DEED",false),columns);
+        return ss.str();
+      }
+
+      std::string getStructureKey(const chull::ChullPoint& point,const std::string& normalized_key_mode) const {
+        if(normalized_key_mode=="prototype"){return point.m_entry.prototype;}
+        if(normalized_key_mode=="prototype_plus_space_group_relax"){return point.m_entry.prototype + " | " + point.getSG();}
+        return point.getSG();
+      }
+
+      bool structureKeyIsInformative(const std::string& structure_key) const {
+        std::string normalized=aurostd::tolower(structure_key);
+        aurostd::StringSubst(normalized," ","");
+        aurostd::StringSubst(normalized,"$","");
+        return !(normalized.empty() || normalized=="unknown" || normalized=="nnn" || normalized=="nnn#0");
+      }
+
+      bool markerRanksHigher(const Marker& candidate,const Marker& reference) const {
+        bool candidate_valid_deed=chull::CoordGroup::isValidDEEDValue(candidate.deed);
+        bool reference_valid_deed=chull::CoordGroup::isValidDEEDValue(reference.deed);
+        if(candidate_valid_deed!=reference_valid_deed){return candidate_valid_deed;}
+        if(candidate_valid_deed && !aurostd::identical(candidate.deed,reference.deed,ZERO_TOL)){return candidate.deed>reference.deed;}
+        if(candidate.point_index>=m_points.size()){return false;}
+        if(reference.point_index>=m_points.size()){return true;}
+
+        const chull::ChullPoint& candidate_point=m_points[candidate.point_index];
+        const chull::ChullPoint& reference_point=m_points[reference.point_index];
+        if(candidate_point.m_is_g_state!=reference_point.m_is_g_state){return candidate_point.m_is_g_state;}
+
+        double candidate_hf=candidate_point.getFormationEnthalpy();
+        double reference_hf=reference_point.getFormationEnthalpy();
+        bool candidate_valid_hf=!aurostd::isNaN(candidate_hf) && std::isfinite(candidate_hf); //HP20260820
+        bool reference_valid_hf=!aurostd::isNaN(reference_hf) && std::isfinite(reference_hf); //HP20260820
+        if(candidate_valid_hf!=reference_valid_hf){return candidate_valid_hf;}
+        if(candidate_valid_hf && !aurostd::identical(candidate_hf,reference_hf,ZERO_TOL)){return candidate_hf<reference_hf;}
+
+        double candidate_dist=candidate_point.getDist2Hull();
+        double reference_dist=reference_point.getDist2Hull();
+        bool candidate_valid_dist=(!aurostd::isNaN(candidate_dist) && std::isfinite(candidate_dist)); //HP20260820
+        bool reference_valid_dist=(!aurostd::isNaN(reference_dist) && std::isfinite(reference_dist)); //HP20260820
+        if(candidate_valid_dist!=reference_valid_dist){return candidate_valid_dist;}
+        if(candidate_valid_dist && !aurostd::identical(candidate_dist,reference_dist,ZERO_TOL)){return candidate_dist<reference_dist;}
+
+        return candidate_point.m_entry.aurl<reference_point.m_entry.aurl;
+      }
+
+      std::string getMarkerStructureKey(const chull::ChullPoint& point,const chull::CoordGroup& coord_group,const std::string& normalized_key_mode,double deed_value) const {
+        std::string structure_key=getStructureKey(point,normalized_key_mode);
+        if(structureKeyIsInformative(structure_key)){return structure_key;}
+
+        Marker best_child_marker;
+        bool best_child_marker_set=false;
+        for(uint i=0,fl_size_i=coord_group.m_points.size();i<fl_size_i;i++){
+          uint i_point=coord_group.m_points[i];
+          if(i_point>=m_points.size() || !m_points[i_point].m_initialized){continue;}
+          const chull::ChullPoint& child_candidate=m_points[i_point];
+          if(!child_candidate.m_has_entry || child_candidate.m_is_artificial || !child_candidate.m_entry.isPoccChild()){continue;}
+          std::string child_structure_key=getStructureKey(child_candidate,normalized_key_mode);
+          if(!structureKeyIsInformative(child_structure_key)){continue;}
+
+          Marker child_marker;
+          child_marker.point_index=i_point;
+          child_marker.stoich=child_candidate.s_coords;
+          child_marker.deed=deed_value;
+          child_marker.structure_key=child_structure_key;
+          if(!best_child_marker_set || markerRanksHigher(child_marker,best_child_marker)){
+            best_child_marker=child_marker;
+            best_child_marker_set=true;
+          }
+        }
+        if(best_child_marker_set){return best_child_marker.structure_key;}
+        return structure_key;
+      }
+
+      std::string formatLegendLabel(const std::string& structure_key,const std::string& normalized_key_mode) const {
+        if(structure_key=="Unknown"){return structure_key;}
+        if(normalized_key_mode=="space_group_relax"){return "$"+aurostd::fixStringLatex(structure_key,false,true)+"$";}
+        return aurostd::fixStringLatex(structure_key,false,false);
+      }
+
+      std::string buildLegendIcon(const std::string& symbol) const {
+        std::stringstream ss;
+        ss << "\\tikz[baseline=-0.6ex]{\\draw plot[only marks,mark=" << symbol << ",mark size=" << m_config.getMarkerSizePt() << "pt,mark options={draw=" << m_config.getMarkerDrawColor() << ",fill=white,solid,line width=" << m_config.getMarkerLineWidthPt() << "pt}] coordinates {(0,0)};}";
+        return ss.str();
+      }
+
+      std::string buildLegendNode(const std::vector<std::string>& structure_keys,const std::map<std::string,std::string>& symbol_map,const std::string& normalized_key_mode,const std::string& font_size) const {
+        std::stringstream ss;
+        ss << "\\node[anchor=west,draw=black,fill=white,inner sep=5pt,align=left,font=" << font_size << "] at (axis description cs:1.02,0.16) {" << std::endl;
+        ss << "\\begin{tabular}{@{}l l@{}}" << std::endl;
+        bool first_entry=true;
+        for(std::vector<std::string>::const_iterator it=structure_keys.begin();it!=structure_keys.end();++it){
+          if(!first_entry){ss << "\\\\" << std::endl;}
+          std::map<std::string,std::string>::const_iterator symbol_it=symbol_map.find(*it);
+          ss << buildLegendIcon((symbol_it!=symbol_map.end()?symbol_it->second:"*")) << " & " << formatLegendLabel(*it,normalized_key_mode);
+          first_entry=false;
+        }
+        ss << std::endl << "\\end{tabular}" << std::endl;
+        ss << "};" << std::endl;
+        return ss.str();
+      }
+
+      std::map<std::string,std::string> assignMarkerSymbols(const std::vector<std::string>& structure_keys) const {
+        std::map<std::string,std::string> mapping;
+        if(structure_keys.empty()){return mapping;}
+        std::vector<std::string> cycle=m_config.getMarkerSymbolCycle();
+        if(cycle.empty()){
+          cycle.push_back("*");
+        }
+        const std::map<std::string,std::string>& overrides=m_config.getMarkerSymbolOverrides();
+        uint cycle_index=0;
+        for(std::vector<std::string>::const_iterator it=structure_keys.begin();it!=structure_keys.end();++it){
+          std::map<std::string,std::string>::const_iterator override_it=overrides.find(*it);
+          if(override_it!=overrides.end()){
+            mapping[*it]=override_it->second;
+          }else{
+            mapping[*it]=cycle[cycle_index%cycle.size()];
+            cycle_index++;
+          }
+        }
+        return mapping;
+      }
+
+    private:
+      const DEEDPlotConfig& m_config;
+      const vector<string>& m_elements;
+      const vector<ChullPoint>& m_points;
+  };
+
+  void ConvexHull::appendLatexPlotPackages(std::stringstream& doc_header_TEX_ss,bool image_only,uint dimension) {
+    doc_header_TEX_ss << "\\usepackage{pgfplots}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\usepackage{pdflscape}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\pgfplotsset{compat=1.18}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\usepgfplotslibrary{ternary,units}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\usetikzlibrary{decorations.pathmorphing,pgfplots.units,backgrounds}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\usepackage{tikz}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\usetikzlibrary{positioning}" << " \%HEADER" << std::endl;
+    if(dimension==3){
+      doc_header_TEX_ss << "\\usetikzlibrary{pgfplots.ternary}" << " \%HEADER" << std::endl;
+    }
+    if(image_only){
+      doc_header_TEX_ss << "\\pgfrealjobname{CHull}" << " \%HEADER" << std::endl;
+    }
+    doc_header_TEX_ss << "\\pgfdeclarelayer{background}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\pgfdeclarelayer{foreground}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\pgfsetlayers{background,main,foreground}" << " \%HEADER" << std::endl;
+    doc_header_TEX_ss << "\\AtBeginEnvironment{tikzpicture}{\\tracinglostchars=0\\relax}" << " \%HEADER" << std::endl;
+  }
+
+  void ConvexHull::appendLatexAxisCommonSettings(std::stringstream& axis_settings_TEX_ss,uint dimension) {
+    axis_settings_TEX_ss << "clip=false," << std::endl;
+    double image_width=19;
+    if(dimension==3){image_width=17;}
+    axis_settings_TEX_ss << "width=" << image_width << "cm," << std::endl;
+    double image_width_proportion=0.8;
+    if(dimension==3){image_width_proportion=1.2;}
+    axis_settings_TEX_ss << "height=" << image_width_proportion*image_width << "cm," << std::endl;
+    if(dimension==3){axis_settings_TEX_ss << "axis line style={line width=3pt}," << std::endl;}
+    axis_settings_TEX_ss << "grid=none," << std::endl;
+    axis_settings_TEX_ss << "axis on top," << std::endl;
+  }
+
+}
+
+namespace chull {
+  // Owns the processed_data.json record schema and its historical aliases.
+  // AUROSTD remains the sole generic JSON reader.
+  class DEEDJsonRecord {
+    public:
+      explicit DEEDJsonRecord(const aurostd::JSON::object& record) : m_record(record) {}
+
+      bool getSpecies(vector<string>& species) const {
+        aurostd::JSON::object* main=getMain();
+        return main && readStringVector(*main,"species",species);
+      }
+
+      bool getMainCompositionEntry(const vector<string>& species,aflowlib::_aflowlib_entry& entry) const {
+        aurostd::JSON::object* main=getMain();
+        return main && getCompositionEntry(*main,species,entry);
+      }
+
+      bool getDirectDEED(double& value) const {
+        vector<string> keys;
+        keys.push_back("DEED");
+        keys.push_back("deed");
+        return readNumberFromMainOrRecord(keys,value);
+      }
+
+      bool getEFA(double& value) const {
+        aurostd::JSON::object* main=getMain();
+        if(!main){return false;}
+        vector<string> keys;
+        keys.push_back("EFA");
+        keys.push_back("efa");
+        keys.push_back("entropy_forming_ability");
+        return readNumber(*main,keys,value);
+      }
+
+      uint getSubPoccCount() const {
+        aurostd::JSON::object* sub_pocc=getSubPocc();
+        if(!sub_pocc){return 0;}
+        return (uint)sub_pocc->size();
+      }
+
+      bool getSubPoccCompositionEntry(uint index,const vector<string>& species,aflowlib::_aflowlib_entry& entry) const {
+        aurostd::JSON::object* other=getSubPoccOther(index);
+        return other && getCompositionEntry(*other,species,entry);
+      }
+
+      bool getSubPoccEnthalpyFormation(uint index,double& value) const {
+        aurostd::JSON::object* other=getSubPoccOther(index);
+        if(!other){return false;}
+        vector<string> keys(1,"enthalpy_formation_atom");
+        return readNumber(*other,keys,value);
+      }
+
+      double getSubPoccWeight(uint index) const {
+        vector<string> keys;
+        keys.push_back("degeneracy");
+        keys.push_back("weight");
+        keys.push_back("multiplicity");
+        double value=AUROSTD_MAX_DOUBLE;
+        aurostd::JSON::object* other=getSubPoccOther(index);
+        if(other && readNumber(*other,keys,value)){return value>ZERO_TOL?value:1.0;}
+        aurostd::JSON::object* sub_entry=getSubPoccEntry(index);
+        if(sub_entry && readNumber(*sub_entry,keys,value) && value>ZERO_TOL){return value;}
+        return 1.0;
+      }
+
+      void getParentIdentifiers(string& auid,string& aurl,string& compound,string& prototype) const {
+        vector<string> keys;
+        keys.push_back("auid"); keys.push_back("AUID");
+        readStringFromMainOrRecord(keys,auid);
+        keys.clear(); keys.push_back("aurl"); keys.push_back("AURL");
+        readStringFromMainOrRecord(keys,aurl);
+        keys.clear(); keys.push_back("compound"); keys.push_back("compound_latex");
+        readStringFromMainOrRecord(keys,compound);
+        keys.clear(); keys.push_back("prototype"); keys.push_back("prototype_latex");
+        readStringFromMainOrRecord(keys,prototype);
+      }
+
+      bool getParentEnthalpyFormation(double& value) const {
+        vector<string> keys;
+        keys.push_back("enthalpy_formation_atom");
+        keys.push_back("Hf");
+        keys.push_back("enthalpy_formation");
+        return readNumberFromMainOrRecord(keys,value);
+      }
+
+    private:
+      const aurostd::JSON::object& m_record;
+
+      aurostd::JSON::object* getValue(const aurostd::JSON::object& dictionary,const string& key) const {
+        if(dictionary.type!=aurostd::JSON::object_types::DICTIONARY){return nullptr;}
+        aurostd::JSON::object& value=dictionary[key];
+        return value.type==aurostd::JSON::object_types::NONE?nullptr:&value;
+      }
+
+      aurostd::JSON::object* findFirst(const aurostd::JSON::object& dictionary,const vector<string>& keys) const {
+        for(uint i=0,fl_size_i=keys.size();i<fl_size_i;i++){
+          aurostd::JSON::object* value=getValue(dictionary,keys[i]);
+          if(value){return value;}
+        }
+        return nullptr;
+      }
+
+      aurostd::JSON::object* getMain() const {
+        aurostd::JSON::object* main=getValue(m_record,"main");
+        return main && main->type==aurostd::JSON::object_types::DICTIONARY?main:nullptr;
+      }
+
+      aurostd::JSON::object* getSubPocc() const {
+        aurostd::JSON::object* sub_pocc=getValue(m_record,"sub_pocc");
+        return sub_pocc && sub_pocc->type==aurostd::JSON::object_types::LIST?sub_pocc:nullptr;
+      }
+
+      aurostd::JSON::object* getSubPoccEntry(uint index) const {
+        aurostd::JSON::object* sub_pocc=getSubPocc();
+        if(!sub_pocc){return nullptr;}
+        if(index>=sub_pocc->size()){return nullptr;}
+        aurostd::JSON::object& entry=(*sub_pocc)[index];
+        return entry.type==aurostd::JSON::object_types::DICTIONARY?&entry:nullptr;
+      }
+
+      aurostd::JSON::object* getSubPoccOther(uint index) const {
+        aurostd::JSON::object* entry=getSubPoccEntry(index);
+        if(!entry){return nullptr;}
+        aurostd::JSON::object* other=getValue(*entry,"other");
+        return other && other->type==aurostd::JSON::object_types::DICTIONARY?other:nullptr;
+      }
+
+      bool readNumber(const aurostd::JSON::object& dictionary,const vector<string>& keys,double& value) const {
+        aurostd::JSON::object* candidate=findFirst(dictionary,keys);
+        if(!candidate || (candidate->type!=aurostd::JSON::object_types::INTEGER && candidate->type!=aurostd::JSON::object_types::FLOAT)){return false;}
+        value=(double)(*candidate);
+        return std::isfinite(value);
+      }
+
+      bool readString(const aurostd::JSON::object& dictionary,const vector<string>& keys,string& value) const {
+        aurostd::JSON::object* candidate=findFirst(dictionary,keys);
+        if(!candidate || candidate->type!=aurostd::JSON::object_types::STRING){return false;}
+        value=(string)(*candidate);
+        return true;
+      }
+
+      bool readStringVector(const aurostd::JSON::object& dictionary,const string& key,vector<string>& values) const {
+        values.clear();
+        aurostd::JSON::object* candidate=getValue(dictionary,key);
+        if(!candidate || candidate->type!=aurostd::JSON::object_types::LIST){return false;}
+        for(uint i=0,fl_size_i=candidate->size();i<fl_size_i;i++){
+          if((*candidate)[i].type!=aurostd::JSON::object_types::STRING){values.clear();return false;}
+          values.push_back((string)(*candidate)[i]);
+        }
+        return !values.empty();
+      }
+
+      bool readDoubleVector(const aurostd::JSON::object& dictionary,const string& key,vector<double>& values) const {
+        values.clear();
+        aurostd::JSON::object* candidate=getValue(dictionary,key);
+        if(!candidate || candidate->type!=aurostd::JSON::object_types::LIST){return false;}
+        for(uint i=0,fl_size_i=candidate->size();i<fl_size_i;i++){
+          if((*candidate)[i].type!=aurostd::JSON::object_types::INTEGER && (*candidate)[i].type!=aurostd::JSON::object_types::FLOAT){values.clear();return false;}
+          double value=(double)(*candidate)[i];
+          if(!std::isfinite(value)){values.clear();return false;}
+          values.push_back(value);
+        }
+        return !values.empty();
+      }
+
+      bool readNumberFromMainOrRecord(const vector<string>& keys,double& value) const {
+        aurostd::JSON::object* main=getMain();
+        return (main && readNumber(*main,keys,value)) || readNumber(m_record,keys,value);
+      }
+
+      bool readStringFromMainOrRecord(const vector<string>& keys,string& value) const {
+        aurostd::JSON::object* main=getMain();
+        return (main && readString(*main,keys,value)) || readString(m_record,keys,value);
+      }
+
+      bool getCompositionEntry(const aurostd::JSON::object& object,const vector<string>& species,aflowlib::_aflowlib_entry& entry) const {
+        vector<double> values;
+        bool values_are_stoichiometry=readDoubleVector(object,"stoichiometry",values);
+        if(!values_are_stoichiometry && !readDoubleVector(object,"composition",values)){return false;}
+        if(species.empty() || species.size()!=values.size()){return false;}
+        for(uint i=0,fl_size_i=values.size();i<fl_size_i;i++){
+          if(!std::isfinite(values[i]) || values[i]<-ZERO_TOL){return false;}
+        }
+        entry=aflowlib::_aflowlib_entry();
+        entry.vspecies=species;
+        entry.species=aurostd::joinWDelimiter(species,",");
+        entry.nspecies=species.size();
+        entry.natoms=0;
+        entry.aurl="DEED";
+        entry.auid="DEED";
+        entry.enthalpy_formation_atom=0.0;
+        entry.enthalpy_formation_cell=0.0;
+        if(values_are_stoichiometry){entry.vstoichiometry=values;}
+        else{entry.vcomposition=values;}
+        return true;
+      }
+  };
+
+
+  string DEEDPlotConfig::normalizeInterpolationMode(const string& mode) {
+    string normalized=aurostd::tolower(mode);
+    if(normalized.empty() || normalized=="white_edges" || normalized=="edge_whitening" || normalized=="interior_with_white_edges" || normalized=="interior_only"){return "white_edges";}
+    if(normalized=="flat_border_mask" || normalized=="mask_edges" || normalized=="hard_mask"){return "flat_border_mask";}
+    return "white_edges";
+  }
+
+  string DEEDPlotConfig::normalizeMarkerMode(const string& mode) {
+    string normalized=aurostd::tolower(mode);
+    if(normalized.empty() || normalized=="highest_deed_per_composition" || normalized=="highest_deed_only" || normalized=="highest_only" || normalized=="single_best"){return "highest_deed_per_composition";}
+    if(normalized=="all_structures" || normalized=="all" || normalized=="all_structure_markers"){return "all_structures";}
+    return "highest_deed_per_composition";
+  }
+
+  string DEEDPlotConfig::normalizeStructureSymbolKey(const string& mode) {
+    string normalized=aurostd::tolower(mode);
+    if(normalized.empty() || normalized=="space_group_relax" || normalized=="spacegroup" || normalized=="space_group"){return "space_group_relax";}
+    if(normalized=="prototype"){return "prototype";}
+    if(normalized=="prototype_plus_space_group_relax" || normalized=="prototype+space_group_relax" || normalized=="prototype_spacegroup" || normalized=="both_combined"){return "prototype_plus_space_group_relax";}
+    return "space_group_relax";
+  }
+
+  DEEDPlotConfig::DEEDPlotConfig() {
+    schema_version=2;
+    enabled_interpolation=true;
+    interpolation_mode="white_edges";
+    border_white_band_thickness=0.10;
+    data_distance_white_fade_radius=0.35;
+    data_distance_white_fade_max_opacity=1.0;
+    interpolation_grid_density=28;
+    interpolation_idw_power=2.0;
+    interpolation_min_points=1;
+    show_structure_markers=true;
+    structure_marker_mode="highest_deed_per_composition";
+    show_structure_legend=true;
+    structure_symbol_key="space_group_relax";
+    marker_use_colormap=false;
+    marker_draw_color="black";
+    marker_fill_color="white";
+    marker_size_pt=3.0;
+    marker_line_width_pt=1.0;
+    show_vertex_markers=true;
+    vertex_draw_color="black";
+    vertex_fill_color="white";
+    vertex_marker_size_pt=2.25;
+    vertex_line_width_pt=0.8;
+    marker_symbol_cycle.push_back("*");
+    marker_symbol_cycle.push_back("square*");
+    marker_symbol_cycle.push_back("triangle*");
+    marker_symbol_cycle.push_back("diamond*");
+    marker_symbol_cycle.push_back("pentagon*");
+    marker_symbol_cycle.push_back("star");
+    marker_symbol_cycle.push_back("asterisk");
+    marker_symbol_cycle.push_back("oplus");
+  }
+
+  DEEDPlotConfig::DEEDPlotConfig(const DEEDPlotConfig& b) {copy(b);}
+
+  DEEDPlotConfig::~DEEDPlotConfig() {free();}
+
+  const DEEDPlotConfig& DEEDPlotConfig::operator=(const DEEDPlotConfig& b) {
+    if(this!=&b){copy(b);}
+    return *this;
+  }
+
+  void DEEDPlotConfig::clear() {
+    DEEDPlotConfig defaults;
+    copy(defaults);
+  }
+
+  void DEEDPlotConfig::free() {
+    schema_version=0;
+    enabled_interpolation=false;
+    interpolation_mode.clear();
+    border_white_band_thickness=0.0;
+    data_distance_white_fade_radius=0.0;
+    data_distance_white_fade_max_opacity=0.0;
+    interpolation_grid_density=0;
+    interpolation_idw_power=0.0;
+    interpolation_min_points=0;
+    show_structure_markers=false;
+    structure_marker_mode.clear();
+    show_structure_legend=false;
+    structure_symbol_key.clear();
+    marker_use_colormap=false;
+    marker_draw_color.clear();
+    marker_fill_color.clear();
+    marker_size_pt=0.0;
+    marker_line_width_pt=0.0;
+    show_vertex_markers=false;
+    vertex_draw_color.clear();
+    vertex_fill_color.clear();
+    vertex_marker_size_pt=0.0;
+    vertex_line_width_pt=0.0;
+    marker_symbol_cycle.clear();
+    marker_symbol_overrides.clear();
+  }
+
+  void DEEDPlotConfig::copy(const DEEDPlotConfig& b) {
+    if(this==&b){return;}
+    free();
+    schema_version=b.schema_version;
+    enabled_interpolation=b.enabled_interpolation;
+    interpolation_mode=b.interpolation_mode;
+    border_white_band_thickness=b.border_white_band_thickness;
+    data_distance_white_fade_radius=b.data_distance_white_fade_radius;
+    data_distance_white_fade_max_opacity=b.data_distance_white_fade_max_opacity;
+    interpolation_grid_density=b.interpolation_grid_density;
+    interpolation_idw_power=b.interpolation_idw_power;
+    interpolation_min_points=b.interpolation_min_points;
+    show_structure_markers=b.show_structure_markers;
+    structure_marker_mode=b.structure_marker_mode;
+    show_structure_legend=b.show_structure_legend;
+    structure_symbol_key=b.structure_symbol_key;
+    marker_use_colormap=b.marker_use_colormap;
+    marker_draw_color=b.marker_draw_color;
+    marker_fill_color=b.marker_fill_color;
+    marker_size_pt=b.marker_size_pt;
+    marker_line_width_pt=b.marker_line_width_pt;
+    show_vertex_markers=b.show_vertex_markers;
+    vertex_draw_color=b.vertex_draw_color;
+    vertex_fill_color=b.vertex_fill_color;
+    vertex_marker_size_pt=b.vertex_marker_size_pt;
+    vertex_line_width_pt=b.vertex_line_width_pt;
+    for(uint i=0,fl_size_i=b.marker_symbol_cycle.size();i<fl_size_i;i++){
+      marker_symbol_cycle.push_back(b.marker_symbol_cycle[i]);
+    }
+    for(std::map<string,string>::const_iterator it=b.marker_symbol_overrides.begin();it!=b.marker_symbol_overrides.end();++it){
+      marker_symbol_overrides[it->first]=it->second;
+    }
+  }
+
+  int DEEDPlotConfig::getSchemaVersion() const {return schema_version;}
+  bool DEEDPlotConfig::getEnabledInterpolation() const {return enabled_interpolation;}
+  const string& DEEDPlotConfig::getInterpolationMode() const {return interpolation_mode;}
+  double DEEDPlotConfig::getBorderWhiteBandThickness() const {return border_white_band_thickness;}
+  double DEEDPlotConfig::getDataDistanceWhiteFadeRadius() const {return data_distance_white_fade_radius;}
+  double DEEDPlotConfig::getDataDistanceWhiteFadeMaxOpacity() const {return data_distance_white_fade_max_opacity;}
+  uint DEEDPlotConfig::getInterpolationGridDensity() const {return interpolation_grid_density;}
+  double DEEDPlotConfig::getInterpolationIDWPower() const {return interpolation_idw_power;}
+  uint DEEDPlotConfig::getInterpolationMinPoints() const {return interpolation_min_points;}
+  bool DEEDPlotConfig::getShowStructureMarkers() const {return show_structure_markers;}
+  const string& DEEDPlotConfig::getStructureMarkerMode() const {return structure_marker_mode;}
+  bool DEEDPlotConfig::getShowStructureLegend() const {return show_structure_legend;}
+  const string& DEEDPlotConfig::getStructureSymbolKey() const {return structure_symbol_key;}
+  bool DEEDPlotConfig::getMarkerUseColormap() const {return marker_use_colormap;}
+  const string& DEEDPlotConfig::getMarkerDrawColor() const {return marker_draw_color;}
+  const string& DEEDPlotConfig::getMarkerFillColor() const {return marker_fill_color;}
+  double DEEDPlotConfig::getMarkerSizePt() const {return marker_size_pt;}
+  double DEEDPlotConfig::getMarkerLineWidthPt() const {return marker_line_width_pt;}
+  bool DEEDPlotConfig::getShowVertexMarkers() const {return show_vertex_markers;}
+  const string& DEEDPlotConfig::getVertexDrawColor() const {return vertex_draw_color;}
+  const string& DEEDPlotConfig::getVertexFillColor() const {return vertex_fill_color;}
+  double DEEDPlotConfig::getVertexMarkerSizePt() const {return vertex_marker_size_pt;}
+  double DEEDPlotConfig::getVertexLineWidthPt() const {return vertex_line_width_pt;}
+  const vector<string>& DEEDPlotConfig::getMarkerSymbolCycle() const {return marker_symbol_cycle;}
+  const std::map<string,string>& DEEDPlotConfig::getMarkerSymbolOverrides() const {return marker_symbol_overrides;}
+
+  string DEEDPlotConfig::getConfigFilename() {
+    return "deed_plot_config.json";
+  }
+
+  string DEEDPlotConfig::getGuideFilename() {
+    return "deed_plot_config.README.txt";
+  }
+
+  uint DEEDPlotConfig::getMaxInterpolationGridDensity() {
+    return 40;
+  }
+
+  aurostd::JSON::object DEEDPlotConfig::toJSON() const {
+    aurostd::JSON::object root(aurostd::JSON::object_types::DICTIONARY);
+    root["schema_version"]=schema_version;
+    root["enabled_interpolation"]=enabled_interpolation;
+    root["interpolation_mode"]=interpolation_mode;
+    root["border_white_band_thickness"]=border_white_band_thickness;
+    root["data_distance_white_fade_radius"]=data_distance_white_fade_radius;
+    root["data_distance_white_fade_max_opacity"]=data_distance_white_fade_max_opacity;
+    root["interpolation_grid_density"]=(unsigned long long)interpolation_grid_density;
+    root["interpolation_idw_power"]=interpolation_idw_power;
+    root["interpolation_min_points"]=(unsigned long long)interpolation_min_points;
+    root["show_structure_markers"]=show_structure_markers;
+    root["structure_marker_mode"]=structure_marker_mode;
+    root["show_structure_legend"]=show_structure_legend;
+    root["structure_symbol_key"]=structure_symbol_key;
+    root["marker_use_colormap"]=marker_use_colormap;
+    root["marker_draw_color"]=marker_draw_color;
+    root["marker_fill_color"]=marker_fill_color;
+    root["marker_size_pt"]=marker_size_pt;
+    root["marker_line_width_pt"]=marker_line_width_pt;
+    root["show_vertex_markers"]=show_vertex_markers;
+    root["vertex_draw_color"]=vertex_draw_color;
+    root["vertex_fill_color"]=vertex_fill_color;
+    root["vertex_marker_size_pt"]=vertex_marker_size_pt;
+    root["vertex_line_width_pt"]=vertex_line_width_pt;
+    root["marker_symbol_cycle"]=marker_symbol_cycle;
+    aurostd::JSON::object overrides(aurostd::JSON::object_types::DICTIONARY);
+    for(std::map<string,string>::const_iterator it=marker_symbol_overrides.begin();it!=marker_symbol_overrides.end();++it){
+      overrides[it->first]=it->second;
+    }
+    root["marker_symbol_overrides"]=overrides;
+    return root;
+  }
+
+  string DEEDPlotConfig::guideText() const {
+    stringstream ss;
+    ss << "DEED Plot Configuration Guide" << std::endl;
+    ss << "============================" << std::endl;
+    ss << std::endl;
+    ss << "File: " << getConfigFilename() << std::endl;
+    ss << std::endl;
+    ss << "This JSON controls only the DEED ternary plot created when AFLOW is run with --print-deed." << std::endl;
+    ss << "The file is generated once if missing. Edit the JSON values to change the DEED plot in future runs." << std::endl;
+    ss << "JSON does not support comments, so this guide explains the keys." << std::endl;
+    ss << std::endl;
+    ss << "Current defaults:" << std::endl;
+    ss << "  enabled_interpolation = " << (enabled_interpolation?"true":"false") << std::endl;
+    ss << "  interpolation_mode = \"" << interpolation_mode << "\"" << std::endl;
+    ss << "  border_white_band_thickness = " << border_white_band_thickness << std::endl;
+    ss << "  data_distance_white_fade_radius = " << data_distance_white_fade_radius << std::endl;
+    ss << "  data_distance_white_fade_max_opacity = " << data_distance_white_fade_max_opacity << std::endl;
+    ss << "  interpolation_grid_density = " << interpolation_grid_density << std::endl;
+    ss << "  interpolation_idw_power = " << interpolation_idw_power << std::endl;
+    ss << "  interpolation_min_points = " << interpolation_min_points << std::endl;
+    ss << "  show_structure_markers = " << (show_structure_markers?"true":"false") << std::endl;
+    ss << "  structure_marker_mode = \"" << structure_marker_mode << "\"" << std::endl;
+    ss << "  show_structure_legend = " << (show_structure_legend?"true":"false") << std::endl;
+    ss << "  structure_symbol_key = \"" << structure_symbol_key << "\"" << std::endl;
+    ss << "  marker_use_colormap = " << (marker_use_colormap?"true":"false") << std::endl;
+    ss << "  marker_draw_color = \"" << marker_draw_color << "\"" << std::endl;
+    ss << "  marker_fill_color = \"" << marker_fill_color << "\"" << std::endl;
+    ss << "  marker_size_pt = " << marker_size_pt << std::endl;
+    ss << "  marker_line_width_pt = " << marker_line_width_pt << std::endl;
+    ss << "  show_vertex_markers = " << (show_vertex_markers?"true":"false") << std::endl;
+    ss << "  vertex_draw_color = \"" << vertex_draw_color << "\"" << std::endl;
+    ss << "  vertex_fill_color = \"" << vertex_fill_color << "\"" << std::endl;
+    ss << "  vertex_marker_size_pt = " << vertex_marker_size_pt << std::endl;
+    ss << "  vertex_line_width_pt = " << vertex_line_width_pt << std::endl;
+    ss << std::endl;
+    ss << "Key descriptions:" << std::endl;
+    ss << "  schema_version: internal version number for this config format." << std::endl;
+    ss << "  enabled_interpolation: if true, build an interpolated DEED field for the ternary interior." << std::endl;
+    ss << "  interpolation_mode: supported values are \"white_edges\" (default) and \"flat_border_mask\"." << std::endl;
+    ss << "  border_white_band_thickness: width of the edge/vertex whitening region. Nearby DEED data suppresses whitening locally." << std::endl;
+    ss << "  data_distance_white_fade_radius: if greater than zero, fade unsupported interpolated regions to white by distance from the nearest real DEED point." << std::endl;
+    ss << "  data_distance_white_fade_max_opacity: maximum opacity for the distance-based white fade. Use 0 to disable without changing the radius." << std::endl;
+    ss << "  interpolation_grid_density: number of subdivisions used for the interpolated triangular mesh. Values above " << getMaxInterpolationGridDensity() << " are clamped for pdfTeX stability." << std::endl;
+    ss << "  interpolation_idw_power: inverse-distance-weighting power used for interpolated DEED values." << std::endl;
+    ss << "  interpolation_min_points: minimum number of DEED-bearing ternary compositions required before interpolation is attempted." << std::endl;
+    ss << "  show_structure_markers: if true, overlay structure-specific symbols on the DEED page." << std::endl;
+    ss << "  structure_marker_mode: choose \"highest_deed_per_composition\" or \"all_structures\". Each DEED composition remains visible; AFLOW prefers its selected POCC parent and falls back to a real child/structure when parent metadata are unavailable." << std::endl;
+    ss << "  show_structure_legend: if true, print a symbol legend for the rendered structure markers." << std::endl;
+    ss << "  structure_symbol_key: controls how structures are grouped into symbols." << std::endl;
+    ss << "    Supported values: \"space_group_relax\", \"prototype\", \"prototype_plus_space_group_relax\"." << std::endl;
+    ss << "  marker_use_colormap: if true, structure markers use the DEED colormap; otherwise markers use marker_fill_color." << std::endl;
+    ss << "  marker_draw_color / marker_fill_color: outline/fill colors for structure markers when marker_use_colormap is false." << std::endl;
+    ss << "  marker_size_pt / marker_line_width_pt: size and outline width of structure markers." << std::endl;
+    ss << "  show_vertex_markers: if true, draw the three pure-element vertices as small white circles." << std::endl;
+    ss << "  vertex_draw_color / vertex_fill_color: outline/fill colors for the vertex circles." << std::endl;
+    ss << "  vertex_marker_size_pt / vertex_line_width_pt: size and outline width of the vertex circles." << std::endl;
+    ss << "  marker_symbol_cycle: ordered list of PGFPlots/TikZ marker names used for structure groups." << std::endl;
+    ss << "  marker_symbol_overrides: optional dictionary mapping a structure key value to a specific marker name." << std::endl;
+    ss << std::endl;
+    ss << "Notes:" << std::endl;
+    ss << "  1. The DEED plot still reads DEED data from processed_data.json or the selected DEED source. This config only changes rendering." << std::endl;
+    ss << "  2. Interpolation never assigns DEED values to the three elemental vertices. They remain white markers only." << std::endl;
+    ss << "  3. The default white_edges mode blends undefined borders and vertices to white. Distance-based fading also whitens regions far from real DEED points." << std::endl;
+    ss << "  4. interpolation_grid_density is capped at " << getMaxInterpolationGridDensity() << " because denser triangular meshes exceed default pdfTeX memory limits." << std::endl;
+    ss << "  5. The default structure_marker_mode marks the selected DEED representative at every composition; missing structure metadata are labeled \"Unknown\" rather than suppressing the point." << std::endl;
+    ss << "  6. If structure_marker_mode is set to \"all_structures\", one marker is plotted for each available structure_symbol_key at a composition." << std::endl;
+    ss << "  7. Missing stable ternary hull facets do not suppress the DEED field or composition markers; only real facets are overlaid when available." << std::endl;
+    ss << std::endl;
+    ss << "Common marker names that usually work in PGFPlots/TikZ:" << std::endl;
+    ss << "  *, square*, triangle*, diamond*, pentagon*, star, asterisk, oplus" << std::endl;
+    ss << std::endl;
+    ss << "Regenerate the default config by deleting deed_plot_config.json and rerunning AFLOW with --print-deed. The guide is refreshed from the effective settings on every run." << std::endl;
+    return ss.str();
+  }
+
+  void DEEDPlotConfig::writeFiles(const string& directory,bool write_config,bool write_guide) const {
+    if(write_config){toJSON().saveFile(directory+getConfigFilename(),false);}
+    if(write_guide){
+      stringstream ss;
+      ss << guideText();
+      aurostd::stringstream2file(ss,directory+getGuideFilename());
+    }
+  }
+
+  bool DEEDPlotConfig::loadFile(const string& path,vector<string>& warnings) {
+    if(!aurostd::FileExist(path)){return false;}
+    try{
+      aurostd::JSON::object root=aurostd::JSON::loadFile(path);
+      if(root.type!=aurostd::JSON::object_types::DICTIONARY){
+        warnings.push_back("Ignoring "+path+" because the JSON root is not a dictionary");
+        return false;
+      }
+
+      aurostd::JSON::object* value=&root["enabled_interpolation"];
+      if(value->type==aurostd::JSON::object_types::T || value->type==aurostd::JSON::object_types::F ||
+         value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        enabled_interpolation=(bool)(*value);
+      }
+      value=&root["interpolation_mode"];
+      if(value->type==aurostd::JSON::object_types::STRING){interpolation_mode=normalizeInterpolationMode((string)(*value));}
+      value=&root["border_white_band_thickness"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed)){border_white_band_thickness=std::max(0.0,std::min(parsed,0.30));}
+      }
+      value=&root["data_distance_white_fade_radius"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed)){data_distance_white_fade_radius=std::max(0.0,std::min(parsed,1.0));}
+      }
+      value=&root["data_distance_white_fade_max_opacity"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed)){data_distance_white_fade_max_opacity=std::max(0.0,std::min(parsed,1.0));}
+      }
+      value=&root["interpolation_grid_density"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>=2.0){interpolation_grid_density=(uint)(parsed+0.5);}
+      }
+      value=&root["interpolation_idw_power"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>ZERO_TOL){interpolation_idw_power=parsed;}
+      }
+      value=&root["interpolation_min_points"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>=1.0){interpolation_min_points=(uint)(parsed+0.5);}
+      }
+      value=&root["show_structure_markers"];
+      if(value->type==aurostd::JSON::object_types::T || value->type==aurostd::JSON::object_types::F ||
+         value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        show_structure_markers=(bool)(*value);
+      }
+      value=&root["structure_marker_mode"];
+      if(value->type==aurostd::JSON::object_types::STRING){structure_marker_mode=normalizeMarkerMode((string)(*value));}
+      value=&root["show_structure_legend"];
+      if(value->type==aurostd::JSON::object_types::T || value->type==aurostd::JSON::object_types::F ||
+         value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        show_structure_legend=(bool)(*value);
+      }
+      value=&root["structure_symbol_key"];
+      if(value->type==aurostd::JSON::object_types::STRING){structure_symbol_key=normalizeStructureSymbolKey((string)(*value));}
+      value=&root["marker_use_colormap"];
+      if(value->type==aurostd::JSON::object_types::T || value->type==aurostd::JSON::object_types::F ||
+         value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        marker_use_colormap=(bool)(*value);
+      }
+      value=&root["marker_draw_color"];
+      if(value->type==aurostd::JSON::object_types::STRING){marker_draw_color=(string)(*value);}
+      value=&root["marker_fill_color"];
+      if(value->type==aurostd::JSON::object_types::STRING){marker_fill_color=(string)(*value);}
+      value=&root["marker_size_pt"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>ZERO_TOL){marker_size_pt=parsed;}
+      }
+      value=&root["marker_line_width_pt"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>ZERO_TOL){marker_line_width_pt=parsed;}
+      }
+      value=&root["show_vertex_markers"];
+      if(value->type==aurostd::JSON::object_types::T || value->type==aurostd::JSON::object_types::F ||
+         value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        show_vertex_markers=(bool)(*value);
+      }
+      value=&root["vertex_draw_color"];
+      if(value->type==aurostd::JSON::object_types::STRING){vertex_draw_color=(string)(*value);}
+      value=&root["vertex_fill_color"];
+      if(value->type==aurostd::JSON::object_types::STRING){vertex_fill_color=(string)(*value);}
+      value=&root["vertex_marker_size_pt"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>ZERO_TOL){vertex_marker_size_pt=parsed;}
+      }
+      value=&root["vertex_line_width_pt"];
+      if(value->type==aurostd::JSON::object_types::INTEGER || value->type==aurostd::JSON::object_types::FLOAT){
+        double parsed=(double)(*value);
+        if(std::isfinite(parsed) && parsed>ZERO_TOL){vertex_line_width_pt=parsed;}
+      }
+      value=&root["marker_symbol_cycle"];
+      if(value->type==aurostd::JSON::object_types::LIST){
+        vector<string> parsed;
+        bool valid=true;
+        for(uint i=0,fl_size_i=value->size();i<fl_size_i && valid;i++){
+          valid=(*value)[i].type==aurostd::JSON::object_types::STRING;
+          if(valid){parsed.push_back((string)(*value)[i]);}
+        }
+        if(valid && !parsed.empty()){marker_symbol_cycle=parsed;}
+      }
+      value=&root["marker_symbol_overrides"];
+      if(value->type==aurostd::JSON::object_types::DICTIONARY){
+        std::map<string,string> parsed;
+        std::map<string,aurostd::JSON::object> dictionary=*value;
+        for(std::map<string,aurostd::JSON::object>::const_iterator it=dictionary.begin();it!=dictionary.end();++it){
+          if(it->second.type==aurostd::JSON::object_types::STRING){parsed[it->first]=(string)it->second;}
+        }
+        if(!parsed.empty()){marker_symbol_overrides=parsed;}
+      }
+
+      if(interpolation_mode!="white_edges" && interpolation_mode!="flat_border_mask"){
+        warnings.push_back("Unsupported interpolation_mode=\""+interpolation_mode+"\" in "+path+"; using white_edges");
+        interpolation_mode="white_edges";
+      }
+      if(interpolation_grid_density>getMaxInterpolationGridDensity()){
+        warnings.push_back("interpolation_grid_density in "+path+" exceeded the pdfTeX-safe limit; using "+aurostd::utype2string(getMaxInterpolationGridDensity()));
+        interpolation_grid_density=getMaxInterpolationGridDensity();
+      }
+      if(marker_symbol_cycle.empty()){
+        warnings.push_back("marker_symbol_cycle in "+path+" was empty; restoring defaults");
+        DEEDPlotConfig defaults;
+        marker_symbol_cycle=defaults.getMarkerSymbolCycle();
+      }
+      interpolation_mode=normalizeInterpolationMode(interpolation_mode);
+      structure_marker_mode=normalizeMarkerMode(structure_marker_mode);
+      structure_symbol_key=normalizeStructureSymbolKey(structure_symbol_key);
+      return true;
+    }
+    catch(aurostd::xerror& err){
+      warnings.push_back("Ignoring "+path+" because it could not be parsed ("+err.what()+")");
+      return false;
+    }
+  }
+} // namespace chull
 
 //CO20180419 - moved to aurostd::xerror and aurostd::xerror
 //namespace chull {
@@ -125,6 +1145,7 @@ namespace chull {
     usage_options.push_back("--load_library=|--loadlibrary=|--ll=icsd|lib1|lib2|lib3");
     usage_options.push_back("--load_API|--load_api|--loadapi|--lapi|--api");
     usage_options.push_back("--load_entries_entry_output|--loadentriesentryoutput|--leo");
+    usage_options.push_back("--deed_source=auto|json|db|raw|--deedsource=auto|json|db|raw|--deed-source=auto|json|db|raw");
     usage_options.push_back("--neglect=|--ban=aflow:bb0d45ab555bc208);aflow:fb9eaa58604ce774");
     usage_options.push_back("--see_neglect|--seeneglect|--sn");
     usage_options.push_back("--remove_extreme_points=|--removeextremepoints=|--remove_extrema=|--removeextrema=|--rep=-1000");
@@ -140,6 +1161,7 @@ namespace chull {
     usage_options.push_back("--skip_n_plus_1_enthalpy_gain_analysis|--skip_n_plus_1_energy_gain_analysis|--skipnplus1enthalpygainanalysis|--skipnplus1energygainanalysis|--skip_nplus1|--skipnplus1|--snp1|--snpo");
     usage_options.push_back("--include_skewed_hulls|--include_skewed|--ish");
     usage_options.push_back("--include_unreliable_hulls|--include_unreliable|--iuh");
+    usage_options.push_back("--include_pocc|--includepocc");  //CO20261004
     usage_options.push_back("--include_outliers|--io");
     usage_options.push_back("--strict_outlier_analysis|--soa");
     usage_options.push_back("--include_ill_converged|--iic");
@@ -153,6 +1175,7 @@ namespace chull {
     usage_options.push_back("--latex_interactive|--latexinteractive");
     usage_options.push_back("--light_contrast|--lightcontrast|--lc");
     usage_options.push_back("--large_font|--largefont|--large|--lf");
+    usage_options.push_back("--print_deed|--print-deed");
     usage_options.push_back("--png_resolution=|--pngresolution=|--pngr=300");
     usage_options.push_back("--plot_iso_max_latent_heat|--plot_isomax|--iso_max|--isomax");
     usage_options.push_back(" ");
@@ -1107,6 +2130,9 @@ namespace chull {
     if(vpflow.flag("CHULL::INCLUDE_UNRELIABLE_HULLS")) {
       pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "CHULL::INCLUDE_UNRELIABLE_HULLS set to TRUE", aflags, FileMESSAGE, oss, _LOGGER_OPTION_, silent);
     }
+    if(vpflow.flag("CHULL::INCLUDE_POCC")) {  //CO20261004
+      pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "CHULL::INCLUDE_POCC set to TRUE", aflags, FileMESSAGE, oss, _LOGGER_OPTION_, silent);
+    }
     if(vpflow.flag("CHULL::INCLUDE_OUTLIERS")) {
       pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "CHULL::INCLUDE_OUTLIERS set to TRUE", aflags, FileMESSAGE, oss, _LOGGER_OPTION_, silent);
     }
@@ -1684,6 +2710,11 @@ namespace chull {
   //small get()'s of fundamental types get copies, otherwise const&
   uint ChullPoint::getDim() const {return m_coords.rows;}
   bool ChullPoint::isUnary() const {return m_i_nary==0;}
+  bool ChullPoint::isMaterialPageAvailable() const {
+    //CO20261005 - CHAOS has no web page per entry (yet), and entries are not linked to the legacy
+    //materials server (ENTRY_PAGE_URL_PREFIX); with an entry page, return true here for its AUIDs
+    return false;
+  }
   double ChullPoint::getFormationEnthalpy() const {return H_f_atom(*this,_std_);} //m_entry.enthalpy_formation_atom;
   double ChullPoint::getEntropicTemperature() const {return T_S(*this);} //m_entry.entropic_temperature;
   double ChullPoint::getEntropyFormingAbility() const {return EFA(*this,_std_);} //m_entry.entropic_temperature;
@@ -1725,7 +2756,6 @@ namespace chull {
     }
     return convertUnits(sqrt(getDist2Hull() / getEntropyFormingAbility()),units);
   }
-
 
   /// \brief sort the vertex indexes based on their angle around a central normal vector
   /// \param facet list of vertex indexes forming the facet
@@ -2852,6 +3882,10 @@ namespace chull {
     m_sym_equivalent_g_states.clear();
     m_stability_criterion=AUROSTD_MAX_DOUBLE;
     m_n_plus_1_enthalpy_gain=AUROSTD_MAX_DOUBLE;
+    m_deed=AUROSTD_MAX_DOUBLE;
+    m_deed_rank=AUROSTD_MAX_DOUBLE;
+    m_deed_point_index=AUROSTD_MAX_UINT;
+    m_deed_candidates.clear();
     m_found_icsd_g_state=false;
     m_i_icsd_g_state=AUROSTD_MAX_UINT;
   }
@@ -2878,6 +3912,10 @@ namespace chull {
     m_sym_equivalent_g_states.clear(); for(uint i=0,fl_size_i=b.m_sym_equivalent_g_states.size();i<fl_size_i;i++){m_sym_equivalent_g_states.push_back(b.m_sym_equivalent_g_states[i]);}
     m_stability_criterion=b.m_stability_criterion;
     m_n_plus_1_enthalpy_gain=b.m_n_plus_1_enthalpy_gain;
+    m_deed=b.m_deed;
+    m_deed_rank=b.m_deed_rank;
+    m_deed_point_index=b.m_deed_point_index;
+    m_deed_candidates=b.m_deed_candidates;
     m_found_icsd_g_state=b.m_found_icsd_g_state;
     m_i_icsd_g_state=b.m_i_icsd_g_state;
   }
@@ -2918,6 +3956,155 @@ namespace chull {
       throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Uninitialized coordgroup");
     }
     return sum(getElementsPresent());
+  }
+
+  xvector<double> CoordGroup::getStoichiometry() const {
+    if(!m_initialized || !m_has_stoich_coords){return xvector<double>();}
+    xvector<double> stoich(m_coords.lrows,m_coords.urows+1);
+    double stoich_sum=0.0;
+    for(int i=m_coords.lrows;i<=m_coords.urows;i++){
+      stoich[i]=m_coords[i];
+      stoich_sum+=m_coords[i];
+    }
+    stoich[stoich.urows]=1.0-stoich_sum;
+    if(aurostd::zeroWithinTol(stoich[stoich.urows],ZERO_TOL)){stoich[stoich.urows]=0.0;}
+    return stoich;
+  }
+
+  double CoordGroup::getDEED() const {
+    return canReportDEED()?m_deed:AUROSTD_MAX_DOUBLE;
+  }
+
+  const vector<double>& CoordGroup::getDEEDCandidates() const {
+    return m_deed_candidates;
+  }
+
+  uint CoordGroup::getDEEDPointIndex() const {
+    return m_deed_point_index;
+  }
+
+  bool CoordGroup::canReportDEED() const {
+    return m_initialized && isValidDEEDValue(m_deed);
+  }
+
+  bool CoordGroup::isValidDEEDValue(double value) {
+    return !aurostd::isNaN(value) && std::isfinite(value) && value>=0.0; //HP20260820
+  }
+
+  bool CoordGroup::isValidDEEDRank(double rank) {
+    return !aurostd::isNaN(rank) && std::isfinite(rank); //HP20260820
+  }
+
+  void CoordGroup::clearDEED() {
+    m_deed=AUROSTD_MAX_DOUBLE;
+    m_deed_rank=AUROSTD_MAX_DOUBLE;
+    m_deed_point_index=AUROSTD_MAX_UINT;
+    m_deed_candidates.clear();
+  }
+
+  bool CoordGroup::addDEEDCandidate(double deed_value,double rank,uint point_index) {
+    if(!isValidDEEDValue(deed_value)){return false;}
+
+    bool duplicate=false;
+    for(uint i=0,fl_size_i=m_deed_candidates.size();i<fl_size_i && !duplicate;i++){
+      duplicate=aurostd::identical(m_deed_candidates[i],deed_value,ZERO_TOL);
+    }
+    if(!duplicate){
+      m_deed_candidates.push_back(deed_value);
+      std::sort(m_deed_candidates.begin(),m_deed_candidates.end(),std::greater<double>());
+    }
+
+    bool candidate_has_rank=isValidDEEDRank(rank);
+    bool selected_has_rank=isValidDEEDRank(m_deed_rank);
+    bool candidate_preferred=!canReportDEED() || (candidate_has_rank && !selected_has_rank);
+    if(candidate_has_rank==selected_has_rank && candidate_has_rank && !aurostd::identical(rank,m_deed_rank,ZERO_TOL)){
+      candidate_preferred=rank<m_deed_rank;
+    }else if(candidate_has_rank==selected_has_rank && (!candidate_has_rank || aurostd::identical(rank,m_deed_rank,ZERO_TOL)) &&
+             canReportDEED() && !aurostd::identical(deed_value,m_deed,ZERO_TOL)){
+      candidate_preferred=deed_value>m_deed;
+    }else if(candidate_has_rank==selected_has_rank && canReportDEED() && aurostd::identical(deed_value,m_deed,ZERO_TOL)){
+      bool candidate_has_point=point_index!=AUROSTD_MAX_UINT;
+      bool selected_has_point=m_deed_point_index!=AUROSTD_MAX_UINT;
+      candidate_preferred=(candidate_has_point!=selected_has_point)?candidate_has_point:(point_index<m_deed_point_index);
+    }
+
+    if(candidate_preferred){
+      m_deed=deed_value;
+      m_deed_rank=rank;
+      m_deed_point_index=point_index;
+    }
+    return true;
+  }
+
+  bool CoordGroup::pointCanRepresentDEED(const ChullPoint& point) const {
+    return point.m_initialized && point.m_has_entry && !point.m_is_artificial && !point.m_entry.isPoccChild();
+  }
+
+  bool CoordGroup::pointMatchesDEEDIdentifiers(const ChullPoint& point,const string& auid,const string& aurl,const string& compound,const string& prototype) const {
+    if(!pointCanRepresentDEED(point)){return false;}
+    if(!auid.empty() && point.m_entry.auid==auid){return true;}
+    if(!aurl.empty() && point.m_entry.hasMatchingPoccAurl(aurl)){return true;}
+    return !prototype.empty() && point.m_entry.prototype==prototype && (compound.empty() || point.m_entry.compound==compound);
+  }
+
+  uint CoordGroup::selectCloserDEEDPoint(uint current,uint candidate,const vector<ChullPoint>& points) const {
+    if(candidate>=points.size()){return current;}
+    if(current>=points.size()){return candidate;}
+    const ChullPoint& candidate_point=points[candidate];
+    const ChullPoint& current_point=points[current];
+    double candidate_rank=candidate_point.getDist2Hull();
+    double current_rank=current_point.getDist2Hull();
+    bool candidate_has_rank=isValidDEEDRank(candidate_rank);
+    bool current_has_rank=isValidDEEDRank(current_rank);
+    if(candidate_has_rank!=current_has_rank){return candidate_has_rank?candidate:current;}
+    if(candidate_has_rank && !aurostd::identical(candidate_rank,current_rank,ZERO_TOL)){return abs(candidate_rank)<abs(current_rank)?candidate:current;}
+    double candidate_hf=candidate_point.getFormationEnthalpy();
+    double current_hf=current_point.getFormationEnthalpy();
+    bool candidate_has_hf=!aurostd::isNaN(candidate_hf) && std::isfinite(candidate_hf); //HP20260820
+    bool current_has_hf=!aurostd::isNaN(current_hf) && std::isfinite(current_hf); //HP20260820
+    if(candidate_has_hf!=current_has_hf){return candidate_has_hf?candidate:current;}
+    if(candidate_has_hf && !aurostd::identical(candidate_hf,current_hf,ZERO_TOL)){return candidate_hf<current_hf?candidate:current;}
+    if(candidate_point.m_entry.aurl<current_point.m_entry.aurl){return candidate;}
+    return current;
+  }
+
+  uint CoordGroup::findClosestPoccParentDEEDPoint(const vector<ChullPoint>& points) const {
+    uint best_point=AUROSTD_MAX_UINT;
+    for(uint i=0,fl_size_i=m_points.size();i<fl_size_i;i++){
+      uint i_point=m_points[i];
+      if(i_point>=points.size()){continue;}
+      if(!pointCanRepresentDEED(points[i_point]) || !points[i_point].m_entry.isPoccParent()){continue;}
+      best_point=selectCloserDEEDPoint(best_point,i_point,points);
+    }
+    return best_point;
+  }
+
+  uint CoordGroup::findDEEDPointIndexByEntry(const vector<ChullPoint>& points,const aflowlib::_aflowlib_entry& entry) const {
+    uint best_point=AUROSTD_MAX_UINT;
+    for(uint i=0,fl_size_i=m_points.size();i<fl_size_i;i++){
+      uint i_point=m_points[i];
+      if(i_point>=points.size() || !pointCanRepresentDEED(points[i_point])){continue;}
+      const ChullPoint& point=points[i_point];
+      if(point.entryIdentical(entry) || pointMatchesDEEDIdentifiers(point,entry.auid,entry.aurl,entry.compound,entry.prototype)){
+        best_point=selectCloserDEEDPoint(best_point,i_point,points);
+      }
+    }
+    if(best_point!=AUROSTD_MAX_UINT){return best_point;}
+    return findClosestPoccParentDEEDPoint(points);
+  }
+
+  uint CoordGroup::findDEEDPointIndexByIdentifiers(const vector<ChullPoint>& points,const string& auid,const string& aurl,const string& compound,const string& prototype) const {
+    uint best_point=AUROSTD_MAX_UINT;
+    for(uint i=0,fl_size_i=m_points.size();i<fl_size_i;i++){
+      uint i_point=m_points[i];
+      if(i_point>=points.size()){continue;}
+      if(pointMatchesDEEDIdentifiers(points[i_point],auid,aurl,compound,prototype)){
+        best_point=selectCloserDEEDPoint(best_point,i_point,points);
+      }
+    }
+    if(best_point!=AUROSTD_MAX_UINT){return best_point;}
+    if(auid.empty() && aurl.empty() && prototype.empty()){return AUROSTD_MAX_UINT;}
+    return findClosestPoccParentDEEDPoint(points);
   }
 
 } // namespace chull
@@ -3064,6 +4251,7 @@ namespace chull {
     m_points.clear();
     m_naries.clear();
     m_coord_groups.clear();
+    m_deed_coord_groups.clear();
     m_dim=AUROSTD_MAX_UINT;
     m_half_hull=false;
     m_lower_hull=false;
@@ -3094,6 +4282,7 @@ namespace chull {
     m_points.clear(); for(uint i=0,fl_size_i=b.m_points.size();i<fl_size_i;i++){m_points.push_back(b.m_points[i]);}
     m_naries.clear(); for(uint i=0,fl_size_i=b.m_naries.size();i<fl_size_i;i++){m_naries.push_back(b.m_naries[i]);}
     m_coord_groups.clear(); for(uint i=0,fl_size_i=b.m_coord_groups.size();i<fl_size_i;i++){m_coord_groups.push_back(b.m_coord_groups[i]);}
+    m_deed_coord_groups.clear(); for(uint i=0,fl_size_i=b.m_deed_coord_groups.size();i<fl_size_i;i++){m_deed_coord_groups.push_back(b.m_deed_coord_groups[i]);}
     m_dim=b.m_dim;
     m_half_hull=b.m_half_hull;
     m_lower_hull=b.m_lower_hull;
@@ -3860,7 +5049,7 @@ namespace chull {
       if(entry.prototype.find("POCC")==string::npos){ //POCC entries have no composition
         //throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Bad entry ("+entry.auid+") - vspecies.size!=vcomposition.size()"); //let's not break the code for one bad entry
         reason="Entry (auid="+entry.auid+") is ill-defined: vspecies.size()!=vcomposition.size()";
-        reason+=" (please report on AFLOW Forum: aflow.org/forum)";
+        reason+=" (please report it to the developers at https://s4e.ai)";
         LOGGER_TYPE=_LOGGER_WARNING_;
         return false;
       }
@@ -3871,7 +5060,7 @@ namespace chull {
       for(uint i=0,fl_size_i=m_velements.size();i<fl_size_i && !found;i++){if(m_velements[i]==entry.vspecies[j]){found=true;}}
       if(!found){
         reason="Entry (auid="+entry.auid+") contains "+entry.vspecies[j]+" and does not belong to hull";
-        reason+=" (please report on AFLOW Forum: aflow.org/forum)";
+        reason+=" (please report it to the developers at https://s4e.ai)";
         LOGGER_TYPE=_LOGGER_WARNING_;
         return false;
       }
@@ -3971,93 +5160,62 @@ namespace chull {
       { // ensures that all resources are released as soon as possible
         aflowlib::EntryLoader el;
         el.m_out_debug = LDEBUG; // leave this on for testing
+        const string database_file=m_cflags.getattachedscheme("CHULL::DATABASE_FILE");  //CO20261007 - the caller's database and only it; no global setting changes
+        if(!database_file.empty()){
+          el.m_sqlite_file=database_file;
+          if(!el.setSource(aflowlib::EntryLoader::Source::SQLITE)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot read the database "+database_file,_FILE_ERROR_);}
+        }
         el.loadAlloy(_velements); // the alloy will be loaded recursive by default, (elements will be cleaned and sorted)
         el.getEntriesThreeLayer(entries);
       }
-      uint i_nary=0,i_alloy=0;
-      bool sortLIB2=true;
-      if(sortLIB2){
-        uint i=0;
-        if(LDEBUG){cerr << __AFLOW_FUNC__ << " reshuffling unaries to optimize duplicate removal" << endl;}
-        //[CO20221111 - VERY SLOW]for(i_alloy=0;i_alloy<entries[i_nary].size();i_alloy++){
-        //[CO20221111 - VERY SLOW]  std::stable_sort(entries[i_nary][i_alloy].begin(),entries[i_nary][i_alloy].end(),sortLIB2Entries(velements,*p_FileMESSAGE,*p_oss));
-        //[CO20221111 - VERY SLOW]}
-        vector<_aflowlib_entry_LIB2sorting> vaes;
-        uint i_entry=0;
-        for(i_alloy=0;i_alloy<entries[i_nary].size();i_alloy++){
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " i_alloy=" << i_alloy << endl;}
-          if(LDEBUG){
-            cerr << __AFLOW_FUNC__ << " INITIAL ORDER=" << endl;
-            for(i=0;i<entries[i_nary][i_alloy].size()-1;i++){
-              cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << endl;
-            }
-            cerr << endl;
-          }
-          vaes.clear();
-          for(i_entry=0;i_entry<entries[i_nary][i_alloy].size();i_entry++){
-            vaes.emplace_back(_aflowlib_entry_LIB2sorting(entries[i_nary][i_alloy][i_entry],i_entry,velements,*p_FileMESSAGE,*p_oss));
-          }
-          std::stable_sort(vaes.begin(),vaes.end());
-          vector<uint> order_new;
-          for(i_entry=0;i_entry<vaes.size();i_entry++){order_new.push_back(vaes[i_entry].m_index);}
-          if(LDEBUG){cerr << __AFLOW_FUNC__ << " order_new=" << aurostd::joinWDelimiter(order_new,",") << endl;}
-          aurostd::reorder(entries[i_nary][i_alloy],order_new,1); //use mode==1
-          if(LDEBUG){
-            cerr << __AFLOW_FUNC__ << " FINAL ORDER=" << endl;
-            for(i=0;i<entries[i_nary][i_alloy].size()-1;i++){
-              cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << endl;
-            }
-            cerr << endl;
-          }
-        }
-        //[CO20221111 - VERY SLOW]//need to reshuffle unaries in LIB2
-        //[CO20221111 - VERY SLOW]uint i_nary=0,i_alloy=0,i=0,j=0,k=0;
-        //[CO20221111 - VERY SLOW]aflowlib::_aflowlib_entry i_entry,j_entry;
-        //[CO20221111 - VERY SLOW]vector<string> i_vspecies,j_vspecies;
-        //[CO20221111 - VERY SLOW]bool i_found_element=0,j_found_element;
-        //[CO20221111 - VERY SLOW]for(i_alloy=0;i_alloy<entries[i_nary].size();i_alloy++){
-        //[CO20221111 - VERY SLOW]  for(i=0;i<entries[i_nary][i_alloy].size()-1;i++){
-        //[CO20221111 - VERY SLOW]    for(j=i+1;j<entries[i_nary][i_alloy].size();j++){
-        //[CO20221111 - VERY SLOW]      const aflowlib::_aflowlib_entry i_entry=entries[i_nary][i_alloy][i];
-        //[CO20221111 - VERY SLOW]      const aflowlib::_aflowlib_entry j_entry=entries[i_nary][i_alloy][j];
-        //[CO20221111 - VERY SLOW]      if(!i_entry.catalog.empty()&&i_entry.catalog!="LIB2"){continue;}  //only a problem with unaries coming from LIB2
-        //[CO20221111 - VERY SLOW]      if(!j_entry.catalog.empty()&&j_entry.catalog!="LIB2"){continue;}  //only a problem with unaries coming from LIB2
-        //[CO20221111 - VERY SLOW]      if(i_entry.prototype==j_entry.prototype){
-        //[CO20221111 - VERY SLOW]        i_vspecies=i_entry.getSpeciesAURL(*p_FileMESSAGE,*p_oss); //in this case, species from AUID is NOT the real species
-        //[CO20221111 - VERY SLOW]        j_vspecies=j_entry.getSpeciesAURL(*p_FileMESSAGE,*p_oss); //in this case, species from AUID is NOT the real species
-        //[CO20221111 - VERY SLOW]        if(LDEBUG){
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " i_vspecies=" << aurostd::joinWDelimiter(i_vspecies,",") << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " j_vspecies=" << aurostd::joinWDelimiter(j_vspecies,",") << endl;
-        //[CO20221111 - VERY SLOW]        }
-        //[CO20221111 - VERY SLOW]        i_found_element=true;for(k=0;k<i_vspecies.size()&&i_found_element;k++){if(!aurostd::WithinList(velements,i_vspecies[k])){i_found_element=false;}}
-        //[CO20221111 - VERY SLOW]        j_found_element=true;for(k=0;k<j_vspecies.size()&&j_found_element;k++){if(!aurostd::WithinList(velements,j_vspecies[k])){j_found_element=false;}}
-        //[CO20221111 - VERY SLOW]        if(LDEBUG){cerr << __AFLOW_FUNC__ << " i_found_element=" << i_found_element << " j_found_element=" << j_found_element << endl;}
-        //[CO20221111 - VERY SLOW]        bool swap=false;
-        //[CO20221111 - VERY SLOW]        if(i_found_element==true && j_found_element==true){
-        //[CO20221111 - VERY SLOW]          for(k=0;k<i_vspecies.size();k++){if(j_vspecies[k]<i_vspecies[k]){swap=true;}}
-        //[CO20221111 - VERY SLOW]        }
-        //[CO20221111 - VERY SLOW]        else if(i_found_element==false && j_found_element==true){swap=true;}
-        //[CO20221111 - VERY SLOW]        if(swap){
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " i_vspecies=" << aurostd::joinWDelimiter(i_vspecies,",") << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " j_vspecies=" << aurostd::joinWDelimiter(j_vspecies,",") << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " i_found_element=" << i_found_element << " j_found_element=" << j_found_element << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " j_entry.auid=" << entries[i_nary][i_alloy][j].auid << " j_entry.aurl=" << entries[i_nary][i_alloy][j].aurl << endl;
-        //[CO20221111 - VERY SLOW]          std::iter_swap(entries[i_nary][i_alloy].begin()+i,entries[i_nary][i_alloy].begin()+j);
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << " SWAPPED" << endl;
-        //[CO20221111 - VERY SLOW]          cerr << __AFLOW_FUNC__ << " j_entry.auid=" << entries[i_nary][i_alloy][j].auid << " j_entry.aurl=" << entries[i_nary][i_alloy][j].aurl << " SWAPPED" << endl;
-        //[CO20221111 - VERY SLOW]        }
-        //[CO20221111 - VERY SLOW]      }
-        //[CO20221111 - VERY SLOW]    }
-        //[CO20221111 - VERY SLOW]  }
-        //[CO20221111 - VERY SLOW]}
-      }
+      reorderUnariesLIB2(entries,velements); //CO20261002 - moved into a function of its own; it read entries[0] when nothing was loaded
     }
     long long int count=0;
     uint i=0;
     for(i=0;i<entries.size();i++){for(uint j=0;j<entries[i].size();j++){count+=entries[i][j].size();}}
     pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, "Loaded "+aurostd::utype2string(count)+" raw entries from the database", m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_NOTICE_);
     return loadPoints(velements,entries);
+  }
+
+  /// @brief order the unary entries (entries[0], one list per element) so duplicates are removed the same way every time
+  /// @param entries entries by nary and alloy (as EntryLoader::getEntriesThreeLayer() gives them)
+  /// @param velements elements of the hull
+  /// @authors
+  /// @mod{CO,20261002,moved out of loadPoints(velements) unchanged, except that nothing loaded is no longer a crash}
+  /// @note when the server refuses the query (no CHAOS API key, say) nothing is loaded and entries is
+  ///       empty; the code read entries[0] and crashed with a segmentation fault before any message
+  void ConvexHull::reorderUnariesLIB2(vector<vector<vector<aflowlib::_aflowlib_entry> > >& entries,vector<string>& velements) {
+    bool LDEBUG=(FALSE || _DEBUG_CHULL_ || XHOST.DEBUG);
+    if(entries.empty()){return;}
+    uint i_nary=0,i_alloy=0,i=0,i_entry=0;
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " reshuffling unaries to optimize duplicate removal" << endl;}
+    vector<_aflowlib_entry_LIB2sorting> vaes;
+    for(i_alloy=0;i_alloy<entries[i_nary].size();i_alloy++){
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " i_alloy=" << i_alloy << endl;}
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " INITIAL ORDER=" << endl;
+        for(i=0;i+1<entries[i_nary][i_alloy].size();i++){ //CO20261002 - was i<size()-1, which wraps around for an empty alloy
+          cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << endl;
+        }
+        cerr << endl;
+      }
+      vaes.clear();
+      for(i_entry=0;i_entry<entries[i_nary][i_alloy].size();i_entry++){
+        vaes.emplace_back(_aflowlib_entry_LIB2sorting(entries[i_nary][i_alloy][i_entry],i_entry,velements,*p_FileMESSAGE,*p_oss));
+      }
+      std::stable_sort(vaes.begin(),vaes.end());
+      vector<uint> order_new;
+      for(i_entry=0;i_entry<vaes.size();i_entry++){order_new.push_back(vaes[i_entry].m_index);}
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " order_new=" << aurostd::joinWDelimiter(order_new,",") << endl;}
+      aurostd::reorder(entries[i_nary][i_alloy],order_new,1); //use mode==1
+      if(LDEBUG){
+        cerr << __AFLOW_FUNC__ << " FINAL ORDER=" << endl;
+        for(i=0;i+1<entries[i_nary][i_alloy].size();i++){ //CO20261002 - was i<size()-1
+          cerr << __AFLOW_FUNC__ << " i_entry.auid=" << entries[i_nary][i_alloy][i].auid << " i_entry.aurl=" << entries[i_nary][i_alloy][i].aurl << endl;
+        }
+        cerr << endl;
+      }
+    }
   }
 
   void ConvexHull::loadPoints(const vector<string>& _velements,const vector<vector<vector<aflowlib::_aflowlib_entry> > >& entries) {
@@ -4592,6 +5750,7 @@ namespace chull {
     bool remove_requested=m_cflags.flag("CHULL::NEGLECT");
     bool see_neglect=m_cflags.flag("CHULL::SEE_NEGLECT");
     bool remove_submodular=true;  //remove AEL-AGL, APL, etc.
+    bool remove_pocc=!m_cflags.flag("CHULL::INCLUDE_POCC");  //CO20261004 - POCC supercells and parents are measured against the hull of ordered structures, not part of it
     bool fhn1eg_requested=m_cflags.flag("CHULL::CALCULATE_FAKE_HULL_N+1_ENTHALPY_GAIN"); //SK20200327
     bool remove_invalid=true;
     bool remove_duplicate_entries=true;        //we remove duplicate entries from the database, but in general, keep input of user constant
@@ -4627,6 +5786,7 @@ namespace chull {
     if(remove_invalid){removing_messages.push_back("erroneous");}
     if(remove_duplicate_entries){removing_messages.push_back("duplicate");}
     if(remove_extreme){removing_messages.push_back("extreme");}
+    if(remove_pocc){removing_messages.push_back("POCC");}  //CO20261004
     if(remove_outliers){removing_messages.push_back("outlier");}
     if(fhn1eg_requested){removing_messages.push_back(aurostd::utype2string(m_velements.size())+"D (N+1 enthalpy gain)");}  //SK20200327
     if(fhsc_requested){removing_messages.push_back("auid="+auid_sc+" and equivalent (stability criterion)");}  //SK20200327
@@ -4677,6 +5837,15 @@ namespace chull {
             continue;
           }
         }
+        //CO20261004 START - a POCC supercell is one tile of a disordered ensemble and a POCC parent is the ensemble average;
+        //neither is an ordered phase, so neither may define the hull (getDatabaseDerivedProperties() measures them against it)
+        if(remove_pocc && (entry.isPoccChild() || entry.isPoccParent())){
+          silent=(!see_neglect);
+          message << "Neglecting [auid=" << entry.auid << ",aurl=" << entry.aurl << "]: POCC entry, not an ordered phase";
+          pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_OPTION_, silent);
+          continue;
+        }
+        //CO20261004 STOP
         if(remove_duplicate_entries && !entryUnique(unique_entries,entry,canonical_auid)){
           silent=(!see_neglect);
           message << "Neglecting [auid=" << entry.auid << ",aurl=" << entry.aurl << "]: duplicate database entry (see " << canonical_auid << ")";
@@ -4940,17 +6109,23 @@ namespace chull {
 
       //check for ground-states (non-artificial points)
       bool found_real = false, found_artificial = false;
-      uint i_coord_group = 0,i_point = 0,i_point_real = 0;
+      uint i_coord_group = 0,i_point = 0,i_point_real = AUROSTD_MAX_UINT;
+      double lowest_real_energy=AUROSTD_MAX_DOUBLE;
       for(uint i_alloy=0,fl_size_i_alloy=m_naries[i_nary].m_alloys.size();i_alloy<fl_size_i_alloy;i_alloy++){
         if(m_naries[i_nary].m_alloys[i_alloy].m_coord_groups.size()!=1){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unexpected count of coordgroups for unaries, should only be 1");}
         found_real=found_artificial=false;
+        i_point_real=AUROSTD_MAX_UINT;
+        lowest_real_energy=AUROSTD_MAX_DOUBLE;
         i_coord_group=m_naries[i_nary].m_alloys[i_alloy].m_coord_groups[0];
         for(uint i=0,fl_size_i=m_coord_groups[i_coord_group].m_points.size();i<fl_size_i&&!(found_real&&found_artificial);i++){
           i_point=m_coord_groups[i_coord_group].m_points[i];
           if(!m_points[i_point].m_initialized){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Point["+aurostd::utype2string(i_point)+"] is not initialized");}
           if(m_points[i_point].m_is_artificial){found_artificial=true;}
           else{
-            if(!found_real){i_point_real=i_point;}  //grab first i_point that's real
+            if(!found_real || m_points[i_point].getLastCoord()<lowest_real_energy){
+              i_point_real=i_point;
+              lowest_real_energy=m_points[i_point].getLastCoord();
+            }
             found_real=true;
           }
         }
@@ -4968,7 +6143,7 @@ namespace chull {
               message << " [i_nary=" << i_nary << ",i_alloy=" << i_alloy << "]";
               message << " (auid=" << m_points[i_point_real].m_entry.auid << ")";
               message << ": abs(" << m_points[i_point_real].getLastCoord() << ")>=" << ENERGY_TOL << " [eV]";
-              message << " (please report on AFLOW Forum: aflow.org/forum)";
+              message << " (please report it to the developers at https://s4e.ai)";
               if(m_cflags.flag("FAKE_HULL")){aurostd::StringstreamClean(message);}  //don't want to see these errors, they are expected
               else if(m_cflags.flag("FORCE")||m_cflags.flag("CHULL::INCLUDE_SKEWED_HULLS")){pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);}
               else{
@@ -6817,7 +7992,614 @@ namespace chull {
     bool perform_n_plus_1_enthalpy_gain=(1&&(!m_cflags.flag("CHULL::SKIP_N+1_ENTHALPY_GAIN_ANALYSIS"))); //(1&&!(m_cflags.flag("CHULL::SKIP_N+1_ENTHALPY_GAIN_ANALYSIS")||(!m_cflags.flag("CHULL::MULTI_OUTPUT")&&m_cflags.flag("CHULL::LATEX_DOC")&&m_cflags.flag("CHULL::IMAGE_ONLY"))));
     if(perform_n_plus_1_enthalpy_gain){setNPlus1EnthalpyGain();}
 
+    if(m_cflags.flag("CHULL::PRINT_DEED")){setDEED();}
+
     return;
+  }
+
+  void ConvexHull::clearDEED() {
+    m_deed_coord_groups=m_coord_groups;
+    for(uint i=0,fl_size_i=m_deed_coord_groups.size();i<fl_size_i;i++){m_deed_coord_groups[i].clearDEED();}
+  }
+
+  bool ConvexHull::getDEEDStoichiometry(const aflowlib::_aflowlib_entry& entry,xvector<double>& stoich) const {
+    try{
+      // Reuse ChullPoint's canonical species ordering and composition normalization.
+      ChullPoint composition_point(m_velements,entry,*p_FileMESSAGE,*p_oss,true);
+      if(!composition_point.m_initialized || (uint)composition_point.s_coords.rows!=m_velements.size()){return false;}
+      stoich=composition_point.s_coords;
+      return true;
+    }
+    catch(aurostd::xerror&){
+      return false;
+    }
+  }
+
+  bool ConvexHull::findDEEDCoordGroupIndex(const xvector<double>& representative_stoich,uint& i_coord_group) const {
+    i_coord_group=AUROSTD_MAX_UINT;
+    if((uint)representative_stoich.rows!=m_velements.size() || m_velements.size()<2){return false;}
+
+    xvector<double> representative_reduced_coords((int)m_velements.size()-1,1);
+    for(int i=representative_reduced_coords.lrows;i<=representative_reduced_coords.urows;i++){
+      representative_reduced_coords[i]=representative_stoich[i];
+    }
+    for(uint i=0,fl_size_i=m_deed_coord_groups.size();i<fl_size_i;i++){
+      if(!m_deed_coord_groups[i].m_initialized){continue;}
+      if(coordsIdentical(m_deed_coord_groups[i].m_coords,representative_reduced_coords)){
+        i_coord_group=i;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool ConvexHull::ensureDEEDCoordGroup(const xvector<double>& representative_stoich,uint& i_coord_group) {
+    if(findDEEDCoordGroupIndex(representative_stoich,i_coord_group)){return true;}
+    if((uint)representative_stoich.rows!=m_velements.size() || m_velements.size()<2){return false;}
+
+    xvector<double> representative_reduced_coords((int)m_velements.size()-1,1);
+    for(int i=representative_reduced_coords.lrows;i<=representative_reduced_coords.urows;i++){
+      representative_reduced_coords[i]=representative_stoich[i];
+    }
+    m_deed_coord_groups.push_back(CoordGroup(representative_reduced_coords,true));
+    i_coord_group=m_deed_coord_groups.size()-1;
+    return true;
+  }
+
+  double ConvexHull::getDEEDHullDistanceRank(const xvector<double>& stoich,double enthalpy_formation_atom,bool signed_distance) const {
+    if((uint)stoich.rows!=m_velements.size() || aurostd::isNaN(enthalpy_formation_atom) || !std::isfinite(enthalpy_formation_atom)){return AUROSTD_MAX_DOUBLE;} //HP20260820
+
+    xvector<double> coords((int)m_velements.size(),1);
+    for(int i=coords.lrows;i<coords.urows;i++){coords[i]=stoich[i];}
+    coords[coords.urows]=enthalpy_formation_atom;
+    ChullPoint point(coords,*p_FileMESSAGE,*p_oss,true,true,false);
+    double distance=getDistanceToHull(point,false,signed_distance);  //CO20261004 - a tile below the hull of ordered structures lowers the hull loss
+    if(!CoordGroup::isValidDEEDRank(distance)){return AUROSTD_MAX_DOUBLE;}
+    return (signed_distance?-distance:abs(distance));  //CO20261004 - chull's signed distance is negative above the hull; the hull loss is positive above
+  }
+
+  bool ConvexHull::applyDEED(const xvector<double>& representative_stoich,double deed_value) {
+    uint i_coord_group=AUROSTD_MAX_UINT;
+    if(!CoordGroup::isValidDEEDValue(deed_value) || !ensureDEEDCoordGroup(representative_stoich,i_coord_group)){return false;}
+    uint deed_point_index=m_deed_coord_groups[i_coord_group].findClosestPoccParentDEEDPoint(m_points);
+    double rank=(deed_point_index<m_points.size()?abs(m_points[deed_point_index].getDist2Hull()):AUROSTD_MAX_DOUBLE);
+    return m_deed_coord_groups[i_coord_group].addDEEDCandidate(deed_value,rank,deed_point_index);
+  }
+
+  bool ConvexHull::coordGroupCanReportDEED(uint i_coord_group) const {
+    if(!m_cflags.flag("CHULL::PRINT_DEED")){return false;}
+    if(i_coord_group>=m_coord_groups.size() || !m_coord_groups[i_coord_group].m_initialized){return false;}
+    if(m_coord_groups[i_coord_group].m_i_nary==0){return false;}
+    xvector<double> stoich=m_coord_groups[i_coord_group].getStoichiometry();
+    uint i_deed_coord_group=AUROSTD_MAX_UINT;
+    if(!findDEEDCoordGroupIndex(stoich,i_deed_coord_group)){return false;}
+    return m_deed_coord_groups[i_deed_coord_group].canReportDEED();
+  }
+
+  string ConvexHull::getCoordGroupDEEDLabel(uint i_coord_group) const {
+    if(!coordGroupCanReportDEED(i_coord_group)){return "";}
+    uint i_deed_coord_group=AUROSTD_MAX_UINT;
+    if(!findDEEDCoordGroupIndex(m_coord_groups[i_coord_group].getStoichiometry(),i_deed_coord_group)){return "";}
+    const uint precision_tmp=2;
+    const double tmp_roundoff_tol=5.0*pow(10,-((int)precision_tmp)-1);
+    stringstream ss;
+    ss << "$\\mathrm{DEED}=";
+    ss << aurostd::utype2string(m_deed_coord_groups[i_deed_coord_group].getDEED(),precision_tmp,true,tmp_roundoff_tol,FIXED_STREAM);
+    ss << "$";
+    return ss.str();
+  }
+
+  bool ConvexHull::setDEEDFromJSON(uint& matched_count,string& source_description) {
+    stringstream message;
+    matched_count=0;
+    source_description="";
+    std::vector<std::string> candidate_paths;
+    candidate_paths.push_back(chull::getPath()+"processed_data.json");
+    string output_path=chull::getPath(m_cflags,*p_FileMESSAGE,*p_oss);
+    string redirected_candidate=output_path+"processed_data.json";
+    if(redirected_candidate!=candidate_paths.front()){candidate_paths.push_back(redirected_candidate);}
+
+    bool found_file=false;
+    bool matched_any=false;
+    for(uint ipath=0,fl_size_ipath=candidate_paths.size();ipath<fl_size_ipath && !matched_any;ipath++){
+      const string& json_path=candidate_paths[ipath];
+      if(!aurostd::FileExist(json_path)){continue;}
+      found_file=true;
+
+      try{
+        aurostd::JSON::object root=aurostd::JSON::loadFile(json_path);
+        if(root.type!=aurostd::JSON::object_types::DICTIONARY){
+          message.str("");
+          message << "Skipping DEED processing from " << json_path << " (root JSON object is not a dictionary)";
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+          continue;
+        }
+
+        std::map<std::string,aurostd::JSON::object> records=root;
+        for(std::map<std::string,aurostd::JSON::object>::const_iterator it=records.begin();it!=records.end();++it){
+          const aurostd::JSON::object& record=it->second;
+          if(record.type!=aurostd::JSON::object_types::DICTIONARY){continue;}
+          DEEDJsonRecord record_data(record);
+
+          std::vector<std::string> record_species;
+          if(!record_data.getSpecies(record_species)){continue;}
+
+          xvector<double> representative_stoich;
+          aflowlib::_aflowlib_entry representative_entry;
+          bool representative_found=record_data.getMainCompositionEntry(record_species,representative_entry) && getDEEDStoichiometry(representative_entry,representative_stoich);
+
+          double deed_value=AUROSTD_MAX_DOUBLE;
+          bool deed_found=record_data.getDirectDEED(deed_value);
+
+          if(!deed_found){
+            double efa_value=AUROSTD_MAX_DOUBLE;
+            if(!record_data.getEFA(efa_value) || efa_value<=ZERO_TOL){continue;}
+
+            uint sub_pocc_count=record_data.getSubPoccCount();
+            if(!sub_pocc_count){continue;}
+
+            double weighted_hull_loss=0.0;
+            double hull_loss_weight_sum=0.0;
+            uint hull_loss_count=0;
+            for(uint isub=0;isub<sub_pocc_count;isub++){
+              xvector<double> tile_stoich;
+              aflowlib::_aflowlib_entry tile_entry;
+              if(!record_data.getSubPoccCompositionEntry(isub,record_species,tile_entry) || !getDEEDStoichiometry(tile_entry,tile_stoich)){continue;}
+              if(!representative_found){
+                representative_stoich=tile_stoich;
+                representative_found=true;
+              }
+
+              double enthalpy_formation_atom=AUROSTD_MAX_DOUBLE;
+              if(!record_data.getSubPoccEnthalpyFormation(isub,enthalpy_formation_atom)){continue;}
+
+              double tile_distance=getDEEDHullDistanceRank(tile_stoich,enthalpy_formation_atom,true);  //CO20261004 - signed
+              if(!CoordGroup::isValidDEEDRank(tile_distance)){continue;}
+
+              double tile_weight=record_data.getSubPoccWeight(isub);
+              weighted_hull_loss+=tile_weight*tile_distance;
+              hull_loss_weight_sum+=tile_weight;
+              hull_loss_count++;
+            }
+
+            if(!hull_loss_count || hull_loss_weight_sum<=ZERO_TOL){continue;}
+            double average_hull_loss=weighted_hull_loss/hull_loss_weight_sum;
+            if(average_hull_loss<=ZERO_TOL){continue;}
+            deed_value=pocc::getDEED(efa_value,average_hull_loss);
+            deed_found=CoordGroup::isValidDEEDValue(deed_value);
+          }
+
+          if(!representative_found){
+            uint sub_pocc_count=record_data.getSubPoccCount();
+            for(uint isub=0;isub<sub_pocc_count && !representative_found;isub++){
+              aflowlib::_aflowlib_entry fallback_entry;
+              representative_found=record_data.getSubPoccCompositionEntry(isub,record_species,fallback_entry) && getDEEDStoichiometry(fallback_entry,representative_stoich);
+            }
+          }
+
+          if(!deed_found || !representative_found || !CoordGroup::isValidDEEDValue(deed_value)){continue;}
+          uint i_coord_group=AUROSTD_MAX_UINT;
+          if(!ensureDEEDCoordGroup(representative_stoich,i_coord_group)){continue;}
+
+          std::string parent_auid,parent_aurl,parent_compound,parent_prototype;
+          record_data.getParentIdentifiers(parent_auid,parent_aurl,parent_compound,parent_prototype);
+
+          uint deed_point_index=m_deed_coord_groups[i_coord_group].findDEEDPointIndexByIdentifiers(m_points,parent_auid,parent_aurl,parent_compound,parent_prototype);
+          double candidate_rank=(deed_point_index<m_points.size()?abs(m_points[deed_point_index].getDist2Hull()):AUROSTD_MAX_DOUBLE);
+          if(!CoordGroup::isValidDEEDRank(candidate_rank)){
+            double parent_enthalpy_formation_atom=AUROSTD_MAX_DOUBLE;
+            if(record_data.getParentEnthalpyFormation(parent_enthalpy_formation_atom)){
+              candidate_rank=getDEEDHullDistanceRank(representative_stoich,parent_enthalpy_formation_atom);
+            }
+          }
+          matched_any=m_deed_coord_groups[i_coord_group].addDEEDCandidate(deed_value,candidate_rank,deed_point_index) || matched_any;
+        }
+
+        if(matched_any){
+          source_description=json_path;
+        }
+      }
+      catch(aurostd::xerror& err){
+        pflow::logger(err.whereFileName(),err.whereFunction(),err.what(),m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+      }
+    }
+
+    if(!found_file){
+      source_description="processed_data.json not found in "+aurostd::joinWDelimiter(candidate_paths,", ");
+      return false;
+    }
+    if(!matched_any){
+      source_description="no matching compositions with usable DEED data were found in processed_data.json";
+      return false;
+    }
+    for(uint i_coord_group=0,fl_size_i_coord_group=m_deed_coord_groups.size();i_coord_group<fl_size_i_coord_group;i_coord_group++){
+      if(m_deed_coord_groups[i_coord_group].canReportDEED()){matched_count++;}
+    }
+    return true;
+  }
+
+  bool ConvexHull::setDEEDFromEntries(aflowlib::EntryLoader::Source source,uint& matched_count,string& source_description) {
+    bool LDEBUG=(FALSE || _DEBUG_CHULL_ || XHOST.DEBUG);
+    matched_count=0;
+    source_description="";
+
+    aflowlib::EntryLoader el(*p_FileMESSAGE,*p_oss);
+    el.m_out_silent=!LDEBUG;
+    el.m_out_debug=LDEBUG;
+
+    if(source==aflowlib::EntryLoader::Source::SQLITE){
+      source_description=el.m_sqlite_file;
+    }else if(source==aflowlib::EntryLoader::Source::FILESYSTEM_RAW){
+      source_description=el.m_filesystem_path;
+    }else{
+      source_description="unsupported entry source";
+      return false;
+    }
+
+    if(!el.setSource(source)){
+      if(source==aflowlib::EntryLoader::Source::SQLITE){source_description="could not initialize SQLite DEED source at "+source_description;}
+      else if(source==aflowlib::EntryLoader::Source::FILESYSTEM_RAW){source_description="could not initialize RAW DEED source rooted at "+source_description;}
+      return false;
+    }
+
+    std::vector<aflowlib::_aflowlib_entry> entries;
+    el.loadAlloy(m_velements,true);
+    el.getEntriesFlat(entries);
+    if(entries.empty()){
+      if(source==aflowlib::EntryLoader::Source::SQLITE){source_description="no entries for alloy "+aurostd::joinWDelimiter(m_velements,"")+" were found in SQLite source "+source_description;}
+      else{source_description="no entries for alloy "+aurostd::joinWDelimiter(m_velements,"")+" were found in RAW source rooted at "+source_description;}
+      return false;
+    }
+
+    std::stable_sort(entries.begin(),entries.end(),[](const aflowlib::_aflowlib_entry& lhs,const aflowlib::_aflowlib_entry& rhs){return lhs.aurl<rhs.aurl;});
+
+    std::vector<const aflowlib::_aflowlib_entry*> parents;
+    std::vector<const aflowlib::_aflowlib_entry*> children;
+    std::vector<std::string> usable_parent_aurl_keys;
+    for(uint i=0,fl_size_i=entries.size();i<fl_size_i;i++){
+      if(entries[i].isPoccChild()){children.push_back(&entries[i]);}
+      else if(entries[i].isPoccParent()){
+        parents.push_back(&entries[i]);
+      }
+    }
+
+    for(uint i=0,fl_size_i=parents.size();i<fl_size_i;i++){
+      const aflowlib::_aflowlib_entry& parent=*parents[i];
+      if(aurostd::isNaN(parent.entropy_forming_ability) || !std::isfinite(parent.entropy_forming_ability) || parent.entropy_forming_ability<=ZERO_TOL){continue;} //HP20260820
+      xvector<double> parent_stoich;
+      if(!getDEEDStoichiometry(parent,parent_stoich)){continue;}
+      for(uint j=0,fl_size_j=children.size();j<fl_size_j;j++){
+        if(children[j]->isPoccChildOf(parent)){
+          std::string parent_key=parent.getPoccParentAurlKey();
+          usable_parent_aurl_keys.push_back(parent_key);
+          break;
+        }
+      }
+    }
+
+    uint candidate_parents=0;
+    uint parents_with_children=0;
+    for(uint i=0,fl_size_i=parents.size();i<fl_size_i;i++){
+      const aflowlib::_aflowlib_entry& parent=*parents[i];
+      if(aurostd::isNaN(parent.entropy_forming_ability) || !std::isfinite(parent.entropy_forming_ability) || parent.entropy_forming_ability<=ZERO_TOL){continue;} //HP20260820
+
+      xvector<double> representative_stoich;
+      if(!getDEEDStoichiometry(parent,representative_stoich)){continue;}
+      candidate_parents++;
+
+      pocc::SupercellDegeneracies pocc_child_degeneracies;
+      bool pocc_degeneracies_loaded=pocc_child_degeneracies.load(parent);
+      double weighted_hull_loss=0.0;
+      double hull_loss_weight_sum=0.0;
+      uint average_hull_loss_count=0;
+      for(uint j=0,fl_size_j=children.size();j<fl_size_j;j++){
+        const aflowlib::_aflowlib_entry& child=*children[j];
+        if(!child.isPoccChildOf(parent)){continue;}
+
+        xvector<double> tile_stoich;
+        if(!getDEEDStoichiometry(child,tile_stoich)){continue;}
+        if(aurostd::isNaN(child.enthalpy_formation_atom) || !std::isfinite(child.enthalpy_formation_atom)){continue;} //HP20260820
+
+        double tile_distance=getDEEDHullDistanceRank(tile_stoich,H_f_atom(child,_std_),true);  //CO20261004 - signed, and the same formation enthalpy (with CCE when present) as the hull points
+        if(!CoordGroup::isValidDEEDRank(tile_distance)){continue;}
+        bool child_weight_found=false;
+        double tile_weight=pocc_child_degeneracies.getWeight(child,child_weight_found);
+        if(pocc_degeneracies_loaded && !child_weight_found){continue;}
+        weighted_hull_loss+=tile_weight*tile_distance;
+        hull_loss_weight_sum+=tile_weight;
+        average_hull_loss_count++;
+      }
+
+      if(!average_hull_loss_count || hull_loss_weight_sum<=ZERO_TOL){continue;}
+      parents_with_children++;
+      double average_hull_loss=weighted_hull_loss/hull_loss_weight_sum;
+      if(average_hull_loss<=ZERO_TOL){continue;}
+
+      double deed_value=pocc::getDEED(parent.entropy_forming_ability,average_hull_loss);
+      if(!CoordGroup::isValidDEEDValue(deed_value)){continue;}
+      uint i_coord_group=AUROSTD_MAX_UINT;
+      if(!ensureDEEDCoordGroup(representative_stoich,i_coord_group)){continue;}
+
+      uint deed_point_index=m_deed_coord_groups[i_coord_group].findDEEDPointIndexByEntry(m_points,parent);
+      double candidate_rank=(deed_point_index<m_points.size()?abs(m_points[deed_point_index].getDist2Hull()):AUROSTD_MAX_DOUBLE);
+      if(!CoordGroup::isValidDEEDRank(candidate_rank) && !aurostd::isNaN(parent.enthalpy_formation_atom) && std::isfinite(parent.enthalpy_formation_atom)){ //HP20260820
+        candidate_rank=getDEEDHullDistanceRank(representative_stoich,parent.enthalpy_formation_atom);
+      }
+      m_deed_coord_groups[i_coord_group].addDEEDCandidate(deed_value,candidate_rank,deed_point_index);
+    }
+
+    std::map<std::string,std::vector<const aflowlib::_aflowlib_entry*> > parentless_child_groups;
+    for(uint i=0,fl_size_i=children.size();i<fl_size_i;i++){
+      const aflowlib::_aflowlib_entry& child=*children[i];
+      std::string parent_key=child.getPoccParentAurlKey();
+      if(parent_key.empty() || std::find(usable_parent_aurl_keys.begin(),usable_parent_aurl_keys.end(),parent_key)!=usable_parent_aurl_keys.end()){continue;}
+      parentless_child_groups[parent_key].push_back(&child);
+    }
+
+    uint parentless_candidate_groups=0;
+    uint parentless_groups_with_hull_loss=0;
+    for(std::map<std::string,std::vector<const aflowlib::_aflowlib_entry*> >::const_iterator it_group=parentless_child_groups.begin();it_group!=parentless_child_groups.end();++it_group){
+      const std::vector<const aflowlib::_aflowlib_entry*>& group_children=it_group->second;
+      if(group_children.empty()){continue;}
+      parentless_candidate_groups++;
+
+      xvector<double> representative_stoich;
+      bool representative_found=false;
+      std::vector<double> child_energies;
+      std::vector<double> child_weights;
+      pocc::SupercellDegeneracies pocc_child_degeneracies;
+      bool pocc_degeneracies_loaded=pocc_child_degeneracies.load(*group_children[0]);
+      double weighted_hull_loss=0.0;
+      double hull_loss_weight_sum=0.0;
+      uint average_hull_loss_count=0;
+
+      for(uint i=0,fl_size_i=group_children.size();i<fl_size_i;i++){
+        const aflowlib::_aflowlib_entry& child=*group_children[i];
+
+        xvector<double> tile_stoich;
+        if(!getDEEDStoichiometry(child,tile_stoich)){continue;}
+        if(!representative_found){
+          representative_stoich=tile_stoich;
+          representative_found=true;
+        }
+
+        double child_energy=child.enthalpy_atom;
+        if(aurostd::isNaN(child_energy) || !std::isfinite(child_energy)){child_energy=child.enthalpy_formation_atom;} //HP20260820
+        bool child_weight_found=false;
+        double tile_weight=pocc_child_degeneracies.getWeight(child,child_weight_found);
+        if(pocc_degeneracies_loaded && !child_weight_found){continue;}
+        if(!aurostd::isNaN(child_energy) && std::isfinite(child_energy)){ //HP20260820
+          child_energies.push_back(child_energy);
+          child_weights.push_back(tile_weight);
+        }
+
+        if(aurostd::isNaN(child.enthalpy_formation_atom) || !std::isfinite(child.enthalpy_formation_atom)){continue;} //HP20260820
+        double tile_distance=getDEEDHullDistanceRank(tile_stoich,H_f_atom(child,_std_),true);  //CO20261004 - signed, and the same formation enthalpy (with CCE when present) as the hull points
+        if(!CoordGroup::isValidDEEDRank(tile_distance)){continue;}
+        weighted_hull_loss+=tile_weight*tile_distance;
+        hull_loss_weight_sum+=tile_weight;
+        average_hull_loss_count++;
+      }
+
+      if(!representative_found || !average_hull_loss_count || hull_loss_weight_sum<=ZERO_TOL){continue;}
+      parentless_groups_with_hull_loss++;
+      double average_hull_loss=weighted_hull_loss/hull_loss_weight_sum;
+      if(average_hull_loss<=ZERO_TOL){continue;}
+
+      if(child_energies.size()<2 || child_energies.size()!=child_weights.size()){continue;}
+      xvector<double> xv_child_energies((int)child_energies.size(),1);
+      xvector<double> xv_child_weights((int)child_weights.size(),1);
+      for(uint i=0,fl_size_i=child_energies.size();i<fl_size_i;i++){
+        xv_child_energies[(int)i+xv_child_energies.lrows]=child_energies[i];
+        xv_child_weights[(int)i+xv_child_weights.lrows]=child_weights[i];
+      }
+      double efa_value=pocc::getEFA(xv_child_energies,xv_child_weights);
+      if(aurostd::isNaN(efa_value) || !std::isfinite(efa_value) || efa_value<=ZERO_TOL){continue;} //HP20260820
+
+      double deed_value=pocc::getDEED(efa_value,average_hull_loss);
+      if(!CoordGroup::isValidDEEDValue(deed_value)){continue;}
+      uint i_coord_group=AUROSTD_MAX_UINT;
+      if(!ensureDEEDCoordGroup(representative_stoich,i_coord_group)){continue;}
+      m_deed_coord_groups[i_coord_group].addDEEDCandidate(deed_value);
+    }
+
+    for(uint i_coord_group=0,fl_size_i_coord_group=m_deed_coord_groups.size();i_coord_group<fl_size_i_coord_group;i_coord_group++){
+      if(m_deed_coord_groups[i_coord_group].canReportDEED()){matched_count++;}
+    }
+
+    if(matched_count){return true;}
+
+    if(source==aflowlib::EntryLoader::Source::SQLITE){
+      if(!candidate_parents){source_description="no top-level POCC entries with usable EFA were found in SQLite source "+source_description;}
+      else if(!parents_with_children && !parentless_groups_with_hull_loss){source_description="no POCC subentries with usable hull-loss data were found in SQLite source "+source_description;}
+      else{source_description="no matching compositions with usable DEED data were found in SQLite source "+source_description;}
+    }else{
+      if(!candidate_parents && !parentless_candidate_groups){source_description="no top-level or parentless POCC groups with usable EFA were found in RAW source rooted at "+source_description;}
+      else if(!parents_with_children && !parentless_groups_with_hull_loss){source_description="no POCC subentries with usable hull-loss data were found in RAW source rooted at "+source_description;}
+      else{source_description="no matching compositions with usable DEED data were found in RAW source rooted at "+source_description;}
+    }
+    return false;
+  }
+
+  void ConvexHull::writeDEEDJSON() const {
+    vector<uint> deed_groups;
+    for(uint i=0,fl_size_i=m_deed_coord_groups.size();i<fl_size_i;i++){
+      if(m_deed_coord_groups[i].canReportDEED()){deed_groups.push_back(i);}
+    }
+    if(deed_groups.empty()){return;}
+
+    // Stable ordering makes this compact file suitable for reproducible post-processing.
+    std::sort(deed_groups.begin(),deed_groups.end(),[this](uint lhs,uint rhs){
+      xvector<double> lhs_stoich=m_deed_coord_groups[lhs].getStoichiometry();
+      xvector<double> rhs_stoich=m_deed_coord_groups[rhs].getStoichiometry();
+      for(int i=lhs_stoich.lrows;i<=lhs_stoich.urows;i++){
+        if(!aurostd::identical(lhs_stoich[i],rhs_stoich[i],ZERO_TOL)){return lhs_stoich[i]<rhs_stoich[i];}
+      }
+      return lhs<rhs;
+    });
+
+    aurostd::JSON::object root(aurostd::JSON::object_types::DICTIONARY);
+    aurostd::JSON::object compositions(aurostd::JSON::object_types::LIST);
+    root["alloy"]=m_velements;
+    for(uint i=0,fl_size_i=deed_groups.size();i<fl_size_i;i++){
+      const CoordGroup& group=m_deed_coord_groups[deed_groups[i]];
+      xvector<double> stoich=group.getStoichiometry();
+      vector<double> composition;
+      for(int j=stoich.lrows;j<=stoich.urows;j++){composition.push_back(stoich[j]);}
+
+      vector<double> candidates;
+      candidates.push_back(group.getDEED());
+      const vector<double>& all_candidates=group.getDEEDCandidates();
+      for(uint j=0,fl_size_j=all_candidates.size();j<fl_size_j;j++){
+        if(!aurostd::identical(all_candidates[j],group.getDEED(),ZERO_TOL)){candidates.push_back(all_candidates[j]);}
+      }
+
+      aurostd::JSON::object record(aurostd::JSON::object_types::DICTIONARY);
+      record["composition"]=composition;
+      record["selected_deed"]=group.getDEED();
+      record["deed_candidates"]=candidates;
+      compositions.push_back(record);
+    }
+    root["compositions"]=compositions;
+
+    string output_path=chull::getPath(m_cflags,*p_FileMESSAGE,*p_oss);
+    if(!output_path.empty() && output_path[output_path.size()-1]!='/'){output_path+="/";}
+    string deed_json_path=output_path+"aflow_"+aurostd::joinWDelimiter(m_velements,"")+"_deed.json";
+    aurostd::JSON::saveFile(root,deed_json_path);
+
+    stringstream message;
+    message << "Wrote DEED post-processing data for " << deed_groups.size() << " compositions to " << deed_json_path;
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+  }
+
+  string ConvexHull::normalizeDEEDSource(const string& source) {
+    string normalized=aurostd::tolower(source);
+    if(normalized.empty()){return "auto";}
+    if(normalized=="database" || normalized=="sqlite"){return "db";}
+    if(normalized=="filesystem" || normalized=="file"){return "raw";}
+    if(normalized=="auto" || normalized=="json" || normalized=="db" || normalized=="raw"){return normalized;}
+    return "";
+  }
+
+  void ConvexHull::setDEED() {
+    stringstream message;
+    clearDEED();
+
+    if(!m_formation_energy_hull || !m_has_stoich_coords){return;}
+
+    const std::string raw_requested_source=m_cflags.getattachedscheme("CHULL::DEED_SOURCE");
+    std::string requested_source=normalizeDEEDSource(raw_requested_source);
+    if(requested_source.empty()){
+      message << "Unknown DEED source \"" << raw_requested_source << "\"; falling back to auto";
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+      requested_source="auto";
+      message.str("");
+    }
+
+    message << "DEED source mode requested=" << (raw_requested_source.empty()?"auto (default)":raw_requested_source);
+    message << "; normalized=" << requested_source;
+    if(requested_source=="auto"){message << "; evaluation priority=JSON, SQLite, RAW";}
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+    message.str("");
+
+    std::vector<std::string> source_order;
+    if(requested_source=="auto"){
+      source_order.push_back("json");
+      source_order.push_back("db");
+      source_order.push_back("raw");
+    }else{
+      source_order.push_back(requested_source);
+    }
+
+    std::vector<std::string> failure_messages;
+    bool best_loaded=false;
+    uint best_matched_count=0;
+    std::string best_source_label;
+    std::string best_source_description;
+    std::vector<CoordGroup> best_deed_state;
+    std::vector<std::string> tied_source_labels;
+    // Backends are evaluated independently so lower-priority data cannot leak into a winner.
+    for(uint i=0,fl_size_i=source_order.size();i<fl_size_i;i++){
+      clearDEED();
+      uint matched_count=0;
+      std::string source_description;
+      bool loaded=false;
+      std::string source_label;
+      if(source_order[i]=="json"){
+        source_label="JSON";
+      }else if(source_order[i]=="db"){
+        source_label="SQLite";
+      }else{
+        source_label="RAW";
+      }
+
+      message << "Evaluating DEED source " << source_label;
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      message.str("");
+
+      if(source_order[i]=="json"){
+        loaded=setDEEDFromJSON(matched_count,source_description);
+      }else if(source_order[i]=="db"){
+        loaded=setDEEDFromEntries(aflowlib::EntryLoader::Source::SQLITE,matched_count,source_description);
+      }else if(source_order[i]=="raw"){
+        loaded=setDEEDFromEntries(aflowlib::EntryLoader::Source::FILESYSTEM_RAW,matched_count,source_description);
+      }
+
+      message << "DEED source " << source_label << " outcome=" << (loaded?"usable":"unavailable");
+      message << "; valid compositions=" << matched_count;
+      if(!source_description.empty()){message << "; " << source_description;}
+      const bool optional_json_unavailable=(requested_source=="auto" && source_order[i]=="json" && !loaded);
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,(loaded || optional_json_unavailable)?_LOGGER_MESSAGE_:_LOGGER_WARNING_);
+      message.str("");
+
+      if(loaded){
+        if(requested_source!="auto"){
+          message << "Selected DEED input source=" << source_label;
+          if(!source_description.empty()){message << "; location=" << source_description;}
+          message << "; valid compositions=" << matched_count << "; mode=explicit";
+          message << "; candidate lists retained only from selected source";
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+          writeDEEDJSON();
+          return;
+        }
+        if(!best_loaded || matched_count>best_matched_count){
+          best_loaded=true;
+          best_matched_count=matched_count;
+          best_source_label=source_label;
+          best_source_description=source_description;
+          best_deed_state=m_deed_coord_groups;
+          tied_source_labels.clear();
+        }else if(matched_count==best_matched_count){
+          tied_source_labels.push_back(source_label);
+        }
+        continue;
+      }
+
+      if(!source_description.empty()){
+        failure_messages.push_back(source_order[i]+": "+source_description);
+      }else{
+        failure_messages.push_back(source_order[i]+": no usable DEED data found");
+      }
+    }
+
+    if(best_loaded){
+      // Restore only the winning backend snapshot; candidates never merge across sources.
+      m_deed_coord_groups=best_deed_state;
+      message << "Selected DEED input source=" << best_source_label;
+      if(!best_source_description.empty()){message << "; location=" << best_source_description;}
+      message << "; valid compositions=" << best_matched_count << "; mode=auto";
+      message << "; candidate lists retained only from selected source";
+      if(!tied_source_labels.empty()){
+        message << "; tie resolved by priority JSON, SQLite, RAW: retained " << best_source_label;
+        message << " over " << aurostd::joinWDelimiter(tied_source_labels,", ");
+      }
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      writeDEEDJSON();
+      return;
+    }
+
+    message << "No DEED source selected (" << aurostd::joinWDelimiter(failure_messages,"; ") << ")";
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
   }
 
   void ConvexHull::calculate(){
@@ -7490,7 +9272,7 @@ namespace chull {
       }else{
         stringstream message;
         message << "Entry (auid=" << entry.auid << ") is ill-defined: vspecies.size()!=vcomposition.size()";
-        message << " (please report on AFLOW Forum: aflow.org/forum)";
+        message << " (please report it to the developers at https://s4e.ai)";
         pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
         return entry.compound;
       }
@@ -7573,7 +9355,7 @@ namespace chull {
     if(entry.prototype.empty()) {
       stringstream message;
       message << "Entry (auid=" << entry.auid << ") is ill-defined: empty prototype";
-      message << " (please report on AFLOW Forum: aflow.org/forum)";
+      message << " (please report it to the developers at https://s4e.ai)";
       pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, m_aflags, *p_FileMESSAGE, *p_oss, _LOGGER_WARNING_);
       return entry.prototype;
     }
@@ -7694,6 +9476,20 @@ namespace chull {
   //[CO20190419 - moved to aurostd_main.cpp]  return output;
   //[CO20190419 - moved to aurostd_main.cpp]}
 
+  double ConvexHull::getPlotColumnValue(const ChullPoint& point,const string& column_header) const {
+    for(uint i=0,fl_size_i=m_velements.size();i<fl_size_i;i++){
+      if(column_header==m_velements[i]){
+        if((int)i+point.s_coords.lrows>point.s_coords.urows){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Stoichiometry index out of range");}
+        return point.s_coords[(int)i+point.s_coords.lrows];
+      }
+    }
+    if(column_header=="H_f_meVatom"){return chull::H_f_atom(point,_m_);}
+    if(column_header=="H_f_kJmol"){return meVatom2kJmol*chull::H_f_atom(point,_m_);}
+    if(column_header=="T_S"){return chull::T_S(point);}
+    if(column_header=="Dist2hull"){return point.getDist2Hull(_m_);}
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Input column_header mode out of scope ("+column_header+")");
+  }
+
   string ConvexHull::getPlotHeaderPDF(char function_mode,const string& column_header,bool display_color_gradient) const {
     // produces addplot latex string
     stringstream message;
@@ -7757,17 +9553,6 @@ namespace chull {
         addplot_output_ss << "solid," << endl;
         if(dimension == 3) {addplot_output_ss << "line width=2pt," << endl;}
       }
-      addplot_output_ss << "] table ";
-      if(dimension == 2) {
-        if(reverse_axes){addplot_output_ss << "[x=" << m_velements[0];}
-        else{addplot_output_ss << "[x=" << m_velements[1];}
-        addplot_output_ss << ",y=" << column_header;
-        addplot_output_ss << "]";
-      }else{  // dimension==3
-        addplot_output_ss << "[x=" << m_velements[1];
-        addplot_output_ss << ",y=" << m_velements[0];
-        addplot_output_ss << ",z=" << m_velements[2] << "]";  // flipping x and y
-      }
     }else{  // function_mode==ADDPLOT_MODE_HULL_POINTS||function_mode==ADDPLOT_MODE_OFF_HULL_POINTS||function_mode==ADDPLOT_MODE_HEAT_MAPS
       if(function_mode == ADDPLOT_MODE_HEAT_MAPS) {
         addplot_output_ss << "patch," << endl;
@@ -7800,27 +9585,13 @@ namespace chull {
         if(function_mode == ADDPLOT_MODE_HULL_POINTS) {addplot_output_ss << "mark options={draw=black,fill=blue,solid}," << endl;}
         else{addplot_output_ss << ",draw=red}," << endl;}// function_mode==ADDPLOT_MODE_OFF_HULL_POINTS
       }
-      addplot_output_ss << "] table ";
-      if(dimension == 2) {
-        if(reverse_axes){addplot_output_ss << "[x=" << m_velements[0];}
-        else{addplot_output_ss << "[x=" << m_velements[1];}
-        addplot_output_ss << ",y=" << column_header;
-        addplot_output_ss << "]";
-      }else{  // dimension==3
-        addplot_output_ss << "[x=" << m_velements[1];
-        addplot_output_ss << ",y=" << m_velements[0];
-        addplot_output_ss << ",z=" << m_velements[2] << "]";  // flipping x and y
-      }
     }
-    addplot_output_ss << "{" << endl;
-    for(uint i=0,fl_size_i=m_velements.size();i<fl_size_i;i++){addplot_output_ss << aurostd::PaddedPOST(m_velements[i], 30);}
-    addplot_output_ss << aurostd::PaddedPOST("H_f_meVatom", 30);
-    addplot_output_ss << aurostd::PaddedPOST("H_f_kJmol", 30);
-    addplot_output_ss << aurostd::PaddedPOST("T_S", 30);
-    if(PRINT_DIST2HULL_COL_TEX){
-      addplot_output_ss << aurostd::PaddedPOST("Dist2hull", 30);
-    }
-    addplot_output_ss << endl;
+    std::vector<string> plot_columns=m_velements;
+    plot_columns.push_back("H_f_meVatom");
+    plot_columns.push_back("H_f_kJmol");
+    plot_columns.push_back("T_S");
+    if(PRINT_DIST2HULL_COL_TEX){plot_columns.push_back("Dist2hull");}
+    addplot_output_ss << ChullPlotTableWriter::beginTable(ChullPlotTableWriter::getAxes(m_velements,dimension,column_header,reverse_axes),plot_columns);
 
     return addplot_output_ss.str();
   }
@@ -7829,47 +9600,32 @@ namespace chull {
     bool LDEBUG = (FALSE || XHOST.DEBUG);
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " starting" << endl;}
 
-    // initializations
-    stringstream addplot_output_ss;
-    // no precision
+    std::vector<string> values;
     stringstream num_ss;
 
-    // explicit dimensions
-    for(int i=point.s_coords.lrows;i<=point.s_coords.urows;i++) {
-      addplot_output_ss << aurostd::PaddedPOST(aurostd::utype2string(point.s_coords[i],FULL_PRECISION), 30);
+    for(int i=point.s_coords.lrows;i<=point.s_coords.urows;i++){
+      values.push_back(aurostd::utype2string(point.s_coords[i],FULL_PRECISION));
     }
-    // enthalpy of formation, row 4
-    // fix for unaries, set to 0
-    if((zero_end_point && point.isUnary()) || !point.m_has_entry) {  // IMPORTANT, these must go through 0
-      // no need for precision for next few columns, leave it same way as received from AFLOW
-      addplot_output_ss << aurostd::PaddedPOST(0, 30); //aurostd::PaddedPOST(aurostd::utype2string(0.0,CHULL_PRECISION,false,ROUNDOFF_TOL,FIXED_STREAM), 30);
-      //H_f but in units of kJ/mol, row 5
-      addplot_output_ss << aurostd::PaddedPOST(0, 30); //aurostd::PaddedPOST(aurostd::utype2string(0.0,CHULL_PRECISION,false,ROUNDOFF_TOL,FIXED_STREAM), 30);
-      // entropic temperature, row 6
-      addplot_output_ss << aurostd::PaddedPOST(0, 30); //aurostd::PaddedPOST(aurostd::utype2string(0.0,CHULL_PRECISION,false,ROUNDOFF_TOL,FIXED_STREAM), 30);
+    if((zero_end_point && point.isUnary()) || !point.m_has_entry){
+      values.push_back("0");
+      values.push_back("0");
+      values.push_back("0");
     }else{
-      // no need for precision for next few columns, leave it same way as received from AFLOW
-      num_ss << chull::H_f_atom(point, _m_);
-      addplot_output_ss << aurostd::PaddedPOST(num_ss.str(), 30);
+      num_ss << getPlotColumnValue(point,"H_f_meVatom");
+      values.push_back(num_ss.str());
       num_ss.str("");
-      //H_f but in units of kJ/mol, row 5
-      num_ss << meVatom2kJmol * chull::H_f_atom(point, _m_);
-      addplot_output_ss << aurostd::PaddedPOST(num_ss.str(), 30);
+      num_ss << getPlotColumnValue(point,"H_f_kJmol");
+      values.push_back(num_ss.str());
       num_ss.str("");
-      // entropic temperature, row 6
-      num_ss << chull::T_S(point);
-      addplot_output_ss << aurostd::PaddedPOST(num_ss.str(), 30);
+      num_ss << getPlotColumnValue(point,"T_S");
+      values.push_back(num_ss.str());
       num_ss.str("");
     }
     if(PRINT_DIST2HULL_COL_TEX){
-      // dist_2_hull, row 7
-      if(zero_dist_2_hull) {addplot_output_ss << aurostd::PaddedPOST(0, 30);} //aurostd::PaddedPOST(aurostd::utype2string(0.0,CHULL_PRECISION,false,ROUNDOFF_TOL,FIXED_STREAM), 30);
-      else{addplot_output_ss << aurostd::PaddedPOST(aurostd::utype2string(point.getDist2Hull(_m_),CHULL_PRECISION), 30);}
+      values.push_back(zero_dist_2_hull?"0":aurostd::utype2string(getPlotColumnValue(point,"Dist2hull"),CHULL_PRECISION));
     }
-    // end line
-    addplot_output_ss << endl;
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " done" << endl;}
-    return addplot_output_ss.str();
+    return ChullPlotTableWriter::formatRow(values);
   }
 
   string ConvexHull::getNodeCoordPosition(const ChullPoint& point) const {
@@ -8066,7 +9822,6 @@ namespace chull {
     if(ftype==txt_ft || ftype==json_ft){headers+=(!headers.empty()?string(","):string(""))+"stability_criterion_relative";}
     if(ftype==txt_ft || ftype==json_ft){headers+=(!headers.empty()?string(","):string(""))+"N+1_enthalpy_gain";}
     if(ftype==txt_ft || ftype==json_ft){headers+=(!headers.empty()?string(","):string(""))+"entropy_stabilization_coefficient";}
-
     return headers;
   }
 
@@ -8318,9 +10073,9 @@ namespace chull {
     bool latex_interactive_mode=m_cflags.flag("CHULL::LATEX_INTERACTIVE");
 
     //FROM AFLOWRC
-    bool print_aflow_logo_full=_AFLOW_CHULL_PRINT_LOGO_1;  //otherwise print aflow_text
+    bool print_logo_1=_AFLOW_CHULL_PRINT_LOGO_1;  //otherwise print aflow_text
     bool print_aflow_text_logo=false;
-    if(print_aflow_logo_full&&print_aflow_text_logo){print_aflow_text_logo=false;}
+    if(print_logo_1&&print_aflow_text_logo){print_aflow_text_logo=false;}
     bool print_logo_2=_AFLOW_CHULL_PRINT_LOGO_2;
     bool print_aflow_webaddress_logo=true;
     if(print_logo_2&&print_aflow_webaddress_logo){print_aflow_webaddress_logo=false;}
@@ -8328,7 +10083,7 @@ namespace chull {
     bool no_banner=(banner_setting==0);
     bool small_banner=(banner_setting==2||image_only);
     if(no_banner&&small_banner){small_banner=false;}
-    if(small_banner&&(image_only||no_doc)){print_aflow_logo_full=print_logo_2=false;}
+    if(small_banner&&(image_only||no_doc)){print_logo_1=print_logo_2=false;}
     bool compounds_column_report=DEFAULT_CHULL_LATEX_COMPOUNDS_COLUMN;
     bool stoich_header_report=DEFAULT_CHULL_LATEX_STOICH_HEADER;
     bool plot_unaries=DEFAULT_CHULL_LATEX_PLOT_UNARIES;
@@ -8500,6 +10255,7 @@ namespace chull {
     stringstream equilibrium_phases_header_TEX_ss;
     stringstream reaction_chem_eq_TEX_ss;
     stringstream main_TEX_ss;
+    stringstream deed_page_TEX_ss;
     stringstream node_option_ss;
     stringstream node_position_ss;
     stringstream node_content_ss;
@@ -8520,9 +10276,9 @@ namespace chull {
     else{main_TEX_file = main_file + ".tex";}
     main_PDF_file = main_file + ".pdf";
     main_PNG_file = main_file + ".png";
-    string aflow_logo_full_file = "aflow_logo_full.pdf";
-    string aflow_logo_skinny_file = "aflow_logo_skinny.pdf";
-    string logo_file_2 = "logo2.png";
+    string s4e_logo_file = "s4e_logo.pdf";  //CO20261004 - S4E logo (it replaces the AFLOW logo)
+    string s4e_logo_skinny_file = "s4e_logo_skinny.pdf";  //CO20261004 - S4E letters alone (watermark)
+    string logo_file_2 = "chaos_logo.pdf";  //CO20261004 - CHAOS logo
     string DEFAULT_PLOT_COLUMN_HEADER = "";
     if(m_formation_energy_hull){DEFAULT_PLOT_COLUMN_HEADER="H_f_meVatom";}
     else{DEFAULT_PLOT_COLUMN_HEADER="T_S";}
@@ -8555,7 +10311,7 @@ namespace chull {
     }
 
     string MARGIN_PICTURE="includeheadfoot,headheight=16pt,margin=0.5in"; //do not make margin any smaller, will screw up fancyheaders elsewhere
-    string MARGIN_REPORT="includeheadfoot,headheight="+(print_aflow_logo_full?string("70"):string("50"))+
+    string MARGIN_REPORT="includeheadfoot,headheight="+(print_logo_1?string("70"):string("50"))+
       "pt,headsep=0.1in,top=0.5in,bottom=0.75in,left="+aurostd::utype2string(LATEX_LEFT_MARGIN_LETTER_STD)+"in,right="+aurostd::utype2string(LATEX_RIGHT_MARGIN_LETTER_STD)+"in,footskip=0.5in";
 
     string headers=getPointsPropertyHeaderList(latex_ft);
@@ -8922,6 +10678,18 @@ namespace chull {
       ////////////////////////////////////////////////////////////////////////////
     }
 
+    bool has_ternary_deed_data=false;
+    if(dimension==3 && m_cflags.flag("CHULL::PRINT_DEED")){
+      for(uint i=0,fl_size_i=m_deed_coord_groups.size();i<fl_size_i;i++){
+        if(m_deed_coord_groups[i].m_initialized && m_deed_coord_groups[i].m_has_stoich_coords &&
+           m_deed_coord_groups[i].getDim()==dimension && m_deed_coord_groups[i].canReportDEED()){
+          has_ternary_deed_data=true;
+          break;
+        }
+      }
+    }
+    bool render_deed_page=(!m_cflags.flag("CHULL::DOC_ONLY") && dimension==3 && !image_only && m_cflags.flag("CHULL::PRINT_DEED") && has_ternary_deed_data);
+
     //links options
     int links_setting=DEFAULT_CHULL_LATEX_LINKS;
     bool kill_all_links=(links_setting==0);       //no links whatsoever
@@ -9032,11 +10800,11 @@ namespace chull {
       _doc_header_TEX_ss << "\\fancyhf{}" << " \%HEADER" << endl;
       if(!(small_banner || no_banner)){
         _doc_header_TEX_ss << "\\fancyhead[C]{" << " \%HEADER" << endl;
-        if(print_aflow_logo_full||print_aflow_text_logo){
+        if(print_logo_1||print_aflow_text_logo){
           _doc_header_TEX_ss << "\\begin{textblock}{0.1}[0.5,1.0](0.09,0.95){\\rotatebox{90}{";
-          if(!print_aflow_logo_full){_doc_header_TEX_ss << "\\shortstack[l]{";}
-          if(external_links) {_doc_header_TEX_ss << "\\href{http://aflow.org}";}
-          if(print_aflow_logo_full) {_doc_header_TEX_ss << "{\\includegraphics[scale=0.2]{" << aflow_logo_full_file << "}}";}
+          if(!print_logo_1){_doc_header_TEX_ss << "\\shortstack[l]{";}
+          if(external_links) {_doc_header_TEX_ss << "\\href{https://s4e.ai}";}
+          if(print_logo_1) {_doc_header_TEX_ss << "{\\includegraphics[scale=0.08]{" << s4e_logo_file << "}}";}  //CO20261004 - S4E logo, letters as tall as the CHAOS logo's (a third of its scale)
           else{
             _doc_header_TEX_ss << "{\\LARGE AFLOW V" << string(AFLOW_VERSION) << "}";
             _doc_header_TEX_ss << "\\\\";
@@ -9049,11 +10817,11 @@ namespace chull {
         if(print_logo_2||print_aflow_webaddress_logo){
           _doc_header_TEX_ss << "\\begin{textblock}{0.1}[0.5,0.0](0.09,0.05){\\rotatebox{90}{";
           if(print_logo_2){
-            if(external_links) {_doc_header_TEX_ss << "\\href{http://www.nomad-coe.eu/}";}
-            _doc_header_TEX_ss << "{\\includegraphics[scale=0.1]{" << logo_file_2 << "}}";
+            if(external_links) {_doc_header_TEX_ss << "\\href{" << CHAOS_WEB << "}";}
+            _doc_header_TEX_ss << "{\\includegraphics[scale=0.24]{" << logo_file_2 << "}}";  //CO20261004 - CHAOS logo, letters as tall as the S4E logo's
           }else{  //print_aflow_webaddress_logo
-            if(external_links) {_doc_header_TEX_ss << "\\href{http://aflow.org}";}
-            _doc_header_TEX_ss << "{" << label_image_font_size << "{\\fontfamily{\\sfdefault}\\selectfont{aflow.org}}}";  //\\fontfamily{\\phv}\\selectfont
+            if(external_links) {_doc_header_TEX_ss << "\\href{https://s4e.ai}";}
+            _doc_header_TEX_ss << "{" << label_image_font_size << "{\\fontfamily{\\sfdefault}\\selectfont{s4e.ai}}}";  //\\fontfamily{\\phv}\\selectfont
           }
           _doc_header_TEX_ss << "}}\\end{textblock}" << " \%HEADER" << endl;
         }
@@ -9079,9 +10847,9 @@ namespace chull {
       _doc_header_TEX_ss << "@{}L{" << tableheaderone_colsize << "in}";
       if(print_logo_2){_doc_header_TEX_ss << "@{}C{" << tableheaderone_colsize << "in}";}
       _doc_header_TEX_ss << "@{}R{" << tableheaderone_colsize << "in}@{}}" << " \%HEADER" << endl;
-      if(!print_aflow_logo_full){_doc_header_TEX_ss << "\\shortstack[l]{";}
-      if(external_links) {_doc_header_TEX_ss << "\\href{" << AFLOW_WEB << "}";}
-      if(print_aflow_logo_full) {_doc_header_TEX_ss << "{\\raisebox{-.5\\height}{\\includegraphics[scale=0.25]{" << aflow_logo_full_file << "}}}";}
+      if(!print_logo_1){_doc_header_TEX_ss << "\\shortstack[l]{";}
+      if(external_links) {_doc_header_TEX_ss << "\\href{https://s4e.ai}";}  //CO20261004 - as in the banner
+      if(print_logo_1) {_doc_header_TEX_ss << "{\\raisebox{-.5\\height}{\\includegraphics[scale=0.1]{" << s4e_logo_file << "}}}";}  //CO20261004 - S4E logo, letters as tall as the CHAOS logo's (a third of its scale)
       else{
         _doc_header_TEX_ss << "{\\LARGE AFLOW V" << string(AFLOW_VERSION) << "}";
         _doc_header_TEX_ss << "\\\\";
@@ -9090,8 +10858,8 @@ namespace chull {
       }
       _doc_header_TEX_ss << " & ";
       if(print_logo_2){
-        if(external_links) {_doc_header_TEX_ss << "\\href{" << NOMAD_WEB << "}";}
-        _doc_header_TEX_ss << "{\\raisebox{-.5\\height}{\\includegraphics[scale=0.125]{" << logo_file_2 << "}}}";
+        if(external_links) {_doc_header_TEX_ss << "\\href{" << CHAOS_WEB << "}";}
+        _doc_header_TEX_ss << "{\\raisebox{-.5\\height}{\\includegraphics[scale=0.3]{" << logo_file_2 << "}}}";  //CO20261004 - CHAOS logo, letters as tall as the S4E logo's
         _doc_header_TEX_ss << " & ";
       }
       //include small redundant header - START
@@ -9146,26 +10914,7 @@ namespace chull {
       // START More header commands specific to tikz pic
       ////////////////////////////////////////////////////////////////////////////
 
-      doc_header_TEX_ss << "\\usepackage{pgfplots}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\usepackage{pdflscape}" << " \%HEADER" << endl;
-      //[MOVED UP]doc_header_TEX_ss << "\\usepackage{array} \%m" << " \%HEADER" << endl;  %brackets
-      //[MOVED UP]doc_header_TEX_ss << "\\usepackage{setspace} \%setstretch linespacing" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\pgfplotsset{compat=1.10}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\usepgfplotslibrary{ternary,units}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\usetikzlibrary{decorations.pathmorphing,pgfplots.units,backgrounds}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\usepackage{tikz}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\usetikzlibrary{positioning}" << " \%HEADER" << endl;
-
-      if(dimension == 3) {
-        doc_header_TEX_ss << "\\usetikzlibrary{pgfplots.ternary}" << " \%HEADER" << endl;
-      }
-      if(image_only) {
-        doc_header_TEX_ss << "\\pgfrealjobname{CHull}" << " \%HEADER" << endl;  // dummy name
-      }
-      doc_header_TEX_ss << "\\pgfdeclarelayer{background}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\pgfdeclarelayer{foreground}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\pgfsetlayers{background,main,foreground}" << " \%HEADER" << endl;
-      doc_header_TEX_ss << "\\AtBeginEnvironment{tikzpicture}{\\tracinglostchars=0\\relax}" << " \%HEADER" << endl; //CO20221111 - avoids printing dumb warnings
+      appendLatexPlotPackages(doc_header_TEX_ss,image_only,dimension);
 
       //[MOVED UP]doc_header_TEX_ss << "\\newcolumntype{L}[1]{>{\\raggedright\\arraybackslash}p{#1} }" << " \%HEADER" << endl;
       //[MOVED UP]doc_header_TEX_ss << "\\newcolumntype{C}[1]{>{\\centering  \\arraybackslash}p{#1} }" << " \%HEADER" << endl;
@@ -9365,40 +11114,7 @@ namespace chull {
         //  common_settings_TEX_ss << "ymax=" << ymax << "," << endl;
         //}
       }
-      common_settings_TEX_ss << "clip=false," << endl;  // for labels
-
-      double image_width=19;
-      if(dimension==3){image_width=17;}
-      common_settings_TEX_ss << "width=" << image_width << "cm," << endl;
-
-      //hsize is not well defined, especially for image only
-      //double image_height_proportion=0.65;
-      //if(dimension==3){image_height_proportion=1.0;}
-      //string image_height_str=aurostd::utype2string(image_height_proportion)+"\\hsize";  //better to define in terms of page, since this is what we are confined to
-      //better to use cm
-      double image_width_proportion=0.8;                //approx 15cm given 19cm width
-      if(dimension==3){image_width_proportion=1.2;}     //approx 20cm given 17cm width
-      common_settings_TEX_ss << "height=" << image_width_proportion*image_width << "cm," << endl;
-
-      if(dimension==3){common_settings_TEX_ss << "axis line style={line width=3pt}," << endl;}
-      //if(dimension == 2) {common_settings_TEX_ss << 20;}
-      //else{  // dimension==3
-      //  //CO change me if we see otherwise
-      //  //if(include_color_bar) {
-      //  //  if(image_only) {common_settings_TEX_ss << 21;}
-      //  //  else{common_settings_TEX_ss << 17;}  // only time we change size
-      //  //}else{common_settings_TEX_ss << 21;}
-      //}
-      //common_settings_TEX_ss << "cm," << endl;
-      //if(dimension == 2) {
-      //  if(image_only) {common_settings_TEX_ss << "height=0.8\\hsize," << endl;}
-      //  else{common_settings_TEX_ss << "height=0.55\\hsize," << endl;}
-      //}else{
-      //  common_settings_TEX_ss << "height=\\hsize," << endl;
-      //  common_settings_TEX_ss << "axis line style={line width=3pt}," << endl;
-      //}
-      common_settings_TEX_ss << "grid=none," << endl;
-      common_settings_TEX_ss << "axis on top," << endl;  // prevents heat map overlap issues
+      appendLatexAxisCommonSettings(common_settings_TEX_ss,dimension);
 
       ////////////////////////////////////////////////////////////////////////////
       // START Axis
@@ -9519,7 +11235,7 @@ namespace chull {
           if(!plot_unaries && isViableGState(g_state)) {
             if(internal_links_graph2report) {
               pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-            }else if(no_doc && external_links) {
+            }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
               pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
             }
           }
@@ -9585,7 +11301,7 @@ namespace chull {
         if(!plot_unaries && isViableGState(g_state)) {
           if(internal_links_graph2report) {
             pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-          }else if(no_doc && external_links) {
+          }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
             pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
           }
         }
@@ -9597,7 +11313,7 @@ namespace chull {
         if(!plot_unaries && isViableGState(g_state)) {
           if(internal_links_graph2report) {
             pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-          }else if(no_doc && external_links) {
+          }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
             pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
           }
         }
@@ -9622,7 +11338,7 @@ namespace chull {
               if(!plot_unaries && isViableGState(g_state)) {
                 if(internal_links_graph2report) {
                   pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-                }else if(no_doc && external_links) {
+                }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
                   pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
                 }
               }
@@ -9635,7 +11351,7 @@ namespace chull {
               if(!plot_unaries && isViableGState(g_state)) {
                 if(internal_links_graph2report) {
                   pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-                }else if(no_doc && external_links) {
+                }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
                   pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
                 }
               }
@@ -9648,7 +11364,7 @@ namespace chull {
               if(!plot_unaries && isViableGState(g_state)) {
                 if(internal_links_graph2report) {
                   pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-                }else if(no_doc && external_links) {
+                }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
                   pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
                 }
               }
@@ -9766,7 +11482,7 @@ namespace chull {
                 //else{
                 node_position_ss << "axis cs:1,0,0";
                 //}
-                node_content_ss << "\\includegraphics[scale=0.25]{" << aflow_logo_skinny_file << "}";
+                node_content_ss << "\\includegraphics[scale=0.08]{" << s4e_logo_skinny_file << "}";  //CO20261004 - same scale as the watermark
                 pseudo_preliminary_axes_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
               }
               if(small_banner)  //image_only)
@@ -9796,7 +11512,7 @@ namespace chull {
         if(!plot_unaries && isViableGState(g_state)) {
           if(internal_links_graph2report) {
             pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-          }else if(no_doc && external_links) {
+          }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
             pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
           }
         }
@@ -9809,7 +11525,7 @@ namespace chull {
         if(!plot_unaries && isViableGState(g_state)) {
           if(internal_links_graph2report) {
             pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-          }else if(no_doc && external_links) {
+          }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
             pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
           }
         }
@@ -9822,7 +11538,7 @@ namespace chull {
         if(!plot_unaries && isViableGState(g_state)) {
           if(internal_links_graph2report) {
             pseudo_preliminary_axes_TEX_ss << "\\hyperrefTitle{" << input << "_" << m_points[g_state].m_entry.auid << "}";
-          }else if(no_doc && external_links) {
+          }else if(no_doc && external_links && m_points[g_state].isMaterialPageAvailable()) {
             pseudo_preliminary_axes_TEX_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << m_points[g_state].m_entry.auid << "}";
           }
         }
@@ -10142,7 +11858,7 @@ namespace chull {
             // get node content
             node_content_ss << "\\tiny";
             node_content_ss << "{";
-            if(no_doc && external_links) {node_content_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << entry.auid << "}";}
+            if(no_doc && external_links && m_points[plot_points[i]].isMaterialPageAvailable()) {node_content_ss << "\\href{" << ENTRY_PAGE_URL_PREFIX << entry.auid << "}";}
             else{
               //uint i_coord_group;
               if(getCoordGroupIndex(point,i_coord_group)){
@@ -10451,48 +12167,48 @@ namespace chull {
           ////top left
           //node_option_ss << "opacity=" << opacity_watermark;
           //node_position_ss << "axis cs:0.1," << ymin*0.05;
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           ////top right
           //node_option_ss << "opacity=" << opacity_watermark;
           //node_position_ss << "axis cs:0.9," << ymin*0.05;
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           ////bottom left
           //node_option_ss << "opacity=" << opacity_watermark;
           //node_position_ss << "axis cs:0.1," << ymin*0.95;
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           //bottom right
           //node_option_ss << "opacity=" << opacity_watermark;
           //node_position_ss << "axis cs:0.9," << ymin*0.95;
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           ////center
           //node_option_ss << "opacity=" << opacity_watermark;
           //node_position_ss << "axis cs:0.5," << ymin*0.5;
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           //node_position_ss << "axis cs:0.125," << ymin*0.95;
           node_option_ss << "opacity=" << opacity_watermark << ",anchor=south west";
           node_position_ss << "axis cs:0," << ymin;
-          node_content_ss << "\\includegraphics[scale=0.25]{" << aflow_logo_skinny_file << "}";
+          node_content_ss << "\\includegraphics[scale=0.08]{" << s4e_logo_skinny_file << "}";  //CO20261004 - S4E letters, as tall as in the banner
           tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
         }else{  //dimension==3
           //// / side
           //node_option_ss << "opacity=" << opacity_watermark << ",rotate=60,anchor=south";
           //node_position_ss << "axis cs:0.5,0.5,0";
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           //// \ side
           //node_option_ss << "opacity=" << opacity_watermark << ",rotate=-60,anchor=south";
           //node_position_ss << "axis cs:0.5,0,0.5";
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           //// _ side
           //node_option_ss << "opacity=" << opacity_watermark << ",anchor=north";
           //node_position_ss << "axis cs:0,0.5,0.5";
-          //node_content_ss << "\\includegraphics[scale=0.15]{" << aflow_logo_skinny_file << "}";
+          //node_content_ss << "\\includegraphics[scale=0.15]{" << s4e_logo_skinny_file << "}";
           //tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
           //node_position_ss << "axis cs:0,0.5,0.5";
           //node_option_ss << ",shift={(0in,-1in)}";
@@ -10507,7 +12223,7 @@ namespace chull {
             node_option_ss << "opacity=" << opacity_watermark << ",shift={(-" << watermark_x_shift << ",0cm)},anchor=north"; // << ",anchor=north west";
             node_position_ss << "axis cs:1,0,0";
           }
-          node_content_ss << "\\includegraphics[scale=0.25]{" << aflow_logo_skinny_file << "}";
+          node_content_ss << "\\includegraphics[scale=0.08]{" << s4e_logo_skinny_file << "}";  //CO20261004 - S4E letters, as tall as in the banner
           tikzpic_TEX_ss << nodeCreator(node_option_ss, node_position_ss, node_content_ss);
         }
         if(small_banner) //image_only) //note: this must also be added to pseudo_preliminary_axes_TEX_ss for proper padding (color bar), ONLY AFFECTS 3D
@@ -10570,7 +12286,7 @@ namespace chull {
       //    
       //    if(!small_banner) {
       //      // get node option
-      //      if(print_aflow_logo_full) {
+      //      if(print_logo_1) {
       //        if(image_only) {
       //          if(print_logo_2){node_option_ss << "shift={(2.75cm,0.75cm)}";}  //DONE
       //          else{node_option_ss << "shift={(2.75cm,0.5cm)}";} //DONE
@@ -10582,9 +12298,9 @@ namespace chull {
       //      // get node position
       //      node_position_ss << "current bounding box.north west";
       //      // get node content
-      //      if(print_aflow_logo_full) {
+      //      if(print_logo_1) {
       //        if(external_links) {node_content_ss << "\\href{" << AFLOW_WEB << "}";}
-      //        node_content_ss << "{\\includegraphics[scale=0.2]{" << aflow_logo_full_file << "}}";
+      //        node_content_ss << "{\\includegraphics[scale=0.2]{" << s4e_logo_file << "}}";
       //      }else{
       //        node_content_ss << "\\shortstack[l]{";
       //        if(external_links) {node_content_ss << "\\href{" << AFLOW_WEB << "}";}
@@ -10603,16 +12319,16 @@ namespace chull {
       //
       //    ////////////////////////////////////////////////////////////////////////
       //    // START AFLOW.org on top right
-      //    // nomad logo too
+      //    // chaos logo too
       //    ////////////////////////////////////////////////////////////////////////
       //
       //    // get node option
       //    if(image_only){
       //      if(!small_banner&&print_logo_2){
-      //        if(print_aflow_logo_full){node_option_ss << "shift={(-2cm,-0.5cm)}";} //1
+      //        if(print_logo_1){node_option_ss << "shift={(-2cm,-0.5cm)}";} //1
       //        else{node_option_ss << "shift={(-2cm,-0.75cm)}";}   //2
       //      }else{
-      //        if(print_aflow_logo_full){
+      //        if(print_logo_1){
       //          if(!small_banner) {node_option_ss << "shift={(-2cm,-1.0cm)}";} //3
       //          else{node_option_ss << "shift={(-2cm,0.75cm)}";} //4
       //        }else{node_option_ss << "shift={(-2cm,-0.75cm)}";}  //5
@@ -10622,7 +12338,7 @@ namespace chull {
       //    node_position_ss << "current bounding box.north east";
       //    // get node content
       //    if(!small_banner&&print_logo_2){
-      //      if(external_links) {node_content_ss << "\\href{" << NOMAD_WEB << "}";}
+      //      if(external_links) {node_content_ss << "\\href{" << CHAOS_WEB << "}";}
       //      node_content_ss << "{\\includegraphics[scale=0.1]{" << logo_file_2 << "}}";
       //    }else{
       //      node_content_ss << "\\large";
@@ -10688,7 +12404,7 @@ namespace chull {
       //      // get node option
       //      node_content_ss << "\\shortstack[l]{";
       //      if(include_color_bar) {
-      //        if(print_aflow_logo_full) {
+      //        if(print_logo_1) {
       //          if(image_only){node_option_ss << "shift={(3.75cm,-2.5cm)}";}
       //          else{node_option_ss << "shift={(3.25cm,-1.0cm)}";}
       //        }else{
@@ -10696,7 +12412,7 @@ namespace chull {
       //          else{node_option_ss << "shift={(3.25cm,-1.25cm)}";}
       //        }
       //      }else{
-      //        if(print_aflow_logo_full) {
+      //        if(print_logo_1) {
       //          if(image_only){node_option_ss << "shift={(3.25cm,-2.25cm)}";}
       //          else{node_option_ss << "shift={(2.25cm,-1.5cm)}";}
       //        }else{
@@ -10707,9 +12423,9 @@ namespace chull {
       //      // get node position
       //      node_position_ss << "current bounding box.north west";
       //      // get node content
-      //      if(print_aflow_logo_full) {
+      //      if(print_logo_1) {
       //        if(external_links) {node_content_ss << "\\href{" << AFLOW_WEB << "}";}
-      //        node_content_ss << "{\\includegraphics[scale=0.25]{" << aflow_logo_full_file << "}}";
+      //        node_content_ss << "{\\includegraphics[scale=0.25]{" << s4e_logo_file << "}}";
       //      }else{
       //        if(external_links) {node_content_ss << "\\href{" << AFLOW_WEB << "}";}
       //        node_content_ss << "{\\LARGE AFLOW V" << string(AFLOW_VERSION) << "}";
@@ -10732,7 +12448,7 @@ namespace chull {
       //
       //    ////////////////////////////////////////////////////////////////////////
       //    // START AFLOW.org on top right
-      //    // nomad logo too
+      //    // chaos logo too
       //    ////////////////////////////////////////////////////////////////////////
       //
       //    // get node option
@@ -10786,9 +12502,426 @@ namespace chull {
     }else{
       // make sure to add this in
       doc_header_TEX_ss << "\\usepackage{graphicx}  \%HEADER" << endl;
+      if(render_deed_page){appendLatexPlotPackages(doc_header_TEX_ss,image_only,dimension);}
       // contains begin{document}, which needs to go in sooner
       doc_header_TEX_ss << _doc_header_TEX_ss.str();
       _doc_header_TEX_ss.str("");
+    }
+
+    if(render_deed_page){
+      const int deed_approx_num_ticks=5;
+      const double deed_unary_distance_axis_3D=0.25;
+      DEEDPlotConfig deed_plot_config;
+      std::string deed_plot_directory=chull::getPath(m_cflags,*p_FileMESSAGE,*p_oss);
+      std::string deed_plot_config_path=deed_plot_directory+DEEDPlotConfig::getConfigFilename();
+      std::string deed_plot_guide_path=deed_plot_directory+DEEDPlotConfig::getGuideFilename();
+      bool create_deed_plot_config=!aurostd::FileExist(deed_plot_config_path);
+      bool create_deed_plot_guide=!aurostd::FileExist(deed_plot_guide_path);
+      if(create_deed_plot_config || create_deed_plot_guide){
+        deed_plot_config.writeFiles(deed_plot_directory,create_deed_plot_config,create_deed_plot_guide);
+        message.str("");
+        message << "Created DEED plot ";
+        if(create_deed_plot_config && create_deed_plot_guide){message << "config and guide files in " << deed_plot_directory;}
+        else if(create_deed_plot_config){message << "config file in " << deed_plot_directory;}
+        else{message << "guide file in " << deed_plot_directory;}
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      }
+
+      std::vector<std::string> deed_plot_config_warnings;
+      if(deed_plot_config.loadFile(deed_plot_config_path,deed_plot_config_warnings)){
+        message.str("");
+        message << "Loaded DEED plot config from " << deed_plot_config_path;
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      }
+      // Refresh documentation from the effective config without ever rewriting user settings.
+      deed_plot_config.writeFiles(deed_plot_directory,false,true);
+      for(uint i=0,fl_size_i=deed_plot_config_warnings.size();i<fl_size_i;i++){
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,deed_plot_config_warnings[i],m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+      }
+
+      DEEDPlotter deed_plotter(deed_plot_config,m_velements,m_points);
+      std::string normalized_interpolation_mode=deed_plot_config.getInterpolationMode();
+      std::string normalized_structure_symbol_key=deed_plot_config.getStructureSymbolKey();
+      std::string normalized_structure_marker_mode=deed_plot_config.getStructureMarkerMode();
+      double deed_min_point=AUROSTD_MAX_DOUBLE;
+      double deed_max_point=-AUROSTD_MAX_DOUBLE;
+      std::vector<DEEDPlotter::Composition> deed_compositions;
+      std::vector<DEEDPlotter::Marker> deed_markers;
+
+      for(uint i_coord_group=0,fl_size_i_coord_group=m_deed_coord_groups.size();i_coord_group<fl_size_i_coord_group;i_coord_group++){
+        const CoordGroup& coord_group=m_deed_coord_groups[i_coord_group];
+        if(!coord_group.m_initialized || !coord_group.m_has_stoich_coords || coord_group.getDim()!=dimension){continue;}
+        if(!coord_group.canReportDEED()){continue;}
+
+        // A DEED datum belongs to the composition ensemble, not to one CHULL point.
+        // Build the plot sample first so parentless POCC ensembles still receive a marker.
+        DEEDPlotter::Composition deed_composition;
+        deed_composition.stoich=coord_group.getStoichiometry();
+        if((uint)deed_composition.stoich.rows!=m_velements.size()){continue;}
+        deed_composition.deed=coord_group.getDEED();
+
+        vector<uint> representative_points;
+        if(normalized_structure_marker_mode=="all_structures"){
+          for(uint i=0,fl_size_i=coord_group.m_points.size();i<fl_size_i;i++){
+            uint i_point=coord_group.m_points[i];
+            if(i_point<m_points.size() && m_points[i_point].m_initialized && m_points[i_point].m_has_entry && !m_points[i_point].m_is_artificial){
+              representative_points.push_back(i_point);
+            }
+          }
+        }else{
+          uint representative=coord_group.getDEEDPointIndex();
+          if(representative>=m_points.size() || !m_points[representative].m_initialized || !m_points[representative].m_has_entry || m_points[representative].m_is_artificial){
+            representative=AUROSTD_MAX_UINT;
+            // Prefer a real POCC parent, then the best available child/structure.
+            for(uint i=0,fl_size_i=coord_group.m_points.size();i<fl_size_i;i++){
+              uint candidate=coord_group.m_points[i];
+              if(candidate>=m_points.size() || !m_points[candidate].m_initialized || !m_points[candidate].m_has_entry || m_points[candidate].m_is_artificial){continue;}
+              if(m_points[candidate].m_entry.isPoccParent()){representative=coord_group.selectCloserDEEDPoint(representative,candidate,m_points);}
+            }
+            if(representative==AUROSTD_MAX_UINT){
+              for(uint i=0,fl_size_i=coord_group.m_points.size();i<fl_size_i;i++){
+                uint candidate=coord_group.m_points[i];
+                if(candidate>=m_points.size() || !m_points[candidate].m_initialized || !m_points[candidate].m_has_entry || m_points[candidate].m_is_artificial){continue;}
+                representative=coord_group.selectCloserDEEDPoint(representative,candidate,m_points);
+              }
+            }
+          }
+          if(representative<m_points.size()){representative_points.push_back(representative);}
+        }
+
+        DEEDPlotter::Marker best_coord_group_marker;
+        bool best_coord_group_marker_set=false;
+        std::map<std::string,DEEDPlotter::Marker> best_markers_by_structure;
+        for(uint i=0,fl_size_i=representative_points.size();i<fl_size_i;i++){
+          uint i_point_candidate=representative_points[i];
+          const ChullPoint& point_candidate=m_points[i_point_candidate];
+          std::string structure_key=deed_plotter.getMarkerStructureKey(point_candidate,coord_group,normalized_structure_symbol_key,deed_composition.deed);
+          if(!deed_plotter.structureKeyIsInformative(structure_key)){structure_key="Unknown";}
+
+          DEEDPlotter::Marker deed_marker;
+          deed_marker.point_index=i_point_candidate;
+          deed_marker.stoich=deed_composition.stoich;
+          deed_marker.deed=deed_composition.deed;
+          deed_marker.structure_key=structure_key;
+
+          if(!best_coord_group_marker_set || deed_plotter.markerRanksHigher(deed_marker,best_coord_group_marker)){
+            best_coord_group_marker=deed_marker;
+            best_coord_group_marker_set=true;
+          }
+
+          std::map<std::string,DEEDPlotter::Marker>::iterator structure_marker_it=best_markers_by_structure.find(structure_key);
+          if(structure_marker_it==best_markers_by_structure.end() || deed_plotter.markerRanksHigher(deed_marker,structure_marker_it->second)){
+            best_markers_by_structure[structure_key]=deed_marker;
+          }
+        }
+
+        if(!best_coord_group_marker_set){
+          best_coord_group_marker.point_index=AUROSTD_MAX_UINT;
+          best_coord_group_marker.stoich=deed_composition.stoich;
+          best_coord_group_marker.deed=deed_composition.deed;
+          best_coord_group_marker.structure_key="Unknown";
+          best_coord_group_marker_set=true;
+          best_markers_by_structure[best_coord_group_marker.structure_key]=best_coord_group_marker;
+        }
+
+        deed_min_point=std::min(deed_min_point,deed_composition.deed);
+        deed_max_point=std::max(deed_max_point,deed_composition.deed);
+        deed_compositions.push_back(deed_composition);
+        if(normalized_structure_marker_mode=="all_structures"){
+          for(std::map<std::string,DEEDPlotter::Marker>::const_iterator it=best_markers_by_structure.begin();it!=best_markers_by_structure.end();++it){
+            deed_markers.push_back(it->second);
+          }
+        }else{
+          deed_markers.push_back(best_coord_group_marker);
+        }
+      }
+
+      if(!deed_compositions.empty()){
+        std::vector<std::string> deed_structure_key_list;
+        for(uint i=0,fl_size_i=deed_markers.size();i<fl_size_i;i++){
+          deed_structure_key_list.push_back(deed_markers[i].structure_key);
+        }
+        std::sort(deed_structure_key_list.begin(),deed_structure_key_list.end());
+        deed_structure_key_list.erase(std::unique(deed_structure_key_list.begin(),deed_structure_key_list.end()),deed_structure_key_list.end());
+        std::map<std::string,std::string> deed_symbol_map=deed_plotter.assignMarkerSymbols(deed_structure_key_list);
+        for(uint i=0,fl_size_i=deed_markers.size();i<fl_size_i;i++){
+          std::map<std::string,std::string>::const_iterator symbol_it=deed_symbol_map.find(deed_markers[i].structure_key);
+          if(symbol_it!=deed_symbol_map.end()){deed_markers[i].symbol=symbol_it->second;}
+          else{deed_markers[i].symbol="*";}
+        }
+
+        double deed_point_range=(deed_compositions.empty()?0.0:deed_max_point-deed_min_point);
+        bool allow_deed_color_gradient=(display_color_gradient && !deed_compositions.empty());
+        double deed_meta_min=deed_min_point;
+        double deed_meta_max=deed_max_point;
+        if(allow_deed_color_gradient && abs(deed_point_range)<=ZERO_TOL){
+          double sparse_deed_range=std::max(10.0,0.2*std::max(abs(deed_max_point),1.0));
+          deed_meta_min=std::max(0.0,deed_max_point-0.5*sparse_deed_range);
+          deed_meta_max=deed_meta_min+sparse_deed_range;
+          if(deed_max_point>=deed_meta_max-ZERO_TOL){
+            deed_meta_max=deed_max_point+0.5*sparse_deed_range;
+            deed_meta_min=deed_meta_max-sparse_deed_range;
+          }
+          deed_point_range=deed_meta_max-deed_meta_min;
+        }
+        std::string deed_color_map=CHULL_DEED_LATEX_COLOR_MAP;
+
+        std::stringstream deed_surface_TEX_ss;
+        std::stringstream deed_edge_overlay_TEX_ss;
+        bool interpolation_rendered=false;
+        uint deed_surface_triangle_count=0;
+        //[CO20261017 - set, never used]uint deed_edge_overlay_triangle_count=0;
+        std::string interpolation_skip_reason;
+        if(!deed_plot_config.getEnabledInterpolation()){
+          interpolation_skip_reason="disabled by deed_plot_config.json";
+        }else if(normalized_interpolation_mode!="white_edges" && normalized_interpolation_mode!="flat_border_mask"){
+          interpolation_skip_reason="unsupported interpolation mode \""+normalized_interpolation_mode+"\"";
+        }else if(deed_compositions.size()<deed_plot_config.getInterpolationMinPoints()){
+          interpolation_skip_reason="fewer than "+aurostd::utype2string(deed_plot_config.getInterpolationMinPoints())+" DEED-bearing ternary compositions were available";
+        }else{
+          bool use_flat_border_mask=(normalized_interpolation_mode=="flat_border_mask");
+          bool use_white_edges=(normalized_interpolation_mode=="white_edges" && allow_deed_color_gradient);
+          bool use_data_distance_white_fade=(use_white_edges && deed_plot_config.getDataDistanceWhiteFadeRadius()>ZERO_TOL && deed_plot_config.getDataDistanceWhiteFadeMaxOpacity()>ZERO_TOL);
+          uint deed_grid_density=std::max((uint)2,deed_plot_config.getInterpolationGridDensity());
+          std::vector<std::vector<bool> > deed_node_valid(deed_grid_density+1,std::vector<bool>(deed_grid_density+1,false));
+          std::vector<std::vector<DEEDPlotter::InterpolatedNode> > deed_nodes(deed_grid_density+1,std::vector<DEEDPlotter::InterpolatedNode>(deed_grid_density+1));
+          deed_surface_TEX_ss << deed_plotter.buildSurfacePlotHeader();
+          for(uint i=0;i<=deed_grid_density;i++){
+            for(uint j=0;j<=deed_grid_density-i;j++){
+              double b=(double)i/(double)deed_grid_density;
+              double c=(double)j/(double)deed_grid_density;
+              double a=1.0-b-c;
+              xvector<double> stoich_node(3,1);
+              stoich_node[stoich_node.lrows]=a;
+              stoich_node[stoich_node.lrows+1]=b;
+              stoich_node[stoich_node.lrows+2]=c;
+              if(use_flat_border_mask && deed_plotter.isNearTriangleBorder(stoich_node)){continue;}
+
+              DEEDPlotter::CartesianPoint cartesian_node=deed_plotter.stoichToCartesian(stoich_node);
+              double node_deed=deed_plotter.interpolateIDW(deed_compositions,cartesian_node);
+              if(!std::isfinite(node_deed)){continue;}
+              deed_nodes[i][j].stoich=stoich_node;
+              deed_nodes[i][j].deed=node_deed;
+              deed_node_valid[i][j]=true;
+            }
+          }
+
+          for(uint i=0;i<deed_grid_density;i++){
+            for(uint j=0;j<deed_grid_density-i;j++){
+              if(deed_node_valid[i][j] && deed_node_valid[i+1][j] && deed_node_valid[i][j+1]){
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i][j].stoich,deed_nodes[i][j].deed);
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i+1][j].stoich,deed_nodes[i+1][j].deed);
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i][j+1].stoich,deed_nodes[i][j+1].deed);
+                deed_surface_triangle_count++;
+              }
+              if(i+j+2<=deed_grid_density && deed_node_valid[i+1][j] && deed_node_valid[i+1][j+1] && deed_node_valid[i][j+1]){
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i+1][j].stoich,deed_nodes[i+1][j].deed);
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i+1][j+1].stoich,deed_nodes[i+1][j+1].deed);
+                deed_surface_TEX_ss << deed_plotter.buildPlotRow(deed_nodes[i][j+1].stoich,deed_nodes[i][j+1].deed);
+                deed_surface_triangle_count++;
+              }
+            }
+          }
+
+          if(use_white_edges){
+            uint overlay_grid_density=std::min(std::max((uint)18,deed_grid_density),(uint)72);
+            std::vector<std::vector<bool> > overlay_node_valid(overlay_grid_density+1,std::vector<bool>(overlay_grid_density+1,false));
+            std::vector<std::vector<double> > overlay_node_opacity(overlay_grid_density+1,std::vector<double>(overlay_grid_density+1,0.0));
+            std::vector<std::vector<xvector<double> > > overlay_node_stoich(overlay_grid_density+1,std::vector<xvector<double> >(overlay_grid_density+1));
+            for(uint i=0;i<=overlay_grid_density;i++){
+              for(uint j=0;j<=overlay_grid_density-i;j++){
+                double b=(double)i/(double)overlay_grid_density;
+                double c=(double)j/(double)overlay_grid_density;
+                double a=1.0-b-c;
+                xvector<double> stoich_node(3,1);
+                stoich_node[stoich_node.lrows]=a;
+                stoich_node[stoich_node.lrows+1]=b;
+                stoich_node[stoich_node.lrows+2]=c;
+                overlay_node_stoich[i][j]=stoich_node;
+                overlay_node_valid[i][j]=true;
+                DEEDPlotter::CartesianPoint cartesian_node=deed_plotter.stoichToCartesian(stoich_node);
+                overlay_node_opacity[i][j]=deed_plotter.getEdgeWhiteBlendFactor(stoich_node,cartesian_node,deed_compositions);
+                if(use_data_distance_white_fade){
+                  overlay_node_opacity[i][j]=std::max(overlay_node_opacity[i][j],deed_plotter.getDataDistanceWhiteFadeFactor(deed_compositions,cartesian_node));
+                }
+              }
+            }
+            for(uint i=0;i<overlay_grid_density;i++){
+              for(uint j=0;j<overlay_grid_density-i;j++){
+                if(overlay_node_valid[i][j] && overlay_node_valid[i+1][j] && overlay_node_valid[i][j+1]){
+                  double overlay_opacity=(overlay_node_opacity[i][j]+overlay_node_opacity[i+1][j]+overlay_node_opacity[i][j+1])/3.0;
+                  if(overlay_opacity>1e-3){
+                    deed_edge_overlay_TEX_ss << deed_plotter.buildWhiteOverlayTriangle(overlay_node_stoich[i][j],overlay_node_stoich[i+1][j],overlay_node_stoich[i][j+1],overlay_opacity);
+                    //[CO20261017 - set, never used]deed_edge_overlay_triangle_count++;
+                  }
+                }
+                if(i+j+2<=overlay_grid_density && overlay_node_valid[i+1][j] && overlay_node_valid[i+1][j+1] && overlay_node_valid[i][j+1]){
+                  double overlay_opacity=(overlay_node_opacity[i+1][j]+overlay_node_opacity[i+1][j+1]+overlay_node_opacity[i][j+1])/3.0;
+                  if(overlay_opacity>1e-3){
+                    deed_edge_overlay_TEX_ss << deed_plotter.buildWhiteOverlayTriangle(overlay_node_stoich[i+1][j],overlay_node_stoich[i+1][j+1],overlay_node_stoich[i][j+1],overlay_opacity);
+                    //[CO20261017 - set, never used]deed_edge_overlay_triangle_count++;
+                  }
+                }
+              }
+            }
+          }
+
+          interpolation_rendered=(deed_surface_triangle_count>0);
+          if(interpolation_rendered){
+            deed_surface_TEX_ss << "};" << endl;
+          }else{
+            deed_surface_TEX_ss.str("");
+            deed_surface_TEX_ss.clear();
+            if(use_flat_border_mask){interpolation_skip_reason="no interpolation cells survived the border mask";}
+            else{interpolation_skip_reason="no interpolation cells were generated";}
+          }
+        }
+
+        bool render_structure_markers=(deed_plot_config.getShowStructureMarkers() && !deed_markers.empty());
+        bool render_structure_legend=(render_structure_markers && deed_plot_config.getShowStructureLegend() && !deed_structure_key_list.empty());
+        bool render_default_markers=(!render_structure_markers && !deed_compositions.empty());
+        bool display_deed_color_gradient=(allow_deed_color_gradient && (interpolation_rendered || (render_structure_markers && deed_plot_config.getMarkerUseColormap()) || render_default_markers));
+        std::string deed_axis_common_settings=common_settings_TEX_ss.str();
+        if(deed_axis_common_settings.empty()){
+          std::stringstream deed_axis_common_settings_TEX_ss;
+          appendLatexAxisCommonSettings(deed_axis_common_settings_TEX_ss,dimension);
+          deed_axis_common_settings=deed_axis_common_settings_TEX_ss.str();
+        }
+        double deed_round_to_value=0.0;
+        double deed_y_tick_distance=0.0;
+        if(display_deed_color_gradient){
+          deed_round_to_value=getRoundToValue(deed_point_range);
+          deed_y_tick_distance=getYTickDistance(deed_point_range,deed_approx_num_ticks,deed_round_to_value);
+        }
+
+        deed_page_TEX_ss << "\\newpage" << endl;
+        deed_page_TEX_ss << "\\newgeometry{" << MARGIN_PICTURE << "}" << endl;
+        deed_page_TEX_ss << "\\thispagestyle{hullImage}" << endl;
+        deed_page_TEX_ss << "\\begin{landscape}" << endl;
+        deed_page_TEX_ss << "\\centering{" << endl;
+        deed_page_TEX_ss << "\\topskip0pt" << endl;
+        deed_page_TEX_ss << "\\vspace*{\\fill}" << endl;
+        deed_page_TEX_ss << "\\begin{tikzpicture}[font=" << general_image_font_size << "]" << endl;
+        deed_page_TEX_ss << "\\begin{ternaryaxis}[" << endl;
+
+        // Keep DEED vertex labels independent of report-link availability for consistent styling.
+        deed_page_TEX_ss << "ylabel={";
+        deed_page_TEX_ss << "{" << m_velements[0] << "}";
+        deed_page_TEX_ss << "}," << endl;
+        deed_page_TEX_ss << "ylabel style={font=" << label_image_font_size << ",at={(axis cs:0,1,0)},anchor=north east,below=" << deed_unary_distance_axis_3D << "cm,left=" << deed_unary_distance_axis_3D << "cm}," << endl;
+
+        deed_page_TEX_ss << "xlabel={";
+        deed_page_TEX_ss << "{" << m_velements[1] << "}";
+        deed_page_TEX_ss << "}," << endl;
+        deed_page_TEX_ss << "xlabel style={font=" << label_image_font_size << ",at={(axis cs:1,0,0)},anchor=south,above=" << sqrt(2.0*deed_unary_distance_axis_3D*deed_unary_distance_axis_3D) << "cm}," << endl;
+
+        deed_page_TEX_ss << "zlabel={";
+        deed_page_TEX_ss << "{" << m_velements[2] << "}";
+        deed_page_TEX_ss << "}," << endl;
+        deed_page_TEX_ss << "zlabel style={font=" << label_image_font_size << ",at={(axis cs:0,0,1)},anchor=north west,below=" << deed_unary_distance_axis_3D << "cm,right=" << deed_unary_distance_axis_3D << "cm}," << endl;
+        deed_page_TEX_ss << "xmin=0," << endl;
+        deed_page_TEX_ss << "xmax=1," << endl;
+        deed_page_TEX_ss << "ymin=0," << endl;
+        deed_page_TEX_ss << "ymax=1," << endl;
+        deed_page_TEX_ss << "zmin=0," << endl;
+        deed_page_TEX_ss << "zmax=1," << endl;
+        deed_page_TEX_ss << "ticks=none," << endl;
+        deed_page_TEX_ss << deed_axis_common_settings;
+        if(display_deed_color_gradient){
+          deed_page_TEX_ss << "point meta min=" << deed_meta_min << "," << endl;
+          deed_page_TEX_ss << "point meta max=" << deed_meta_max << "," << endl;
+          deed_page_TEX_ss << "colorbar," << endl;
+          deed_page_TEX_ss << "colorbar style={" << endl;
+          deed_page_TEX_ss << "shift={(1.75cm,0cm)}," << endl;
+          deed_page_TEX_ss << "ylabel={{DEED}}," << endl;
+          deed_page_TEX_ss << "ylabel style={font=" << label_image_font_size << "}," << endl;
+          deed_page_TEX_ss << "yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=5}," << endl;
+          deed_page_TEX_ss << "yticklabel shift=6pt," << endl;
+          deed_page_TEX_ss << "ytick distance={" << deed_y_tick_distance << "}," << endl;
+          deed_page_TEX_ss << "ytick align=outside," << endl;
+          deed_page_TEX_ss << "scaled y ticks=false," << endl;
+          deed_page_TEX_ss << "ymin=" << deed_meta_min << "," << endl;
+          deed_page_TEX_ss << "ymax=" << deed_meta_max << "," << endl;
+          deed_page_TEX_ss << "}," << endl;
+          deed_page_TEX_ss << "colormap={mymap}{" << deed_color_map << "}," << endl;
+        }
+        deed_page_TEX_ss << "]" << endl;
+
+        if(interpolation_rendered){
+          deed_page_TEX_ss << deed_surface_TEX_ss.str();
+          if(!deed_edge_overlay_TEX_ss.str().empty()){
+            deed_page_TEX_ss << deed_edge_overlay_TEX_ss.str();
+          }
+        }
+        if(!convex_hull_facets_drop_shadow_TEX_ss.str().empty()){
+          deed_page_TEX_ss << convex_hull_facets_drop_shadow_TEX_ss.str();
+        }
+        if(!convex_hull_facets_TEX_ss.str().empty()){
+          deed_page_TEX_ss << convex_hull_facets_TEX_ss.str();
+        }
+
+        if(render_structure_markers){
+          std::map<std::string,std::vector<uint> > deed_marker_groups;
+          for(uint i=0,fl_size_i=deed_markers.size();i<fl_size_i;i++){
+            deed_marker_groups[deed_markers[i].structure_key].push_back(i);
+          }
+          bool use_fixed_marker_colors=!(display_deed_color_gradient && deed_plot_config.getMarkerUseColormap());
+          for(std::map<std::string,std::vector<uint> >::const_iterator it=deed_marker_groups.begin();it!=deed_marker_groups.end();++it){
+            std::map<std::string,std::string>::const_iterator symbol_it=deed_symbol_map.find(it->first);
+            std::string marker_symbol=(symbol_it!=deed_symbol_map.end()?symbol_it->second:"*");
+            deed_page_TEX_ss << deed_plotter.buildMarkerPlotHeader(marker_symbol,display_deed_color_gradient,use_fixed_marker_colors);
+            for(uint i=0,fl_size_i=it->second.size();i<fl_size_i;i++){
+              const DEEDPlotter::Marker& marker=deed_markers[it->second[i]];
+              deed_page_TEX_ss << deed_plotter.buildPlotRow(marker.stoich,marker.deed);
+            }
+            deed_page_TEX_ss << "};" << endl;
+          }
+        }else if(render_default_markers){
+          bool use_fixed_marker_colors=!(display_deed_color_gradient && deed_plot_config.getMarkerUseColormap());
+          deed_page_TEX_ss << deed_plotter.buildMarkerPlotHeader("x",display_deed_color_gradient,use_fixed_marker_colors);
+          for(uint i=0,fl_size_i=deed_compositions.size();i<fl_size_i;i++){
+            deed_page_TEX_ss << deed_plotter.buildPlotRow(deed_compositions[i].stoich,deed_compositions[i].deed);
+          }
+          deed_page_TEX_ss << "};" << endl;
+        }
+
+        if(deed_plot_config.getShowVertexMarkers()){
+          xvector<double> vertex_a(3,1),vertex_b(3,1),vertex_c(3,1);
+          vertex_a[vertex_a.lrows]=1.0; vertex_a[vertex_a.lrows+1]=0.0; vertex_a[vertex_a.lrows+2]=0.0;
+          vertex_b[vertex_b.lrows]=0.0; vertex_b[vertex_b.lrows+1]=1.0; vertex_b[vertex_b.lrows+2]=0.0;
+          vertex_c[vertex_c.lrows]=0.0; vertex_c[vertex_c.lrows+1]=0.0; vertex_c[vertex_c.lrows+2]=1.0;
+          deed_page_TEX_ss << deed_plotter.buildVertexPlotHeader();
+          deed_page_TEX_ss << deed_plotter.buildPlotRow(vertex_a,0.0);
+          deed_page_TEX_ss << deed_plotter.buildPlotRow(vertex_b,0.0);
+          deed_page_TEX_ss << deed_plotter.buildPlotRow(vertex_c,0.0);
+          deed_page_TEX_ss << "};" << endl;
+        }
+
+        if(render_structure_legend){
+          deed_page_TEX_ss << deed_plotter.buildLegendNode(deed_structure_key_list,deed_symbol_map,normalized_structure_symbol_key,general_image_font_size);
+        }
+
+        deed_page_TEX_ss << "\\end{ternaryaxis}" << endl;
+        deed_page_TEX_ss << "\\end{tikzpicture}" << endl;
+        deed_page_TEX_ss << "\\vspace*{\\fill}" << endl;
+        deed_page_TEX_ss << "}" << endl;
+        deed_page_TEX_ss << "\\end{landscape}" << endl;
+        deed_page_TEX_ss << "\\restoregeometry" << endl;
+
+        message.str("");
+        message << "Adding DEED ternary plot for " << deed_compositions.size() << " ternary compositions";
+        if(interpolation_rendered){message << " with " << normalized_interpolation_mode << " interpolation (" << deed_surface_triangle_count << " interpolated patches)";}
+        else{message << " without interpolation"; if(!interpolation_skip_reason.empty()){message << " (" << interpolation_skip_reason << ")";}}
+        if(render_structure_markers){message << "; " << deed_markers.size() << " structure markers (" << normalized_structure_marker_mode << ")";}
+        else if(render_default_markers){message << "; marker fallback enabled";}
+        if(render_structure_legend){message << "; legend enabled";}
+        if(!display_deed_color_gradient){message << "; no DEED color gradient";}
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
+      }else{
+        message.str("");
+        message << "Skipping DEED ternary plot (no ternary DEED composition groups were available for plotting)";
+        pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags,*p_FileMESSAGE,*p_oss,_LOGGER_WARNING_);
+      }
     }
 
     // BIG MERGE
@@ -10808,6 +12941,10 @@ namespace chull {
       }
       main_TEX_ss << tikzpic_TEX_ss.str();
       tikzpic_TEX_ss.str("");
+    }
+    if(!deed_page_TEX_ss.str().empty()){
+      main_TEX_ss << deed_page_TEX_ss.str();
+      deed_page_TEX_ss.str("");
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -10861,9 +12998,9 @@ namespace chull {
       bool added_nary_tag=false;  //for unary, binary, ternary, etc.
       bool add_vspace=true; //ONLY once, first TERNARY is too close to column headers
       string pdftable_font_sizes;
-      vector<string> chpoint_properties;
-      bool print_scriterion=true,print_np1=true;
-      stringstream scriterion_data_ss,np1_data_ss;
+      vector<string> chpoint_properties, thermo_summary_vs;
+      bool print_scriterion=true,print_np1=true,print_deed=true;
+      stringstream scriterion_data_ss,np1_data_ss,deed_data_ss;
       //uint num_cols_scriterion=2;
       //uint num_cols_np1=3;
       uint precision_tmp=0;
@@ -11069,8 +13206,10 @@ namespace chull {
               //}else{main_TEX_ss << "\\multicolumn{" << vheaders.size() << "}{l}{} \\\\[0.1cm]" << endl;}  //padding and spacing preservation
               print_scriterion=false;
               print_np1=false;
+              print_deed=false;
               scriterion_data_ss.str("");
               np1_data_ss.str("");
+              deed_data_ss.str("");
               if(m_coord_groups[i_coord_group].m_is_on_hull) {
                 _report_data_ss << " " << "(ground-state)"; // if ground-state
                 if(m_coord_groups[i_coord_group].m_stability_criterion<AUROSTD_NAN){
@@ -11102,19 +13241,28 @@ namespace chull {
               }else{
                 _report_data_ss << " " << "(unstable)"; // if above hull	  
               }
+              print_deed=coordGroupCanReportDEED(i_coord_group);
+              if(print_deed){deed_data_ss << getCoordGroupDEEDLabel(i_coord_group);}
+              thermo_summary_vs.clear();
+              if(print_scriterion){thermo_summary_vs.push_back(scriterion_data_ss.str());}
+              if(print_np1){thermo_summary_vs.push_back(np1_data_ss.str());}
+              if(print_deed){thermo_summary_vs.push_back(deed_data_ss.str());}
+              string thermo_summary=aurostd::joinWDelimiter(thermo_summary_vs,", " );
+              const bool use_thermoprops_table=m_coord_groups[i_coord_group].m_is_on_hull || !thermo_summary.empty();
               // compound name
-              main_TEX_ss << "\\begin{longtable}{" << aurostd::joinWDelimiter( (m_coord_groups[i_coord_group].m_is_on_hull?valignments_compoundname_thermopropstable_string:valignments_onecol_lefttable_string) ,"") << "}" << endl;
+              main_TEX_ss << "\\begin{longtable}{" << aurostd::joinWDelimiter( (use_thermoprops_table?valignments_compoundname_thermopropstable_string:valignments_onecol_lefttable_string) ,"") << "}" << endl;
               if(internal_links && isViablePoint(m_coord_groups[i_coord_group].m_ref_state)) {
                 uint ref_state=m_coord_groups[i_coord_group].m_ref_state;
-                main_TEX_ss << "\\multicolumn{" << (m_coord_groups[i_coord_group].m_is_on_hull?n_cols_compoundname_thermoprops:n_cols_onecol_left) << "}{l}{\\phantomsection\\label{"+input + "_" + m_points[ref_state].m_entry.auid + "}} \\\\[0.1cm]" << endl;
-              }else{main_TEX_ss << "\\multicolumn{" << (m_coord_groups[i_coord_group].m_is_on_hull?n_cols_compoundname_thermoprops:n_cols_onecol_left) << "}{l}{} \\\\[0.1cm]" << endl;}  //padding and spacing preservation
+                main_TEX_ss << "\\multicolumn{" << (use_thermoprops_table?n_cols_compoundname_thermoprops:n_cols_onecol_left) << "}{l}{\\phantomsection\\label{"+input + "_" + m_points[ref_state].m_entry.auid + "}} \\\\[0.1cm]" << endl;
+              }else{main_TEX_ss << "\\multicolumn{" << (use_thermoprops_table?n_cols_compoundname_thermoprops:n_cols_onecol_left) << "}{l}{} \\\\[0.1cm]" << endl;}  //padding and spacing preservation
               //main_TEX_ss << "\\multicolumn{" << vheaders.size()-((print_scriterion?num_cols_scriterion:0)+(print_np1?num_cols_np1:0)) << "}{l}{";
-              main_TEX_ss << "\\cellcolor{white}\\normalsize{" + _report_data_ss.str() << "}";
+              main_TEX_ss << "\\cellcolor{white}\\normalsize{" << _report_data_ss.str();
+              main_TEX_ss << "}";
               //main_TEX_ss << "}";
-              if(print_scriterion || print_np1){
+              if(use_thermoprops_table && !thermo_summary.empty()){
                 main_TEX_ss << " & ";
                 //main_TEX_ss << "\\multicolumn{" << (print_scriterion?num_cols_scriterion:0)+(print_np1?num_cols_np1:0) << "}{r}{";
-                main_TEX_ss << "\\cellcolor{white}\\normalsize{" + (print_scriterion?scriterion_data_ss.str():"") + (print_scriterion&&print_np1?", ":"") + (print_np1?np1_data_ss.str():"") << "}";
+                main_TEX_ss << "\\cellcolor{white}\\normalsize{" << thermo_summary << "}";
                 //main_TEX_ss << "}";
               }
               main_TEX_ss << " \\\\[0.05cm]" << endl;  //0.1cm
@@ -11179,6 +13327,7 @@ namespace chull {
             }
             scriterion_data_ss.str("");
             np1_data_ss.str("");
+            deed_data_ss.str("");
             _report_data_ss.str("");
             report_data_ss.str("");
             reaction_chem_eq_TEX_ss.str("");
@@ -11222,27 +13371,27 @@ namespace chull {
     }
     //watermark
     if(!doc_only){
-      aurostd::EmbData::save_to_file("AFLOW_LOGO_SKINNY.pdf", LATEX_dir+"/"+aflow_logo_skinny_file);
-      if(!aurostd::FileExist(LATEX_dir+"/"+aflow_logo_skinny_file)) {
+      aurostd::EmbData::save_to_file("S4E_LOGO_SKINNY.pdf", LATEX_dir+"/"+s4e_logo_skinny_file);
+      if(!aurostd::FileExist(LATEX_dir+"/"+s4e_logo_skinny_file)) {
         //[CO20221027 - suppressing warning]if(0) chdir(PWD.c_str());
 #ifndef _AFLOW_TEMP_PRESERVE_
         aurostd::RemoveDirectory(LATEX_dir);
 #endif
-        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not write "+aflow_logo_skinny_file+" to "+LATEX_dir);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not write "+s4e_logo_skinny_file+" to "+LATEX_dir);
       }
     }
-    if(print_aflow_logo_full) {
-      aurostd::EmbData::save_to_file("AFLOW_LOGO_FULL.pdf", LATEX_dir+"/"+aflow_logo_full_file);
-      if(!aurostd::FileExist(LATEX_dir+"/"+aflow_logo_full_file)) {
+    if(print_logo_1) {
+      aurostd::EmbData::save_to_file("S4E_LOGO.pdf", LATEX_dir+"/"+s4e_logo_file);
+      if(!aurostd::FileExist(LATEX_dir+"/"+s4e_logo_file)) {
         //[CO20221027 - suppressing warning]if(0) chdir(PWD.c_str());
 #ifndef _AFLOW_TEMP_PRESERVE_
         aurostd::RemoveDirectory(LATEX_dir);
 #endif
-        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not write "+aflow_logo_full_file+" to "+LATEX_dir);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not write "+s4e_logo_file+" to "+LATEX_dir);
       }
     }
     if(print_logo_2) {
-      aurostd::EmbData::save_to_file("NOMAD_LOGO.png", LATEX_dir+"/"+logo_file_2);
+      aurostd::EmbData::save_to_file("CHAOS_LOGO.pdf", LATEX_dir+"/"+logo_file_2);
       if(!aurostd::FileExist(LATEX_dir+"/"+logo_file_2)) {
         //[CO20221027 - suppressing warning]if(0) chdir(PWD.c_str());
 #ifndef _AFLOW_TEMP_PRESERVE_
@@ -11283,8 +13432,8 @@ namespace chull {
       pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags, *p_FileMESSAGE,*p_oss,_LOGGER_ERROR_);
       files_2_move.clear(); //only move these files
       files_2_move.push_back(LATEX_dir+"/"+main_TEX_file);
-      if(!doc_only){files_2_move.push_back(LATEX_dir+"/"+aflow_logo_skinny_file);}
-      if(print_aflow_logo_full){files_2_move.push_back(LATEX_dir+"/"+aflow_logo_full_file);}
+      if(!doc_only){files_2_move.push_back(LATEX_dir+"/"+s4e_logo_skinny_file);}
+      if(print_logo_1){files_2_move.push_back(LATEX_dir+"/"+s4e_logo_file);}
       if(print_logo_2){files_2_move.push_back(LATEX_dir+"/"+logo_file_2);}
 
       message << "Moving " << aurostd::joinWDelimiter(files_2_move,", "," and ",", and ") << " to " << path; //CO20180220 - current directory";
@@ -11345,8 +13494,8 @@ namespace chull {
     if(m_cflags.flag("CHULL::PNG_IMAGE")){files_2_move.push_back(LATEX_dir+"/"+main_PNG_file);}
     if(keep_tex) {
       files_2_move.push_back(LATEX_dir+"/"+main_TEX_file);
-      if(!doc_only){files_2_move.push_back(LATEX_dir+"/"+aflow_logo_skinny_file);}
-      if(print_aflow_logo_full){files_2_move.push_back(LATEX_dir+"/"+aflow_logo_full_file);} //files_2_move.push_back(LATEX_dir+"/"+aflow_logo_skinny_file);
+      if(!doc_only){files_2_move.push_back(LATEX_dir+"/"+s4e_logo_skinny_file);}
+      if(print_logo_1){files_2_move.push_back(LATEX_dir+"/"+s4e_logo_file);} //files_2_move.push_back(LATEX_dir+"/"+s4e_logo_skinny_file);
       if(print_logo_2){files_2_move.push_back(LATEX_dir+"/"+logo_file_2);}
       message << "Moving " << aurostd::joinWDelimiter(files_2_move,", "," and ",", and ") << " to " << path; //CO20180220 - current directory";
       pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,m_aflags, *p_FileMESSAGE,*p_oss,_LOGGER_MESSAGE_);
@@ -11431,7 +13580,7 @@ namespace chull {
     misc_ss << "\"aflow_version\":\"aflow" << string(AFLOW_VERSION) << "\"";
     vout.push_back(misc_ss.str()); misc_ss.str("");
 
-    misc_ss << "\"aflow_website\":\"" << AFLOW_WEB << "\"";
+    misc_ss << "\"aflow_website\":\"" << "https://s4e.ai" << "\"";  //CO20261005 - as the PDF's links
     vout.push_back(misc_ss.str()); misc_ss.str("");
 
     misc_ss << "\"date\":\"" << aurostd::get_datetime_formatted("-",false) << "\""; //CO20180819 - we don't need minute/second precision, date is fine //previously datetime
@@ -11520,7 +13669,7 @@ namespace chull {
       else{value=aurostd::wrapString(point.m_entry.auid,string_wrapper);}
     }
     else if(property=="aurl"){value=aurostd::wrapString(point.m_entry.aurl,string_wrapper);}
-    else if(property=="url_entry_page"){value=aurostd::wrapString(ENTRY_PAGE_URL_PREFIX+point.m_entry.auid,string_wrapper);}
+    else if(property=="url_entry_page"){if(point.isMaterialPageAvailable()){value=aurostd::wrapString(ENTRY_PAGE_URL_PREFIX+point.m_entry.auid,string_wrapper);}}  //CO20261005 - empty (null) without a page
     else if(property=="space_group_orig"||property=="space_group_orig_latex"){
       math_mode=true;
       latex_property=(property=="space_group_orig_latex");
@@ -11834,7 +13983,10 @@ namespace chull {
     if(value.empty()){value=null_value;}
     if(ftype==latex_ft){
       if(external_links && (property=="compound"||(!compounds_column_report&&property=="prototype"))){
-        value="\\href{"+ENTRY_PAGE_URL_PREFIX+point.m_entry.auid+"}{"+value+"}";
+        // Only add hyperlink if auid does not start with "s4e:"
+        if(point.isMaterialPageAvailable()){
+          value="\\href{"+ENTRY_PAGE_URL_PREFIX+point.m_entry.auid+"}{"+value+"}";
+        }
       }
       value=aurostd::PaddedPOST(value,padding);
     }
@@ -12807,6 +14959,280 @@ namespace chull {
 
     return false;
   }
+
+  //CO20261004 START - database derived properties
+  //getDatabaseDerivedProperties///////////////////////////////////////////////
+  // Gives every entry of the hull its distance to the hull (eV/atom), and
+  // every POCC parent its DEED. Entries that define the hull get their
+  // distance to it (zero on it). POCC supercells and parents, which are left
+  // out of the hull (structurePoints()), get their signed distance to it:
+  // negative below the hull of ordered structures. Entries left out for any
+  // other reason (unreliable, +U, duplicates, outliers) get none. A POCC
+  // parent whose distance is positive gets DEED=sqrt(EFA/distance)
+  // (pocc::getDEED()). The parent's formation enthalpy is the degeneracy
+  // weighted mean of its supercells' (LIB2RAW_Loop_POCC()), so its distance is
+  // the mean hull distance of its supercells (Divilov et al., Nature 2024).
+  void ConvexHull::getDatabaseDerivedProperties(vector<aflowlib::_aflowlib_entry>& entries) const {
+    entries.clear();
+    if(!m_initialized){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Hull not initialized",_RUNTIME_INIT_);}
+    std::set<uint> hull_points; // points that took part in the hull
+    for(uint i_coord_group=0,fl_size_i_coord_group=m_coord_groups.size();i_coord_group<fl_size_i_coord_group;i_coord_group++){
+      hull_points.insert(m_coord_groups[i_coord_group].m_points.begin(),m_coord_groups[i_coord_group].m_points.end());
+    }
+    const bool measure_pocc=!m_cflags.flag("CHULL::INCLUDE_POCC");
+    const bool ignore_bad_database=(DEFAULT_CHULL_IGNORE_KNOWN_ILL_CONVERGED && !m_cflags.flag("CHULL::INCLUDE_ILL_CONVERGED"));
+    for(uint i_point=0,fl_size_i_point=m_points.size();i_point<fl_size_i_point;i_point++){
+      const ChullPoint& point=m_points[i_point];
+      if(!point.m_initialized || !point.m_has_entry || point.m_is_artificial){continue;}
+      entries.push_back(point.m_entry);
+      aflowlib::_aflowlib_entry& entry=entries.back();
+      entry.distance_hull=AUROSTD_NAN;
+      entry.deed=AUROSTD_NAN;
+      if(hull_points.count(i_point)){entry.distance_hull=getDistanceToHull(i_point,false,false);}
+      else if(measure_pocc && (entry.isPoccChild() || entry.isPoccParent()) && entryValid(entry,ignore_bad_database)){
+        entry.distance_hull=-getDistanceToHull(point,false,true);  // chull's signed distance is negative above the hull; ours is positive above, negative below
+      }
+      if(entry.isPoccParent() && !aurostd::isNaN(entry.distance_hull) && entry.distance_hull>ZERO_TOL){
+        const double deed=pocc::getDEED(entry.entropy_forming_ability,entry.distance_hull);
+        if(CoordGroup::isValidDEEDValue(deed)){entry.deed=deed;}
+      }
+    }
+  }
+
+  //getAffectedAlloys//////////////////////////////////////////////////////////
+  // Alloys of the database whose hulls a change in the given alloys can move:
+  // each changed alloy and every database alloy that contains it. Taken from
+  // Hashan Peiris's code (HP), which queried the database for the supersets.
+  vector<string> getAffectedAlloys(const vector<string>& changed_alloys,const vector<string>& database_alloys){
+    vector<vector<string> > changed_elements;
+    for(uint i=0,fl_size_i=changed_alloys.size();i<fl_size_i;i++){
+      vector<string> elements=aurostd::getElements(changed_alloys[i]);
+      if(elements.empty()){continue;}
+      std::sort(elements.begin(),elements.end());
+      changed_elements.push_back(elements);
+    }
+    std::set<string> affected;
+    for(uint i=0,fl_size_i=database_alloys.size();i<fl_size_i;i++){
+      vector<string> elements=aurostd::getElements(database_alloys[i]);
+      std::sort(elements.begin(),elements.end());
+      for(uint j=0,fl_size_j=changed_elements.size();j<fl_size_j;j++){
+        if(std::includes(elements.begin(),elements.end(),changed_elements[j].begin(),changed_elements[j].end())){affected.insert(database_alloys[i]);break;}
+      }
+    }
+    return vector<string>(affected.begin(),affected.end());
+  }
+
+  //getMaximalAlloys///////////////////////////////////////////////////////////
+  // The alloys not contained in another alloy of the list. A hull of an alloy
+  // gives the right hull distance for every entry of its subsystems, because
+  // the hull restricted to a face is the hull of that face. From Hashan Peiris (HP).
+  vector<string> getMaximalAlloys(const vector<string>& alloys){
+    vector<vector<string> > element_sets(alloys.size());
+    for(uint i=0,fl_size_i=alloys.size();i<fl_size_i;i++){
+      element_sets[i]=aurostd::getElements(alloys[i]);
+      std::sort(element_sets[i].begin(),element_sets[i].end());
+      element_sets[i].erase(std::unique(element_sets[i].begin(),element_sets[i].end()),element_sets[i].end());
+    }
+    std::set<string> maximal;
+    for(uint i=0,fl_size_i=alloys.size();i<fl_size_i;i++){
+      bool contained=false;
+      for(uint j=0,fl_size_j=alloys.size();j<fl_size_j && !contained;j++){
+        if(i==j || element_sets[i].size()>=element_sets[j].size()){continue;}
+        contained=std::includes(element_sets[j].begin(),element_sets[j].end(),element_sets[i].begin(),element_sets[i].end());
+      }
+      if(!contained){maximal.insert(alloys[i]);}
+    }
+    return vector<string>(maximal.begin(),maximal.end());
+  }
+
+  //getDatabaseDerivedProperties///////////////////////////////////////////////
+  // Builds the hull of one alloy from the SQLite database database_file and
+  // returns its entries with their hull distances and DEED. Structure
+  // comparison, the stability criterion and the N+1 enthalpy gain do not
+  // change hull distances, so they are skipped.
+  bool getDatabaseDerivedProperties(const string& alloy,const string& database_file,vector<aflowlib::_aflowlib_entry>& entries,ostream& oss){
+    entries.clear();
+    aurostd::xoption cflags;
+    cflags.push_attached("CHULL::DATABASE_FILE",database_file);  //CO20261007
+    cflags.flag("FORCE",true);  // small hulls are not refused
+    cflags.flag("CHULL::SKIP_STRUCTURE_COMPARISON",true);
+    cflags.flag("CHULL::SKIP_STABILITY_CRITERION_ANALYSIS",true);
+    cflags.flag("CHULL::SKIP_N+1_ENTHALPY_GAIN_ANALYSIS",true);
+    ConvexHull hull(cflags,aurostd::getElements(alloy),oss);
+    if(!hull.m_initialized){return false;}
+    hull.getDatabaseDerivedProperties(entries);
+    return true;
+  }
+
+  //updateDatabaseDerivedProperties////////////////////////////////////////////
+  // aflow --derived_properties: hull distance (distance_hull) of every entry
+  // and DEED (deed) of every POCC parent, kept in a JSONL file next to the
+  // database (one line per AUID) and patched into the database. Each line
+  // records the inputs it was computed from (derived_inputs: alloy,
+  // formation enthalpy, CCE formation enthalpy at 0 K, entropy-forming
+  // ability). A run recomputes only the hulls that new, changed or removed
+  // entries can move (getAffectedAlloys(), getMaximalAlloys()), in parallel
+  // (--np), and patches every line whose values the database does not hold,
+  // which after aflow --update_database rebuilt the database is all of them.
+  // Returns 0 when the database was patched and 100 when nothing changed.
+  int updateDatabaseDerivedProperties(aflowlib::AflowDB& db,const string& derived_file,ostream& oss){
+    stringstream message;
+    ofstream FileMESSAGE;
+    _aflags aflags; aflags.Directory=".";
+    if(derived_file.empty()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"No file for the derived properties",_INPUT_MISSING_);}
+    const auto to_number=[](const string& value){  // database text or JSON number; empty and null are unset
+      if(value.empty() || aurostd::toupper(value)=="NULL"){return (double)AUROSTD_NAN;}
+      return aurostd::string2utype<double>(value);
+    };
+    const auto same_value=[](double a,double b){
+      if(aurostd::isNaN(a) || aurostd::isNaN(b)){return aurostd::isNaN(a) && aurostd::isNaN(b);}
+      return std::abs(a-b)<=1e-9*std::max(1.0,std::abs(a));
+    };
+    const auto json_number=[](double value){return (aurostd::isNaN(value)?string("null"):aurostd::utype2string(value,12));};  // JSON::object writes 6 digits
+    const auto json_value=[](const aurostd::JSON::object& value){  // not through toString(), which keeps 6 digits
+      if(value.type==aurostd::JSON::object_types::FLOAT || value.type==aurostd::JSON::object_types::INTEGER){return (double)value;}
+      return (double)AUROSTD_NAN;
+    };
+
+    // inputs and current values from the database
+    //CO20261010 - the identifier's column: chaos_id, or auid in a database built before
+    const vector<string> keys={db.idColumn(),"alloy","enthalpy_formation_atom","enthalpy_formation_cce_0K_atom","entropy_forming_ability","distance_hull","deed"};
+    const vector<vector<string> > rows=db.getRowsMultiTables("",aurostd::joinWDelimiter(keys,","));
+    const string database_file=db.getDatabaseFile();  //CO20261007 - the hulls read this database
+    std::map<string,string> inputs,alloys;  // by AUID
+    std::map<string,std::pair<double,double> > database_values;  // by AUID: distance_hull, deed
+    std::set<string> database_alloys;
+    for(uint i=0,fl_size_i=rows.size();i<fl_size_i;i++){
+      if(rows[i].size()!=keys.size()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Unexpected database row",_FILE_CORRUPT_);}
+      const string auid=aurostd::RemoveCharacter(rows[i][0],'"');
+      const string alloy=aurostd::RemoveCharacter(rows[i][1],'"');
+      if(auid.empty() || alloy.empty()){continue;}
+      inputs[auid]=alloy+"|"+rows[i][2]+"|"+rows[i][3]+"|"+rows[i][4];
+      alloys[auid]=alloy;
+      database_values[auid]=std::make_pair(to_number(rows[i][5]),to_number(rows[i][6]));
+      database_alloys.insert(alloy);
+    }
+
+    // the previous run
+    std::map<string,string> records,previous_inputs,previous_alloys;  // by AUID
+    std::map<string,std::pair<double,double> > values;  // by AUID: distance_hull, deed
+    if(aurostd::FileExist(derived_file)){
+      vector<string> lines;
+      aurostd::file2vectorstring(derived_file,lines);
+      for(uint i=0,fl_size_i=lines.size();i<fl_size_i;i++){
+        if(aurostd::RemoveWhiteSpaces(lines[i]).empty()){continue;}
+        const aurostd::JSON::Dictionary record=aurostd::JSON::loadString(lines[i]);
+        if(!record.count("auid") || !record.count("derived_inputs") || !record.count("distance_hull") || !record.count("deed")){
+          throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Line "+aurostd::utype2string(i+1)+" of "+derived_file+" lacks auid, derived_inputs, distance_hull or deed",_FILE_CORRUPT_);
+        }
+        const string auid=string(record.at("auid"));
+        records[auid]=lines[i];
+        previous_inputs[auid]=string(record.at("derived_inputs"));
+        previous_alloys[auid]=previous_inputs[auid].substr(0,previous_inputs[auid].find('|'));
+        values[auid]=std::make_pair(json_value(record.at("distance_hull")),json_value(record.at("deed")));
+      }
+    }
+
+    // what changed: new, changed and removed entries
+    std::set<string> changed_alloys;
+    uint nadded=0,nchanged=0,nremoved=0;
+    for(std::map<string,string>::const_iterator it=inputs.begin();it!=inputs.end();++it){
+      const std::map<string,string>::const_iterator it_previous=previous_inputs.find(it->first);
+      if(it_previous==previous_inputs.end()){nadded++;}
+      else if(it_previous->second!=it->second){nchanged++;}
+      else{continue;}
+      changed_alloys.insert(alloys[it->first]);
+    }
+    vector<string> removed;
+    for(std::map<string,string>::const_iterator it=previous_inputs.begin();it!=previous_inputs.end();++it){
+      if(inputs.count(it->first)){continue;}
+      removed.push_back(it->first);
+      changed_alloys.insert(previous_alloys[it->first]);
+      nremoved++;
+    }
+    const vector<string> affected=getAffectedAlloys(vector<string>(changed_alloys.begin(),changed_alloys.end()),vector<string>(database_alloys.begin(),database_alloys.end()));
+    vector<string> systems=getMaximalAlloys(affected);  // not const: xThread::run is instantiated for vector<string>&
+    message << "Entries in the database: " << inputs.size() << "; new " << nadded << ", changed " << nchanged << ", removed " << nremoved << "; hulls to compute: " << systems.size();
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+
+    // hulls, in parallel
+    const uint ntasks=systems.size();
+    vector<vector<aflowlib::_aflowlib_entry> > results(ntasks);
+    vector<uint> vKrun(ntasks,0);  // c++ doesn't like vector<bool>
+    ofstream devnull("/dev/null");
+    ostream oss_dn(devnull.rdbuf());
+#ifdef AFLOW_MULTITHREADS_ENABLE
+    const int ncpus=KBIN::get_NCPUS();
+    if(ncpus>1 && ntasks>1){
+      xthread::xThread xt(oss,ncpus,1);
+      std::function<void(uint,const vector<string>&,vector<vector<aflowlib::_aflowlib_entry> >&,vector<uint>&,ostream&)> fn=
+        [&](uint i,const vector<string>& systems,vector<vector<aflowlib::_aflowlib_entry> >& results,vector<uint>& vKrun,ostream& oss){
+          vKrun[i]=(getDatabaseDerivedProperties(systems[i],database_file,results[i],oss)?1:0);
+        };
+      xt.run(ntasks,fn,systems,results,vKrun,oss_dn);
+    }else
+#endif
+    {
+      for(uint i=0;i<ntasks;i++){vKrun[i]=(getDatabaseDerivedProperties(systems[i],database_file,results[i],oss_dn)?1:0);}
+    }
+    vector<string> failed;
+    for(uint i=0;i<ntasks;i++){if(!vKrun[i]){failed.push_back(systems[i]);}}
+    if(!failed.empty()){
+      // nothing is written, so the next run computes the same hulls again
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Hull failed for "+aurostd::joinWDelimiter(failed,","),_RUNTIME_ERROR_);
+    }
+
+    // new lines; entries of the recomputed alloys that no hull returned get empty values, so they are not recomputed every run
+    for(uint i=0,fl_size_i=removed.size();i<fl_size_i;i++){records.erase(removed[i]);values.erase(removed[i]);}
+    std::map<string,std::pair<double,double> > computed;  // by AUID
+    for(uint i=0;i<ntasks;i++){
+      for(uint j=0,fl_size_j=results[i].size();j<fl_size_j;j++){
+        const aflowlib::_aflowlib_entry& entry=results[i][j];
+        if(inputs.count(entry.auid) && !computed.count(entry.auid)){computed[entry.auid]=std::make_pair(entry.distance_hull,entry.deed);}  // subsystems shared by two hulls: once
+      }
+    }
+    const std::set<string> affected_set(affected.begin(),affected.end());
+    for(std::map<string,string>::const_iterator it=inputs.begin();it!=inputs.end();++it){
+      if(!computed.count(it->first) && affected_set.count(alloys[it->first])){computed[it->first]=std::make_pair((double)AUROSTD_NAN,(double)AUROSTD_NAN);}
+    }
+    uint nupdated=0;
+    for(std::map<string,std::pair<double,double> >::const_iterator it=computed.begin();it!=computed.end();++it){
+      const string line="{\"auid\":\""+aurostd::JSON::escape(it->first)+"\",\"distance_hull\":"+json_number(it->second.first)+
+        ",\"deed\":"+json_number(it->second.second)+",\"derived_inputs\":\""+aurostd::JSON::escape(inputs[it->first])+"\"}";
+      if(records.count(it->first) && records[it->first]==line){continue;}
+      records[it->first]=line;
+      values[it->first]=it->second;
+      nupdated++;
+    }
+
+    // the file first, then the database: a failed patch is repeated by the next run
+    if(nupdated || nremoved){
+      stringstream content;
+      for(std::map<string,string>::const_iterator it=records.begin();it!=records.end();++it){content << it->second << endl;}
+      const string derived_file_tmp=derived_file+".tmp";
+      if(!aurostd::stringstream2file(content,derived_file_tmp)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not write "+derived_file_tmp,_FILE_ERROR_);}
+      if(std::rename(derived_file_tmp.c_str(),derived_file.c_str())!=0){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Could not replace "+derived_file,_FILE_ERROR_);}
+      message << "Wrote " << records.size() << " lines to " << derived_file << " (" << nupdated << " new or changed, " << nremoved << " removed)";
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    }
+    vector<string> patch_lines;
+    for(std::map<string,string>::const_iterator it=records.begin();it!=records.end();++it){
+      const std::map<string,std::pair<double,double> >::const_iterator it_db=database_values.find(it->first);
+      if(it_db==database_values.end()){continue;}
+      const std::pair<double,double>& value=values[it->first];
+      if(same_value(it_db->second.first,value.first) && same_value(it_db->second.second,value.second)){continue;}
+      patch_lines.push_back(it->second);
+    }
+    message << "Database lines to patch: " << patch_lines.size();
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,aflags,FileMESSAGE,oss,_LOGGER_MESSAGE_);
+    if(patch_lines.empty()){return 100;}
+    const string patch_file=aurostd::TmpFileCreate("derived_properties_patch");
+    aurostd::string2file(aurostd::joinWDelimiter(patch_lines,"\n")+"\n",patch_file);
+    const int patch_code=db.patchDatabase(patch_file,false);
+    aurostd::RemoveFile(patch_file);
+    return patch_code;
+  }
+  //CO20261004 STOP - database derived properties
 } // namespace chull
 
 #endif  // _AFLOW_CHULL_CPP_

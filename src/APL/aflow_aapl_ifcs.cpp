@@ -217,7 +217,7 @@ namespace apl {
     }
 
     bool stagebreak = false;
-    xinput.xvasp.AVASP_arun_mode = __AFLOW_FUNC__;
+    xinput.xvasp.AVASP_arun_mode = "AAPL"; //[CO20240516 - very odd...]__AFLOW_FUNC__;
     stringstream _logger;
     _logger << "Managing directories for ";
     if (order == 3) {

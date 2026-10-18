@@ -1,21 +1,14 @@
 // aflowlib_webapp_entry.js
 //
 // author: Bob Hanson
-// called from aflow_web_interface2.cpp via
-// http://aflowlib.duke.edu/users/jmolers/test/entry.php?id=aflow:137d3cb39fa592d3
+// called from aflow_web_interface2.cpp
 
 //BH20160521 12:57:40 PM
 //BH20160522 10:03:22 PM finalized
 //CO20170623 12:02:22 PM minor changes
 //PC20180723 Add Symmetry Operations
 
-//var jsmolDir = "http://aflowlib.duke.edu/users/jmolers/test/jsmol";
-
 document.write("<div id='jmol'></div>");
-
-//Jmol.db._DirectDatabaseCalls["aflowlib.duke.edu"] = "%URL"; // not indicated in JSmolCore.js
-//Jmol.db._DirectDatabaseCalls["aflow.duke.edu"] = "%URL"; // not indicated in JSmolCore.js
-//Jmol.db._DirectDatabaseCalls["aflowlib.duke.edu"] = "%URL"; // not indicated in JSmolCore.js
 
 //function testfunction() {
 //  var all = document.getElementById('symop-container').querySelectorAll('*');
@@ -27,7 +20,7 @@ if (!self.AFLOW) {
   AFLOW = {};
   AFLOW.version = "31028";
   AFLOW.url_WEB =
-    "http://aflowlib.duke.edu/AFLOWDATA/ICSD_WEB/BCC/Ag3Au1Se2_ICSD_171959";
+    "https://s4e.ai/AFLOWDATA/ICSD_WEB/BCC/Ag3Au1Se2_ICSD_171959";
   AFLOW.label = "Ag3Au1Se2_ICSD_171959";
   AFLOW.spaceGroupNo = 214;
   AFLOW.spaceGroupName = "I4_{1}32";

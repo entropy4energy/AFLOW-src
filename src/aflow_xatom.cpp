@@ -2668,12 +2668,15 @@ void xstructure::free() { //DX20191220 - moved all initializations from constuct
   qm_forces_write=FALSE;
   qm_positions.clear();
   qm_positions_write=FALSE;
-  qm_E_cell=0.0;qm_dE_cell=0.0;qm_H_cell=0.0;qm_PV_cell=0.0;qm_mag_cell=0.0;qm_P=0.0;
-  qm_E_atom=0.0;qm_dE_atom=0.0;qm_H_atom=0.0;qm_PV_atom=0.0;qm_mag_atom=0.0; 
+  qm_E_cell=0.0;qm_dE_cell=0.0;qm_H_cell=0.0;qm_V_cell=0.0;qm_PV_cell=0.0;qm_mag_cell=0.0;qm_P=0.0; //CO20230917 - volume
+  qm_E_atom=0.0;qm_dE_atom=0.0;qm_H_atom=0.0;qm_V_atom=0.0;qm_PV_atom=0.0;qm_mag_atom=0.0;  //CO20230917 - volume
+  qm_vmag.clear();  //CO20230915
+  qm_vmag_write=FALSE;  //CO20230915
   // KPOINTS ---------------------------
   kpoints_k1=0;kpoints_k2=0;kpoints_k3=0;
   kpoints_s1=0;kpoints_s2=0;kpoints_s3=0;
   kpoints_kmax=0;kpoints_kppra=0;
+  kpoints_kppra_orig=0; //CO20260124
   kpoints_mode=0;
   kpoints_kscheme="";
   //DX+CO START
@@ -2980,12 +2983,17 @@ void xstructure::copy(const xstructure& bstr) {
   for(uint i=0;i<bstr.qm_positions.size();i++)
     qm_positions.push_back(bstr.qm_positions.at(i));
   qm_positions_write=bstr.qm_positions_write;
-  qm_E_cell=bstr.qm_E_cell;qm_dE_cell=bstr.qm_dE_cell;qm_H_cell=bstr.qm_H_cell;qm_PV_cell=bstr.qm_PV_cell;qm_mag_cell=bstr.qm_mag_cell;qm_P=bstr.qm_P;
-  qm_E_atom=bstr.qm_E_atom;qm_dE_atom=bstr.qm_dE_atom;qm_H_atom=bstr.qm_H_atom;qm_PV_atom=bstr.qm_PV_atom;qm_mag_atom=bstr.qm_mag_atom;
+  qm_E_cell=bstr.qm_E_cell;qm_dE_cell=bstr.qm_dE_cell;qm_H_cell=bstr.qm_H_cell;qm_V_cell=bstr.qm_V_cell;qm_PV_cell=bstr.qm_PV_cell;qm_mag_cell=bstr.qm_mag_cell;qm_P=bstr.qm_P; //CO20230917 - volume
+  qm_E_atom=bstr.qm_E_atom;qm_dE_atom=bstr.qm_dE_atom;qm_H_atom=bstr.qm_H_atom;qm_V_atom=bstr.qm_V_atom;qm_PV_atom=bstr.qm_PV_atom;qm_mag_atom=bstr.qm_mag_atom;  //CO20230917 - volume
+  qm_vmag.clear();  //CO20230915
+  for(uint i=0;i<bstr.qm_vmag.size();i++) //CO20230915
+    qm_vmag.push_back(bstr.qm_vmag.at(i));  //CO20230915
+  qm_vmag_write=bstr.qm_vmag_write; //CO20230915
   // KPOINTS ---------------------------
   kpoints_k1=bstr.kpoints_k1;kpoints_k2=bstr.kpoints_k2;kpoints_k3=bstr.kpoints_k3;
   kpoints_s1=bstr.kpoints_s1;kpoints_s2=bstr.kpoints_s2;kpoints_s3=bstr.kpoints_s3;
   kpoints_kmax=bstr.kpoints_kmax;kpoints_kppra=bstr.kpoints_kppra;
+  kpoints_kppra_orig=bstr.kpoints_kppra_orig; //CO20260124
   kpoints_mode=bstr.kpoints_mode;
   kpoints_kscheme=bstr.kpoints_kscheme;
   //DX+CO START
@@ -3365,7 +3373,13 @@ ostream& operator<<(ostream& oss,const xstructure& a) { // operator<<
       oss.precision(_precision_);  //SC to cut/paste from matlab in format long
     }
     else if(a_iomode==IOVASP_WYCKCAR){ //DX20210525 - note wyccar uses lattice parameters of the conventional cell
-      xvector<double> data = Getabc_angles(a.standard_lattice_ITC,DEGREES);
+      xvector<double> data;
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " a.standard_lattice_ITC=" << endl << a.standard_lattice_ITC << endl;}
+      if(det(a.standard_lattice_ITC)==0){  //CO20250724 - perhaps it has not been set
+        xstructure b(a);
+        b.SpaceGroup_ITC();
+        data=Getabc_angles(b.standard_lattice_ITC,DEGREES);
+      }else{data = Getabc_angles(a.standard_lattice_ITC,DEGREES);}
       oss << " ";
       oss.precision(10);  //SC to cut/paste from matlab in format long
       if(abs(data(1))<10.0) oss << " ";
@@ -3430,7 +3444,7 @@ ostream& operator<<(ostream& oss,const xstructure& a) { // operator<<
     //CO20170630 - fixing for POCC
     //[CO20180705 - we have const str&, so we can't modify atom arrangement, this MUST be done before structure is printed]a.MakeTypes();  //CO20180705 - repetita iuvant
     //[CO20180705 - we have const str&, so we can't modify atom arrangement, this MUST be done before structure is printed]std::stable_sort(a.atoms.begin(),a.atoms.end(),sortAtomsType);  //CO20180705 - this makes it necessary that atoms are properly typed
-    if(a_iomode!=IOVASP_WYCKCAR) { //DX20210611 - do not do for Wyccar, atom count is not the same as number of Wyckoff positiosn
+    if(a_iomode!=IOVASP_WYCKCAR) { //DX20210611 - do not do for Wyccar, atom count is not the same as number of Wyckoff positions
       if(a.partial_occupation_flag==TRUE) {
         //need to figure out the '+'
         uint iatom=0;
@@ -3584,6 +3598,14 @@ ostream& operator<<(ostream& oss,const xstructure& a) { // operator<<
             if(!std::signbit(a.qm_positions.at(iat)(j))) oss << " ";
             oss << a.qm_positions.at(iat)(j) << " ";
           }
+          oss << ")_   ";
+        }
+        if(a.qm_vmag_write) { //CO20230915
+          if(a.qm_calculated==TRUE)  oss << "M *(";
+          if(a.qm_calculated==FALSE) oss << "M  (";
+          if(abs(a.qm_vmag.at(iat))<10.0) oss << " ";
+          if(!std::signbit(a.qm_vmag.at(iat))) oss << " ";
+          oss << a.qm_vmag.at(iat) << " ";
           oss << ")_   ";
         }
         if(a.write_DEBUG_flag) {
@@ -6424,6 +6446,7 @@ istream& operator>>(istream& cinput, xstructure& a) {
     bool found_atom_site_labels=FALSE;
     bool already_storing_atoms=FALSE;
     for(uint i=0;i<vinput.size();i++) {
+      if(LDEBUG){cerr << __AFLOW_FUNC__ << " vinput[i=" << i << "]=\"" << vinput[i] << "\"" << endl;}
       //DX20181210 - CIF can have multiple loops, reset after each loop and neglect aniso loop - START
       if(aurostd::substring2bool(vinput[i],"loop")){
         found_atom_site_labels = FALSE;
@@ -6440,17 +6463,62 @@ istream& operator>>(istream& cinput, xstructure& a) {
       }
       //DX20181210 - CIF can have multiple loops, reset after each loop and neglect aniso_U loop - END
       else if(found_atom_site_labels == TRUE && aurostd::RemoveWhiteSpaces(vinput[i]).size()!=0){
+        //CO20250407 START - new parser, more robust to quoted lines
         vector<string> tokens;
-        aurostd::string2tokens(vinput[i],tokens," ");
-        //DX20190718 - check tokens first; Springer Materials has extra spaces - START
-        for(uint t=0;t<tokens.size();t++){
-          if(aurostd::RemoveWhiteSpaces(tokens[t])[0]=='\'' && aurostd::RemoveWhiteSpaces(tokens[t])[tokens[t].size()-1]!='\''){
-            if(t+1<tokens.size()){
-              if(aurostd::RemoveWhiteSpaces(tokens[t+1])[0]!='\'' && aurostd::RemoveWhiteSpaces(tokens[t+1])[tokens[t+1].size()-1]=='\''){
-                tokens[t]+="_"+tokens[t+1];
-                tokens.erase(tokens.begin()+t+1);
+        string strtmp="";
+        string::size_type lastPos=vinput[i].find_first_not_of(" ",0);
+        string::size_type pos=vinput[i].find_first_of(" ",lastPos);
+        if(vinput[i][lastPos]=='\''){pos=vinput[i].find_first_of("\'",lastPos+1);if(pos!=string::npos){pos+=1;}}
+        if(vinput[i][lastPos]=='\"'){pos=vinput[i].find_first_of("\"",lastPos+1);if(pos!=string::npos){pos+=1;}}
+        if(LDEBUG){
+          cerr << __AFLOW_FUNC__ << " lastPos=" << lastPos << endl;
+          cerr << __AFLOW_FUNC__ << " pos=" << pos << endl;
+        }
+        while(pos!=string::npos || lastPos!=string::npos){
+          strtmp=vinput[i].substr(lastPos,pos-lastPos);
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " strtmp=\"" << strtmp << "\"" << endl;}
+          strtmp=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(strtmp);
+          strtmp=aurostd::RemoveCharacterFromTheFrontAndBack(strtmp,'\'');
+          strtmp=aurostd::RemoveCharacterFromTheFrontAndBack(strtmp,'\"');
+          strtmp=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(strtmp); //CO20250407 - do again after removing '', ""
+          aurostd::StringSubst(strtmp," ","_"); //CO20250407 - keep DX original implementation, any spaces in the middle get replaced with "_"
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " strtmp(CLEAN)=\"" << strtmp << "\"" << endl;}
+          tokens.push_back(strtmp);
+          if(LDEBUG){cerr << __AFLOW_FUNC__ << " tokens.back()=\"" << tokens.back() << "\"" << endl;}
+          //
+          lastPos=vinput[i].find_first_not_of(" ",pos);
+          pos=vinput[i].find_first_of(" ",lastPos);
+          if(vinput[i][lastPos]=='\''){pos=vinput[i].find_first_of("\'",lastPos+1);if(pos!=string::npos){pos+=1;}}
+          if(vinput[i][lastPos]=='\"'){pos=vinput[i].find_first_of("\"",lastPos+1);if(pos!=string::npos){pos+=1;}}
+          if(LDEBUG){
+            cerr << __AFLOW_FUNC__ << " lastPos=" << lastPos << endl;
+            cerr << __AFLOW_FUNC__ << " pos=" << pos << endl;
+          }
+        }
+        if(LDEBUG){for(uint t=0;t<tokens.size();t++){cerr << __AFLOW_FUNC__ << " tokens[t=" << t << "]=\"" << tokens[t] << "\"" << endl;}}
+        //CO20250407 STOP - new parser, more robust to quoted lines
+        if(0){  //CO20250407 - more robust implementation above, deal with quotes directly, keeping below for history
+          aurostd::string2tokens(vinput[i],tokens," ");
+          //DX20190718 - check tokens first; Springer Materials has extra spaces - START
+          //CO20250406 - would like to see an example for 'CHECK 3.1', I am assuming it is not a float case like 3.2
+          for(uint t=0;t<tokens.size();t++){
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " tokens[t=" << t << ";PRE ]=\"" << tokens[t] << "\"" << endl;}
+            if(aurostd::RemoveWhiteSpaces(tokens[t])[0]=='\'' && aurostd::RemoveWhiteSpaces(tokens[t])[tokens[t].size()-1]!='\''){
+              if(LDEBUG){cerr << __AFLOW_FUNC__ << " CHECK 1" << endl;}
+              if(t+1<tokens.size()){
+                if(LDEBUG){cerr << __AFLOW_FUNC__ << " CHECK 2" << endl;}
+                if(aurostd::RemoveWhiteSpaces(tokens[t+1]).size()>1 && aurostd::RemoveWhiteSpaces(tokens[t+1])[0]!='\'' && aurostd::RemoveWhiteSpaces(tokens[t+1])[tokens[t+1].size()-1]=='\''){  //CO20250406 - added check for string size, this must be true since first and last character are not the same //CO20250406 - would like to see example, since solution is to append via '_", seems it must be an irrelevant string field
+                  if(LDEBUG){cerr << __AFLOW_FUNC__ << " CHECK 3.1" << endl;}
+                  tokens[t]+="_"+tokens[t+1];
+                  tokens.erase(tokens.begin()+t+1);
+                }else if(aurostd::RemoveWhiteSpaces(tokens[t+1]).size()==1 && aurostd::RemoveWhiteSpaces(tokens[t+1])[0]=='\''){  //CO20240406 - example line in ICSD_197199.936377_1.cif:  "In2 In0+ 4 d '0. ' 0.5 0.25 . 1."
+                  if(LDEBUG){cerr << __AFLOW_FUNC__ << " CHECK 3.2" << endl;}
+                  tokens[t]+=tokens[t+1];
+                  tokens.erase(tokens.begin()+t+1);
+                }
               }
             }
+            if(LDEBUG){cerr << __AFLOW_FUNC__ << " tokens[t=" << t << ";POST]=\"" << tokens[t] << "\"" << endl;}
           }
         }
         //DX20190718 - check tokens first; Springer Materials has extra spaces - END
@@ -6943,6 +7011,7 @@ istream& operator>>(istream& cinput, xstructure& a) {
     atom.cpos.clear();atom.fpos.clear();
     a.qm_forces.push_back(v);
     a.qm_positions.push_back(v);
+    a.qm_vmag.push_back(0.0); //CO20230915
     a.qm_atoms.push_back(atom);
   }
 
@@ -7001,6 +7070,7 @@ istream& operator>>(istream& cinput, xstructure& a) {
   a.qm_calculated=FALSE;
   a.qm_forces_write=FALSE;
   a.qm_positions_write=FALSE;
+  a.qm_vmag_write=FALSE;  //CO20230915
   // CALCULATED STUFF
   //DX+CO START
   a.dist_nn_min=AUROSTD_NAN;    //CO
@@ -7056,6 +7126,11 @@ istream& operator>>(istream& cinput, xstructure& a) {
   }
   if(a.atoms.size()!=a.qm_positions.size()) {
     message << "a.atoms.size()!=a.qm_positions.size() " << endl;  //CO20190629
+    for(uint i=0;i<vinput.size();i++) message << vinput[i] << endl;  //CO20190629
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ERROR_); //CO20190629
+  }
+  if(a.atoms.size()!=a.qm_vmag.size()) {
+    message << "a.atoms.size()!=a.qm_vmag.size() " << endl;  //CO20190629
     for(uint i=0;i<vinput.size();i++) message << vinput[i] << endl;  //CO20190629
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ERROR_); //CO20190629
   }
@@ -10194,22 +10269,31 @@ string KPPRA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const int& 
   xvector<double> b1(3),b2(3),b3(3),db1(3),db2(3),db3(3);
   double nb1,nb2,nb3;
   k1=1;k2=1;k3=1;
-  int kk1,kk2,kk3,kk;
+  int kk1,kk2,kk3; //[CO20230626 - clang warning not used],kk;
   b1=klattice(1);nb1=aurostd::modulus(b1);
   b2=klattice(2);nb2=aurostd::modulus(b2);
   b3=klattice(3);nb3=aurostd::modulus(b3);
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << endl << rlattice << endl << endl << klattice << endl << b1 << endl << b2 << endl << b3 << endl << nb1 << endl << nb2 << endl << nb3 << endl;
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << nb1 << " " << nb2 << " " << nb3 << " " << endl;
+  if(LDEBUG){
+    cerr << __AFLOW_FUNC__ << endl;
+    cerr << "rlattice=" << endl << rlattice << endl;
+    cerr << "klattice=" << endl << klattice << endl;
+    cerr << "b1=" << b1 << endl;
+    cerr << "b2=" << b2 << endl;
+    cerr << "b3=" << b3 << endl;
+    cerr << "||b1||=" << nb1 << endl;
+    cerr << "||b2||=" << nb2 << endl;
+    cerr << "||b3||=" << nb3 << endl;
+  }
   if(NK>1) {
     bool found=FALSE;
     double dkdelta,dk;
     dkdelta=0.999;
     dk=aurostd::min(nb1,nb2,nb3);
     kk1=0;kk2=0;kk3=0;
-    kk=0;
+    //[CO20230626 - clang warning not used]kk=0;
     int iverbose=0;
     while(!found) {
-      kk++;
+      //[CO20230626 - clang warning not used]kk++;
       if(dk<=1e-5) {
         k1=1;k2=1;k3=1;
         aus << "00000  MESSAGE KPOINTS KPPRA minimum not found k=[" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3 << endl;
@@ -10219,7 +10303,8 @@ string KPPRA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const int& 
       kk3=(int) floor((double) nb3/dk);db3=b3/((double) kk3);
       if(kk1+kk2+kk3>iverbose) {
         //  if(!mod(kk,50) || kk1*kk2*kk3>=NK)
-        aus << "00000  MESSAGE KPOINTS KPPRA minimizing k=[" << kk1 << "," << kk2 << "," << kk3 << "]=" << kk1*kk2*kk3 << " =[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   dk=" << dk << endl;
+        aus << "00000  MESSAGE KPOINTS KPPRA minimizing k=[" << kk1 << "," << kk2 << "," << kk3 << "]=" << kk1*kk2*kk3;
+        aus << " =[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   dk=" << dk << endl;
         iverbose=kk1+kk2+kk3;
       }
       if(kk1*kk2*kk3>=NK) {
@@ -10232,11 +10317,14 @@ string KPPRA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const int& 
     k1=1;k2=1;k3=1;
   }
   db1=b1/((double) k1); db2=b2/((double) k2); db3=b3/((double) k3);
-  aus << "00000  MESSAGE KPOINTS KPPRA routine [" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3 << "=[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   "  << endl;
+  aus << "00000  MESSAGE KPOINTS KPPRA routine [" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3;
+  aus << "=[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   "  << endl;
   return aus.str();
 }
 
 string KPPRA_LAT(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const int& NK) {
+  //CO20231129 - difference with KPPRA() is kdata/kdatagrid and klattice=GetStandardPrimitive(klattice), see below
+  //this seems like a bad idea, klattice may rotate
   bool LDEBUG=(FALSE || XHOST.DEBUG);
   stringstream aus("");
   aus.precision(5);
@@ -10249,22 +10337,31 @@ string KPPRA_LAT(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const i
   xvector<double> b1(3),b2(3),b3(3),db1(3),db2(3),db3(3);
   double nb1,nb2,nb3;
   k1=1;k2=1;k3=1;
-  int kk1,kk2,kk3,kk;
+  int kk1,kk2,kk3; //[CO20230626 - clang warning not used],kk;
   b1=klattice(1);nb1=aurostd::modulus(b1);
   b2=klattice(2);nb2=aurostd::modulus(b2);
   b3=klattice(3);nb3=aurostd::modulus(b3);
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << endl << rlattice << endl << endl << klattice << endl << b1 << endl << b2 << endl << b3 << endl << nb1 << endl << nb2 << endl << nb3 << endl;
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << nb1 << " " << nb2 << " " << nb3 << " " << endl;
+  if(LDEBUG){
+    cerr << __AFLOW_FUNC__ << endl;
+    cerr << "rlattice=" << endl << rlattice << endl;
+    cerr << "klattice=" << endl << klattice << endl;
+    cerr << "b1=" << b1 << endl;
+    cerr << "b2=" << b2 << endl;
+    cerr << "b3=" << b3 << endl;
+    cerr << "||b1||=" << nb1 << endl;
+    cerr << "||b2||=" << nb2 << endl;
+    cerr << "||b3||=" << nb3 << endl;
+  }
   if(NK>1) {
     bool found=FALSE;
     double dkdelta,dk;
     dkdelta=0.999;
     dk=aurostd::min(nb1,nb2,nb3);
     kk1=0;kk2=0;kk3=0;
-    kk=0;
+    //[CO20230626 - clang warning not used]kk=0;
     int iverbose=0;
     while(!found) {
-      kk++;
+      //[CO20230626 - clang warning not used]kk++;
       if(dk<=1e-5) {
         k1=1;k2=1;k3=1;
         aus << "00000  MESSAGE KPOINTS KPPRA minimum not found k=[" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3 << endl;
@@ -10276,7 +10373,9 @@ string KPPRA_LAT(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const i
 
       if(kk1+kk2+kk3>iverbose) {
         //  if(!mod(kk,50) || kk1*kk2*kk3>=NK)
-        aus << "00000  MESSAGE KPOINTS KPPRA minimizing k=[" << kk1 << "," << kk2 << "," << kk3 << "," << GetLatticeType(kdatagrid) << "]=" << kk1*kk2*kk3 << " = [" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   dk=" << dk << " " << endl;
+        aus << "00000  MESSAGE KPOINTS KPPRA minimizing k=[" << kk1 << "," << kk2 << "," << kk3 << ",";
+        aus << GetLatticeType(kdatagrid) << "]=" << kk1*kk2*kk3;
+        aus << " = [" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   dk=" << dk << " " << endl;
         iverbose=kk1+kk2+kk3;
       }
       if(kk1*kk2*kk3>=NK) {
@@ -10289,7 +10388,8 @@ string KPPRA_LAT(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const i
     k1=1;k2=1;k3=1;
   }
   db1=b1/((double) k1); db2=b2/((double) k2); db3=b3/((double) k3);
-  aus << "00000  MESSAGE KPOINTS KPPRA routine [" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3 << "=[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   "  << endl;
+  aus << "00000  MESSAGE KPOINTS KPPRA routine [" << k1 << "," << k2 << "," << k3 << "]=" << k1*k2*k3;
+  aus << "=[" << aurostd::modulus(db1) << "," << aurostd::modulus(db2) << "," << aurostd::modulus(db3) << "]   "  << endl;
   return aus.str();
 }
 
@@ -10322,22 +10422,31 @@ string KPPRA_DELTA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const
   xvector<double> b1(3),b2(3),b3(3),db1(3),db2(3),db3(3);
   double nb1,nb2,nb3;
   k1=1;k2=1;k3=1;
-  int kk1,kk2,kk3,kk;
+  int kk1,kk2,kk3; //[CO20230626 - clang warning not used],kk;
   b1=klattice(1);nb1=aurostd::modulus(b1);
   b2=klattice(2);nb2=aurostd::modulus(b2);
   b3=klattice(3);nb3=aurostd::modulus(b3);
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << endl << rlattice << endl << endl << klattice << endl << b1 << endl << b2 << endl << b3 << endl << nb1 << endl << nb2 << endl << nb3 << endl;
-  if(LDEBUG) aus << "KPPRA LDEBUG:  " << nb1 << " " << nb2 << " " << nb3 << " " << endl;
+  if(LDEBUG){
+    cerr << __AFLOW_FUNC__ << endl;
+    cerr << "rlattice=" << endl << rlattice << endl;
+    cerr << "klattice=" << endl << klattice << endl;
+    cerr << "b1=" << b1 << endl;
+    cerr << "b2=" << b2 << endl;
+    cerr << "b3=" << b3 << endl;
+    cerr << "||b1||=" << nb1 << endl;
+    cerr << "||b2||=" << nb2 << endl;
+    cerr << "||b3||=" << nb3 << endl;
+  }
   if(DK>1.0e-6) {
     bool found=FALSE;
     double dkdelta,dk;
     dkdelta=0.9999;
     dk=aurostd::min(nb1,nb2,nb3);
     kk1=0;kk2=0;kk3=0;
-    kk=0;
+    //[CO20230626 - clang warning not used]kk=0;
     int iverbose=0;
     while(!found) {
-      kk++;
+      //[CO20230626 - clang warning not used]kk++;
       kk1=(int) floor((double) nb1/dk);db1=b1/((double) kk1);
       kk2=(int) floor((double) nb2/dk);db2=b2/((double) kk2);
       kk3=(int) floor((double) nb3/dk);db3=b3/((double) kk3);
@@ -10375,7 +10484,7 @@ string KPPRA_DELTA(xstructure& str,const double& DK) {
 // **************************************************************************
 // returns estimated version of NBANDS starting from
 // electrons, ions, spin and ispin
-int GetNBANDS(int electrons,int nions,int spineach,bool ispin,int NPAR) {
+int GetNBANDS(int electrons,int nions,int spineach,bool ispin,int NCORE) {
   double out=0.0;
   out=max(ceil((electrons+4.0)/1.75)+max(nions/1.75,6.0),ceil(0.80*electrons)); // from VASP
   if(ispin) out+=(nions*spineach+1)/2;
@@ -10395,14 +10504,61 @@ int GetNBANDS(int electrons,int nions,int spineach,bool ispin,int NPAR) {
   //  cerr << "GetNBANDS=" << out << endl;
   // throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Throw for debugging purposes.",_GENERIC_ERROR_);
   int nbands=(int)ceil(out);
+  //CO20260124 START - switching to NCORE per VASP wiki for NBANDS https://www.vasp.at/wiki/NBANDS
   //CO20210315 START - adjust for NPAR
-  if(NPAR>0){
+  if(NCORE>0){
     int increment=1; //(increase?+1:-1);
-    while((nbands%NPAR)!=0){nbands+=increment;}
+    while((nbands%NCORE)!=0){nbands+=increment;}
   }
   //CO20210315 END - adjust for NPAR
+  //CO20260124 END - switching to NCORE per VASP wiki for NBANDS https://www.vasp.at/wiki/NBANDS
   return nbands;
 }
+//CO20260124 - formula above should be LARGER than VASP's default
+//this formula is used as a default minimum cutoff for MEMORY patches with the monitor
+//actually there is one already implemented at the bottom of KBIN::XVASP_Afix_NBANDS() (ivasp), so we are set
+//VASP will cry if we go too low for NBANDS, which the monitor knows how to catch
+//it is better to leave as is as the NBANDS formula can change with version of vasp
+int GetNBANDS_VASP(int electrons,int nions,int spineach,bool ispin,int NCORE) { //CO20260124 - this is the formula giving by VASP wiki: https://www.vasp.at/wiki/NBANDS
+  double out=0.0;
+  out=max(0.5*(electrons+2.0)+max(0.5*nions,3.0),3.0/5.0*electrons); //CO20260124 - https://www.vasp.at/wiki/NBANDS
+  if(ispin) out+=(nions*spineach+1)/2;
+  int nbands=(int)ceil(out);
+  if(NCORE>0){
+    int increment=1; //(increase?+1:-1);
+    while((nbands%NCORE)!=0){nbands+=increment;}
+  }
+  return nbands;
+}
+
+//CO20261009 START - default NBANDS from the bands the electrons occupy
+//the majority spin holds (electrons+|magmom|)/2 electrons at the initial moments (all electrons in spinor bands when
+//noncollinear, half of them without spin); NBANDS is 1.2 times those bands plus 4, the GPAW default (Quantum ESPRESSO
+//takes 20% more and at least 4 for metals), rounded up to a multiple of NCORE
+//it is never below VASP's own default (GetNBANDS_VASP() without spin, plus (sum|MAGMOM|+1)/2 with spin, doubled when
+//noncollinear), which the VASP wiki calls a safe choice in most cases
+//GetNBANDS() above stacks 1.3*1.1*1.075*1.03*1.05 (1.66) and nions^0.025 on a spin term of 2.5 bands per ion; in 127
+//finished CHAOS runs (relax1 and static OUTCARs, Oct 9 2026) it gave a median 2.8 times the highest band with
+//occupation above 1e-3, while this count stayed at least 4 bands (7%) above that band in 126 of them, a median 33% above
+//(the 127th occupied all 80 of its bands in its first ionic step); bands above the occupied ones do not change the
+//converged energy, and the wavefunctions, most of the memory of a large cell, scale with NBANDS
+//too few bands are still caught by the NBANDS error (KBIN::VASP_ProcessWarnings, also under --monitor_vasp), whose fix
+//adds 20+20% (XVASP_Afix_NBANDS)
+int GetNBANDS_OCC(double electrons,int nions,double magmom,bool ispin,bool noncollinear,int NCORE) {
+  double nocc=electrons/2.0;
+  if(noncollinear){nocc=electrons;}
+  else if(ispin){nocc=(electrons+std::abs(magmom))/2.0;}
+  int nbands=(int)std::ceil(1.2*std::ceil(nocc-1e-6)-1e-6)+4;
+  int nbands_vasp=GetNBANDS_VASP((int)std::ceil(electrons-1e-6),nions,0,false,1);
+  if(noncollinear){nbands_vasp*=2;}
+  else if(ispin){nbands_vasp+=(int)((std::abs(magmom)+1.0)/2.0);}
+  if(nbands<nbands_vasp){nbands=nbands_vasp;}
+  if(NCORE>0){
+    while((nbands%NCORE)!=0){nbands++;}
+  }
+  return nbands;
+}
+//CO20261009 END - default NBANDS from the bands the electrons occupy
 
 // **************************************************************************
 // Function GetZVAL from *CAR
@@ -10925,7 +11081,13 @@ xvector<int> LatticeDimensionSphere(const xmatrix<double>& _lattice, double radi
 #if DEBUG_LATTICE_DIMENSIONS
     if(LDEBUG) {cerr << __AFLOW_FUNC__ << " abs(frac_normals(i,i))=" << abs(frac_normals(i,i)) << endl;}
 #endif
-    dim(i)=(int)ceil(abs(frac_normals(i,i)));
+    //CO20261018 - a (nearly) singular lattice gives dimensions far past int, whose conversion is undefined: it gave INT_MIN
+    //on x86-64, where the loops over cells did not run, and INT_MAX on arm64 (macOS), where the cell lists filled memory
+    const double dim_d=ceil(abs(frac_normals(i,i)));
+    if(!std::isfinite(dim_d) || dim_d>1.0e6) {
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"lattice dimension "+aurostd::utype2string(dim_d)+" along vector "+aurostd::utype2string(i)+" for radius "+aurostd::utype2string(radius)+": the lattice is (nearly) singular",_VALUE_RANGE_);
+    }
+    dim(i)=(int)dim_d;
   }
   if(max(dim)==0) { 
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,_AUROSTD_XLIBS_ERROR_+" dim=0!!",_INPUT_ILLEGAL_);
@@ -11142,7 +11304,7 @@ void xstructure::GetLatticeType(xstructure& str_sp,xstructure& str_sc, double sy
   // set symmetry tolerance based on the following sequence
   // 1) use input, 2) use sym_eps in xstructure, 3) calculate default
   double tolerance = sym_eps;
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps_calculated){ tolerance = (*this).sym_eps; }
     else{ tolerance=SYM::defaultTolerance((*this)); }
   }
@@ -11385,7 +11547,7 @@ void xstructure::GetExtendedCrystallographicData(xstructure& str_sp,
   // set symmetry tolerance based on the following sequence
   // 1) use input, 2) use sym_eps in xstructure, 3) calculate default
   double tolerance = sym_eps;
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps_calculated){ tolerance = (*this).sym_eps; }
     else{ tolerance=SYM::defaultTolerance((*this)); }
   }
@@ -11489,7 +11651,7 @@ void xstructure::GetRealLatticeType(xstructure& str_sp,xstructure& str_sc, doubl
   // set symmetry tolerance based on the following sequence
   // 1) use input, 2) use sym_eps in xstructure, 3) calculate default
   double tolerance = sym_eps;
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps_calculated){ tolerance = (*this).sym_eps; }
     else{ tolerance=SYM::defaultTolerance((*this)); }
   }
@@ -11563,7 +11725,7 @@ void xstructure::GetReciprocalLatticeType(xstructure& str_sp,xstructure& str_sc,
   // set symmetry tolerance based on the following sequence
   // 1) use input, 2) use sym_eps in xstructure, 3) calculate default
   double tolerance = sym_eps;
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps_calculated){ tolerance = (*this).sym_eps; }
     else{ tolerance=SYM::defaultTolerance((*this)); }
   }
@@ -11624,7 +11786,7 @@ void xstructure::GetSuperlatticeType(xstructure& str_sp,xstructure& str_sc, doub
   // set symmetry tolerance based on the following sequence
   // 1) use input, 2) use sym_eps in xstructure, 3) calculate default
   double tolerance = sym_eps;
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps_calculated){ tolerance = (*this).sym_eps; }
     else{ tolerance=SYM::defaultTolerance((*this)); }
   }
@@ -12839,6 +13001,26 @@ xmatrix<double> MinkowskiBasisReduction(const xmatrix<double>& lattice) {
   return basis;
 }
 
+//CO20261009 START - the number of point operations of a lattice: 48 cubic, 24 hexagonal, 16 tetragonal, 12 rhombohedral,
+//8 orthorhombic, 4 monoclinic, 2 triclinic; AFLOW-SYM (CalculateSymmetryPointGroup) on a cell of one atom spanned by the
+//Minkowski-reduced basis (the order does not depend on the basis); 0 when the symmetry cannot be found
+uint LatticePointGroupOrder(const xmatrix<double>& lattice) {
+  try{
+    xmatrix<double> lat=MinkowskiBasisReduction(lattice);
+    if(det(lat)<0.0){lat=-1.0*lat;}  //same lattice, right-handed basis
+    stringstream ss;
+    ss << "lattice point group" << endl << "1.0" << endl;
+    ss.precision(14);
+    for(int i=1;i<=3;i++){ss << lat[i][1] << " " << lat[i][2] << " " << lat[i][3] << endl;}
+    ss << "1" << endl << "Direct" << endl << "0 0 0" << endl;
+    xstructure xstr(ss,IOVASP_POSCAR);
+    xstr.CalculateSymmetryPointGroup(false);
+    return (uint)xstr.pgroup.size();
+  }
+  catch(aurostd::xerror& excpt){return 0;}
+}
+//CO20261009 END
+
 // ***************************************************************************
 // Function GetMinkowskiStructures() //DX20201006
 // ***************************************************************************
@@ -13090,6 +13272,10 @@ xstructure GetPrimitiveVASP(const xstructure& a,double tol) {
 // -------------------------------------------------------------------
 // double (change in place)
 void BringInCellInPlace(double& component, double tolerance, double upper_bound, double lower_bound) {
+  return BringInCellInPlace_20250724(component,tolerance,upper_bound,lower_bound);
+}
+void BringInCellInPlace_20250724(double& component, double tolerance, double upper_bound, double lower_bound) {
+  //if(component>=lower_bound && component<upper_bound){return;}  //CO20250724
   if (component == INFINITY || component != component || component == -INFINITY) {
     stringstream message; // Moving the stringstream outside the if-statement would add a lot to the run time (~1 sec). 
     message << "Value of component is invalid: (+-) INF or NAN value (component=" << component << ").";
@@ -13099,6 +13285,61 @@ void BringInCellInPlace(double& component, double tolerance, double upper_bound,
     stringstream message; // Moving the stringstream outside the if-statement would add a lot to the run time (~1 sec). 
     message << "Sign of tolerance is negative (tolerance=" << tolerance << ").";
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ERROR_);
+  }
+  if(0){  //CO20250724 - debug
+    cerr << __AFLOW_FUNC__ << " component=" << component << endl;
+    cerr << __AFLOW_FUNC__ << " tolerance=" << tolerance << endl;
+    cerr << __AFLOW_FUNC__ << " upper_bound=" << upper_bound << endl;
+    cerr << __AFLOW_FUNC__ << " lower_bound=" << lower_bound << endl;
+  }
+  
+  //CO20250725 - this approach works well if the component is VERY far outside of the interval
+  //leaving the while loops will take forever
+  //bring the component closer to the loop, then allow the while loop to correct as usual
+  double cell_size=upper_bound-lower_bound;
+  if(cell_size<=0) {
+    std::stringstream message;
+    message << "upper_bound must be greater than lower_bound";
+    throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INPUT_ERROR_);
+  }
+  double shifted=component-lower_bound;
+  //CO20260930 - k is a double, not an int: a component more than 2^31 cells away overflowed the int conversion
+  //(undefined; INT_MIN in practice), so the while loops below were left stepping by 1.0 from about 1e14, or forever
+  //once |component|>2^53, where component-1.0==component. A nearly singular candidate lattice in
+  //SYM::determineLatticeCentering() produces such components (c2f of a cell with volume ~1e-14), which is how
+  //aflowSG(loose) hung (17 hours, then killed) on LIB3 AgAsS/A2BC4_aP14_1_4a_2a_8a-001.BAC. Wherever the int did not overflow,
+  //floor() gives the same integer and k*cell_size the same double, so the result is unchanged.
+  //See the unit test bringincell_far_component.
+  double k=std::floor(shifted/cell_size);
+  component-=k*cell_size;
+
+  if(0){  //CO20250725 - do NOT use this approach, breaks one of the unit tests
+    //brings component into [lower_bound, upper_bound)
+    component=lower_bound+aurostd::mod_floored(component-lower_bound,cell_size);
+    //snap to limits within tolerance
+    //this approach is PROBLEMATIC, it will introduce a bit of noise into every position, better to leave old approach
+    if(component<lower_bound+tolerance){component=lower_bound;} //note: non-symmetric, favors values closer to lower bound
+    else if(component>=upper_bound-tolerance){component=upper_bound-tolerance;}
+  }
+  while (component - upper_bound >= -tolerance){ component -= 1.0; } //note: non-symmetric, favors values closer to lower bound
+  while (component - lower_bound < -tolerance){ component += 1.0; }
+}
+void BringInCellInPlace_20250101(double& component, double tolerance, double upper_bound, double lower_bound) {
+  if (component == INFINITY || component != component || component == -INFINITY) {
+    stringstream message; // Moving the stringstream outside the if-statement would add a lot to the run time (~1 sec). 
+    message << "Value of component is invalid: (+-) INF or NAN value (component=" << component << ").";
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ERROR_); //DX20190905 - replaced cerr with throw
+  }
+  if (std::signbit(tolerance)) { //DX20191115 
+    stringstream message; // Moving the stringstream outside the if-statement would add a lot to the run time (~1 sec). 
+    message << "Sign of tolerance is negative (tolerance=" << tolerance << ").";
+    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ERROR_);
+  }
+  if(0){  //CO20250724
+    cerr << __AFLOW_FUNC__ << " component=" << component << endl;
+    cerr << __AFLOW_FUNC__ << " tolerance=" << tolerance << endl;
+    cerr << __AFLOW_FUNC__ << " upper_bound=" << upper_bound << endl;
+    cerr << __AFLOW_FUNC__ << " lower_bound=" << lower_bound << endl;
   }
   while (component - upper_bound >= -tolerance){ component -= 1.0; } //note: non-symmetric, favors values closer to lower bound
   while (component - lower_bound < -tolerance){ component += 1.0; }
@@ -13608,11 +13849,12 @@ xstructure BringInWignerSeitz(const xstructure& a) {
 //#define IsTranslationFVector IsTranslationFVectorFAST
 //#define IsTranslationFVector IsTranslationFVectorORIGINAL
 //#define IsTranslationFVector IsTranslationFVectorFAST_2011
-#define IsTranslationFVector IsTranslationFVectorORIGINAL_2011
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]#define IsTranslationFVector IsTranslationFVectorORIGINAL_2011
 
 // isTranslationVector() //DX20210316 - moved from XtalFinder
 // faster than subsequent variants below and more robust
-bool isTranslationVector(const xstructure& xstr, const xvector<double>& vec, double tolerance, bool is_frac){
+bool isTranslationVector(const xstructure& xstr, const xvector<double>& cvec, double tolerance, bool skew){ //CO20240518 - removing is_frac //bool is_frac
+  //CO20240518 - updated the function so that is_frac is not allowed
 
   // Check if input vector is a translation vector (i.e. preserves periodicity)
   // tolerance: default is half an Angstrom
@@ -13624,27 +13866,28 @@ bool isTranslationVector(const xstructure& xstr, const xvector<double>& vec, dou
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
   }
 
-  xvector<double> cvec, fvec;
-  if(is_frac){
-    fvec = vec;
-    cvec = xstr.f2c*vec;
-  }
-  else{
-    fvec = xstr.c2f*vec;
-    cvec = vec;
-  }
+  //[CO20240518 - this is wrong]xvector<double> cvec, fvec;
+  //[CO20240518 - this is wrong]if(is_frac){
+  //[CO20240518 - this is wrong]  fvec = vec;
+  //[CO20240518 - this is wrong]  cvec = xstr.f2c*vec;
+  //[CO20240518 - this is wrong]}
+  //[CO20240518 - this is wrong]else{
+  //[CO20240518 - this is wrong]  fvec = xstr.c2f*vec;
+  //[CO20240518 - this is wrong]  cvec = vec;
+  //[CO20240518 - this is wrong]}
 
   uint natoms = xstr.atoms.size();
-  bool skew = false;
+  //[CO20240519 - now input]bool skew = false;
   uint count=0;
 
   // ---------------------------------------------------------------------------
   // check if applying the translation maps to another atom
   // use MapAtom to match type/name/spin/occupation/etc.
+  // CO20240519 - one-to-one mapping check not necessary because this is a simple translation
   for(uint d=0;d<natoms;d++){
     _atom tmp_atom = xstr.atoms[d];
     tmp_atom.cpos+=cvec;
-    tmp_atom.fpos+=fvec;
+    tmp_atom.fpos=xstr.c2f*tmp_atom.cpos; //[CO20240518 - this is wrong]+=fvec;
     if(SYM::MapAtom(xstr.atoms,tmp_atom,true,xstr.lattice,xstr.f2c,skew,tolerance)){
       count++;
     }
@@ -13654,154 +13897,158 @@ bool isTranslationVector(const xstructure& xstr, const xvector<double>& vec, dou
   return (count == natoms);
 }
 
-bool IsTranslationFVectorFAST(const xstructure& a, const xvector<double>& ftvec) {
-  stringstream message;
-  if(a.equiv_fpos_epsilon<1.0e-12) {
-    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
-  }
-  double tolerance=a.equiv_fpos_epsilon;
-  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]bool IsTranslationFVectorFAST(const xstructure& a, const xvector<double>& ftvec) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  stringstream message;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(a.equiv_fpos_epsilon<1.0e-12) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  double tolerance=a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  uint CntGoodTrans=0;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<double> ftpos(3),diff(3);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  bool found_atom=FALSE,found_tvec=TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size()&&found_tvec;iat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Get translated position and shift back into unit cell.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    //  ftpos=a.atoms.at(iat).fpos+ftvec;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // ftpos=BringInCell(ftpos,tolerance);  // no because it will be needed later...
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    found_atom=FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    for(uint jat=0;jat<a.atoms.size()&&!found_atom&&found_tvec;jat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      if(types[iat]==types[jat]) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        //        diff=ftpos-a.atoms.at(jat).fpos;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        diff=BringInCell(a.atoms.at(iat).fpos-a.atoms.at(jat).fpos+ftvec,tolerance);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        if(aurostd::modulus(diff)<=tolerance) {CntGoodTrans++;found_atom=TRUE;}
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    } // For jat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    if(found_atom==FALSE) found_tvec=FALSE; // at least one atom does not have a copy...
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  } // For iat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  // If we counted a good translation for every atoms then we have a translation vector.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  // cout << "GOODs=" << CntGoodTrans << endl;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(CntGoodTrans==a.atoms.size()) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  return FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]}
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]bool IsTranslationFVectorORIGINAL(const xstructure& a, const xvector<double>& ftvec) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  stringstream message;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(a.equiv_fpos_epsilon<1.0e-12) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  double tolerance=a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  uint CntGoodTrans=0;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<double> ftpos(3),diff(3);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Get translated position and shift back into unit cell.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // ftpos=a.atoms.at(iat).fpos+ftvec;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // ftpos=BringInCell(ftpos,tolerance); // no because it will be needed later...
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    for(uint jat=0;jat<a.atoms.size();jat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      if(types[iat]==types[jat]) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        //        diff=ftpos-a.atoms.at(jat).fpos;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        diff=BringInCell(a.atoms.at(iat).fpos-a.atoms.at(jat).fpos+ftvec,tolerance);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        if(aurostd::modulus(diff)<=tolerance) CntGoodTrans++;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    } // For jat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  } // For iat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  // If we counted a good translation for every atoms then we have a translation vector.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  //  cout << "GOODs=" << CntGoodTrans << endl;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(CntGoodTrans==a.atoms.size()) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  return FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]}
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]bool IsTranslationFVectorFAST_2011(const xstructure& a, const xvector<double>& ftvec) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  stringstream message;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(a.equiv_fpos_epsilon<1.0e-12) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  double tolerance=a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  uint CntGoodTrans=0;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<double> ftpos(3),diff(3);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  bool found_atom=FALSE,found_tvec=TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size()&&found_tvec;iat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Get translated position and shift back into unit cell.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    ftpos=a.atoms.at(iat).fpos+ftvec;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    ftpos=BringInCell(ftpos);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    found_atom=FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    for(uint jat=0;jat<a.atoms.size()&&!found_atom&&found_tvec;jat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      if(types[iat]==types[jat]) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        diff=ftpos-a.atoms.at(jat).fpos;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        if(aurostd::modulus(diff)< tolerance ) {CntGoodTrans++;found_atom=TRUE;}
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    } // For jat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    if(found_atom==FALSE) found_tvec=FALSE; // at least one atom does not have a copy...
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  } // For iat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  // If we counted a good translation for every atoms then we have a translation vector.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(CntGoodTrans==a.atoms.size()) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  return FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]}
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]bool IsTranslationFVectorORIGINAL_2011(const xstructure& a, const xvector<double>& ftvec) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  stringstream message;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(a.equiv_fpos_epsilon<1.0e-12) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  double tolerance=a.equiv_fpos_epsilon;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  uint CntGoodTrans=0;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<double> ftpos(3),diff(3);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  for(uint iat=0;iat<a.atoms.size();iat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Get translated position and shift back into unit cell.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    ftpos=a.atoms.at(iat).fpos+ftvec;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    ftpos=BringInCell(ftpos);
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    for(uint jat=0;jat<a.atoms.size();jat++) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      if(types[iat]==types[jat]) {
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        diff=ftpos-a.atoms.at(jat).fpos;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        diff = SYM::minimizeDistanceFractionalMethod(diff); //DX20190613
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        //DX20190613 [OBSOLETE] SYM::PBC(diff); //DX20190317 - need to use PBC for comparing difference vectors
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]        if(aurostd::modulus(diff)< tolerance ) CntGoodTrans++;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]      }
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]    } // For jat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  } // For iat
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  // If we counted a good translation for every atoms then we have a translation vector.
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  if(CntGoodTrans==a.atoms.size()) return TRUE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]  return FALSE;
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]}
 
-  uint CntGoodTrans=0;
-  xvector<double> ftpos(3),diff(3);
-  bool found_atom=FALSE,found_tvec=TRUE;
-  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
-    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size()&&found_tvec;iat++) {
-    // Get translated position and shift back into unit cell.
-    //  ftpos=a.atoms.at(iat).fpos+ftvec;
-    // ftpos=BringInCell(ftpos,tolerance);  // no because it will be needed later...
-    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
-    found_atom=FALSE;
-    for(uint jat=0;jat<a.atoms.size()&&!found_atom&&found_tvec;jat++) {
-      if(types[iat]==types[jat]) {
-        //        diff=ftpos-a.atoms.at(jat).fpos;
-        diff=BringInCell(a.atoms.at(iat).fpos-a.atoms.at(jat).fpos+ftvec,tolerance);
-        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
-        if(aurostd::modulus(diff)<=tolerance) {CntGoodTrans++;found_atom=TRUE;}
-      }
-    } // For jat
-    if(found_atom==FALSE) found_tvec=FALSE; // at least one atom does not have a copy...
-  } // For iat
-  // If we counted a good translation for every atoms then we have a translation vector.
-  // cout << "GOODs=" << CntGoodTrans << endl;
-  if(CntGoodTrans==a.atoms.size()) return TRUE;
-  return FALSE;
-}
 
-bool IsTranslationFVectorORIGINAL(const xstructure& a, const xvector<double>& ftvec) {
-  stringstream message;
-  if(a.equiv_fpos_epsilon<1.0e-12) {
-    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
-  }
-  double tolerance=a.equiv_fpos_epsilon;
-  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
-  uint CntGoodTrans=0;
-  xvector<double> ftpos(3),diff(3);
-  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
-    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++) {
-    // Get translated position and shift back into unit cell.
-    // ftpos=a.atoms.at(iat).fpos+ftvec;
-    // ftpos=BringInCell(ftpos,tolerance); // no because it will be needed later...
-    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
-    for(uint jat=0;jat<a.atoms.size();jat++) {
-      if(types[iat]==types[jat]) {
-        //        diff=ftpos-a.atoms.at(jat).fpos;
-        diff=BringInCell(a.atoms.at(iat).fpos-a.atoms.at(jat).fpos+ftvec,tolerance);
-        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
-        if(aurostd::modulus(diff)<=tolerance) CntGoodTrans++;
-      }
-    } // For jat
-  } // For iat
-  // If we counted a good translation for every atoms then we have a translation vector.
-  //  cout << "GOODs=" << CntGoodTrans << endl;
-  if(CntGoodTrans==a.atoms.size()) return TRUE;
-  return FALSE;
-}
-
-bool IsTranslationFVectorFAST_2011(const xstructure& a, const xvector<double>& ftvec) {
-  stringstream message;
-  if(a.equiv_fpos_epsilon<1.0e-12) {
-    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
-  }
-  double tolerance=a.equiv_fpos_epsilon;
-  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
-  uint CntGoodTrans=0;
-  xvector<double> ftpos(3),diff(3);
-  bool found_atom=FALSE,found_tvec=TRUE;
-  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
-    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size()&&found_tvec;iat++) {
-    // Get translated position and shift back into unit cell.
-    ftpos=a.atoms.at(iat).fpos+ftvec;
-    ftpos=BringInCell(ftpos);
-    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
-    found_atom=FALSE;
-    for(uint jat=0;jat<a.atoms.size()&&!found_atom&&found_tvec;jat++) {
-      if(types[iat]==types[jat]) {
-        diff=ftpos-a.atoms.at(jat).fpos;
-        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
-        if(aurostd::modulus(diff)< tolerance ) {CntGoodTrans++;found_atom=TRUE;}
-      }
-    } // For jat
-    if(found_atom==FALSE) found_tvec=FALSE; // at least one atom does not have a copy...
-  } // For iat
-  // If we counted a good translation for every atoms then we have a translation vector.
-  if(CntGoodTrans==a.atoms.size()) return TRUE;
-  return FALSE;
-}
-
-bool IsTranslationFVectorORIGINAL_2011(const xstructure& a, const xvector<double>& ftvec) {
-  stringstream message;
-  if(a.equiv_fpos_epsilon<1.0e-12) {
-    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
-  }
-  double tolerance=a.equiv_fpos_epsilon;
-  if(aurostd::modulus(ftvec)<=tolerance) return TRUE;
-
-  uint CntGoodTrans=0;
-  xvector<double> ftpos(3),diff(3);
-  xvector<int> types(0,a.atoms.size());       // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++)    // mirror to enhance speed !
-    types(iat)=a.atoms.at(iat).type;          // mirror to enhance speed !
-  for(uint iat=0;iat<a.atoms.size();iat++) {
-    // Get translated position and shift back into unit cell.
-    ftpos=a.atoms.at(iat).fpos+ftvec;
-    ftpos=BringInCell(ftpos);
-    // Find closest atom in unit cell to translated position (should only be one atom less than tolerance).
-    for(uint jat=0;jat<a.atoms.size();jat++) {
-      if(types[iat]==types[jat]) {
-        diff=ftpos-a.atoms.at(jat).fpos;
-        diff = SYM::minimizeDistanceFractionalMethod(diff); //DX20190613
-        //DX20190613 [OBSOLETE] SYM::PBC(diff); //DX20190317 - need to use PBC for comparing difference vectors
-        // If the translated atom maps onto another and its type is the same as the atom mapped onto then increment.
-        if(aurostd::modulus(diff)< tolerance ) CntGoodTrans++;
-      }
-    } // For jat
-  } // For iat
-  // If we counted a good translation for every atoms then we have a translation vector.
-  if(CntGoodTrans==a.atoms.size()) return TRUE;
-  return FALSE;
-}
-
-
-bool IsTranslationCVector(const xstructure& a, const xvector<double>& ctvec) {
-  stringstream message;
-  if(a.equiv_fpos_epsilon<1.0e-12) {
-    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
-  }
-  /* Input translation vector is expectd to be in cartesian coordinates. */
-  return IsTranslationFVector(a,C2F(a.lattice,ctvec));
-}
+//[CO20240518 - OBSOLETE]bool IsTranslationCVector(const xstructure& a, const xvector<double>& ctvec) {
+//[CO20240518 - OBSOLETE]  stringstream message;
+//[CO20240518 - OBSOLETE]  if(a.equiv_fpos_epsilon<1.0e-12) {
+//[CO20240518 - OBSOLETE]    message << "Zero tolerance: " << a.equiv_fpos_epsilon;
+//[CO20240518 - OBSOLETE]    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
+//[CO20240518 - OBSOLETE]  }
+//[CO20240518 - OBSOLETE]  /* Input translation vector is expectd to be in cartesian coordinates. */
+//[CO20240518 - OBSOLETE]  //[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]return IsTranslationFVector(a,C2F(a.lattice,ctvec));
+//[CO20240518 - OBSOLETE]  double tolerance=AUROSTD_MAX_DOUBLE;  //CO20240518
+//[CO20240518 - OBSOLETE]  if(a.sym_eps!=AUROSTD_NAN){ tolerance = a.sym_eps; }  //CO20240518
+//[CO20240518 - OBSOLETE]  else{ tolerance = SYM::defaultTolerance(a); }   //CO20240518
+//[CO20240518 - OBSOLETE]  return isTranslationVector(a,ctvec,tolerance);  //CO20240518
+//[CO20240518 - OBSOLETE]}
 
 // **************************************************************************
 // Function GetPrimitive
@@ -13869,10 +14116,56 @@ xstructure GetPrimitive(const xstructure& _a,double tolerance) {
 xstructure GetPrimitive(const xstructure& a) {
   //DX20210401 [OBSOLETE] return GetPrimitive(a,_EQUIV_FPOS_EPS_);
   double tolerance=AUROSTD_MAX_DOUBLE;
-  if(a.sym_eps!=AUROSTD_NAN){ tolerance = a.sym_eps; }
+  if(a.sym_eps!=AUROSTD_NAN && a.sym_eps!=AUROSTD_MAX_DOUBLE){ tolerance = a.sym_eps; }
   else{ tolerance = SYM::defaultTolerance(a); }
   return GetPrimitive(a,tolerance);
 }
+
+//[CO20240619 - OBSOLETE keep for history]xstructure GetPrimitive(const xstructure& a) {
+//[CO20240619 - OBSOLETE keep for history]  //CO20240619 - this function was adapted to allow for a tolerance sweep
+//[CO20240619 - OBSOLETE keep for history]  //if you do NOT want a tolerance sweep, call it with an input tolerance
+//[CO20240619 - OBSOLETE keep for history]  bool LDEBUG=(true || XHOST.DEBUG);
+//[CO20240619 - OBSOLETE keep for history]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " BEGIN" << endl;}
+//[CO20240619 - OBSOLETE keep for history]  //DX20210401 [OBSOLETE] return GetPrimitive(a,_EQUIV_FPOS_EPS_);
+//[CO20240619 - OBSOLETE keep for history]  double tolerance=a.sym_eps;
+//[CO20240619 - OBSOLETE keep for history]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " a.sym_eps=" << tolerance << endl;}
+//[CO20240619 - OBSOLETE keep for history]  if(tolerance==AUROSTD_NAN || tolerance==AUROSTD_MAX_DOUBLE){
+//[CO20240619 - OBSOLETE keep for history]    tolerance=SYM::defaultTolerance(a);
+//[CO20240619 - OBSOLETE keep for history]    if(LDEBUG){cerr << __AFLOW_FUNC__ << " changing tolerance to default value: " << tolerance << endl;}
+//[CO20240619 - OBSOLETE keep for history]  }
+//[CO20240619 - OBSOLETE keep for history]  //CO20240618 - fixing issues with APL-distorted runs like LIB1/LIB/As:PAW_PBE/A_hR2_166_c-001.A:ITC/ARUN.APL_1_A0D0P
+//[CO20240619 - OBSOLETE keep for history]  //GetPrimitive() can be called around without having calculated the full symmetry (PerformFullSymmetry)
+//[CO20240619 - OBSOLETE keep for history]  //if we enter this loop, PerformFullSymmetry() is being performed, or has already been performed, so keep sym_eps and return
+//[CO20240619 - OBSOLETE keep for history]  //if we enter this loop, GetPrimitive() was called without having performed the full symmetry analysis
+//[CO20240619 - OBSOLETE keep for history]  //therefore, allow the tolerance to shift to avoid 'supercell has the wrong number of atoms' error
+//[CO20240619 - OBSOLETE keep for history]  if(LDEBUG){cerr << __AFLOW_FUNC__ << " using tolerance sweep (if necessary)" << endl;}
+//[CO20240619 - OBSOLETE keep for history]  bool successful=false;
+//[CO20240619 - OBSOLETE keep for history]  bool can_change_tolerance=true;
+//[CO20240619 - OBSOLETE keep for history]  xstructure b(a),xprim(a); //use b instead of a for change_tolerance
+//[CO20240619 - OBSOLETE keep for history]  double min_dist = b.dist_nn_min; //CO20180409
+//[CO20240619 - OBSOLETE keep for history]  while(successful==false&&can_change_tolerance==true){
+//[CO20240619 - OBSOLETE keep for history]    if(LDEBUG){cerr << __AFLOW_FUNC__ << " trying to primitivitize" << endl;}
+//[CO20240619 - OBSOLETE keep for history]    xprim=GetPrimitive(b,tolerance);
+//[CO20240619 - OBSOLETE keep for history]    try{xprim=GetPrimitive(b,tolerance);successful=true;}
+//[CO20240619 - OBSOLETE keep for history]    catch(aurostd::xerror& err){  //CO20240519 - with AAPL distorted supercells, some tolerances yield bad supercell-atom counts, try changing tolerances
+//[CO20240619 - OBSOLETE keep for history]      if(b.sym_eps_no_scan){
+//[CO20240619 - OBSOLETE keep for history]        if(LDEBUG){cerr << __AFLOW_FUNC__ << " no scan option provided, skipping tolerance scan" << endl;}
+//[CO20240619 - OBSOLETE keep for history]        break;
+//[CO20240619 - OBSOLETE keep for history]      }
+//[CO20240619 - OBSOLETE keep for history]      if(min_dist == AUROSTD_NAN || min_dist == AUROSTD_MAX_DOUBLE){min_dist=SYM::minimumDistance(b);} //CO20180409 //DX20210615 - add AUROSTD_MAX_DOUBLE
+//[CO20240619 - OBSOLETE keep for history]      if(LDEBUG){
+//[CO20240619 - OBSOLETE keep for history]        cerr << __AFLOW_FUNC__ << " min_dist=" << min_dist << endl;
+//[CO20240619 - OBSOLETE keep for history]        cerr << __AFLOW_FUNC__ << " tolerance(OLD)=" << tolerance << endl;
+//[CO20240619 - OBSOLETE keep for history]      }
+//[CO20240619 - OBSOLETE keep for history]      can_change_tolerance=SYM::change_tolerance(b,b.sym_eps,min_dist,b.sym_eps_no_scan);
+//[CO20240619 - OBSOLETE keep for history]      tolerance=b.sym_eps;
+//[CO20240619 - OBSOLETE keep for history]      if(LDEBUG){cerr << __AFLOW_FUNC__ << " tolerance(NEW)=" << tolerance << endl;}
+//[CO20240619 - OBSOLETE keep for history]      successful=false;
+//[CO20240619 - OBSOLETE keep for history]    }
+//[CO20240619 - OBSOLETE keep for history]  }
+//[CO20240619 - OBSOLETE keep for history]  if(successful==false){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Cannot calculate primitive structure, even after varying the tolerance",_RUNTIME_ERROR_);}
+//[CO20240619 - OBSOLETE keep for history]  return xprim;
+//[CO20240619 - OBSOLETE keep for history]}
 
 //ME20220208 [OBSOLETE - not used] pthread_mutex_t mutex_XATOM=PTHREAD_MUTEX_INITIALIZER;
 //ME20220208 [OBSOLETE - not used] #define _PTHREAD_FLUSH_TIME_ 1
@@ -14000,12 +14293,15 @@ void xstructure::GetPrimitive_20210322(double eps) { //DX20210406
   // set tolerance
   double tolerance = eps;
   if((*this).dist_nn_min==AUROSTD_NAN){ (*this).MinDist(); }
+  if(LDEBUG){ cerr << __AFLOW_FUNC__ << " [0] min_dist = " << (*this).dist_nn_min << endl; }
 
-  if(tolerance==AUROSTD_MAX_DOUBLE){
+  if(tolerance>=AUROSTD_NAN){ //CO20250407 - seems to be using wrong default value '==AUROSTD_MAX_DOUBLE'
     if((*this).sym_eps!=AUROSTD_NAN){ tolerance = (*this).sym_eps; }
     else{ tolerance = SYM::defaultTolerance((*this)); }
   }
   if(LDEBUG){ cerr << __AFLOW_FUNC__ << " [1] Tolerance = " << tolerance << endl; }
+  
+  bool skew = SYM::isLatticeSkewed((*this).lattice,(*this).dist_nn_min,tolerance);  //CO20240518
 
   double volume_orig=(*this).Volume();
 
@@ -14029,15 +14325,19 @@ void xstructure::GetPrimitive_20210322(double eps) { //DX20210406
   // get all lattice vectors
   // only need to check difference between 0th and ith atom coordinates for the
   // subset of atom indices
-  vector<xvector<double> > diff_vectors;
+  //[no need to blow up memory]vector<xvector<double> > diff_vectors;
+  xvector<double> cdiff;
   for(uint i=1; i<natoms_min; i++) {
-    diff_vectors.push_back(::BringInCell((*this).atoms[vindices_atoms_min[i]].fpos - (*this).atoms[vindices_atoms_min[0]].fpos)); //need to get BringInCell from outside xstructure scope
-  }
-  //Translate by difference vectors and check if equivalent
-  bool is_frac = true;
-  for(uint d=0; d < diff_vectors.size(); d++){
-    if(isTranslationVector((*this), diff_vectors[d], tolerance, is_frac)){
-      candidate_lattice_vector.push_back((*this).f2c*diff_vectors[d]);
+    //[CO20240518 - CANNOT do with fpos]diff_vectors.push_back(::BringInCell((*this).atoms[vindices_atoms_min[i]].fpos - (*this).atoms[vindices_atoms_min[0]].fpos)); //need to get BringInCell from outside xstructure scope
+    //[no need to blow up memory]diff_vectors.push_back(SYM::CPOSDistFromFPOS((*this).atoms[vindices_atoms_min[i]].fpos,(*this).atoms[vindices_atoms_min[0]].fpos,(*this).lattice,(*this).f2c,skew)); //CO20240518
+    cdiff=SYM::CPOSDistFromFPOS((*this).atoms[vindices_atoms_min[i]].fpos,(*this).atoms[vindices_atoms_min[0]].fpos,(*this).lattice,(*this).f2c,skew); //CO20240518
+  //[no need to blow up memory]}
+  //[no need to blow up memory]//Translate by difference vectors and check if equivalent
+  //[no need to blow up memory]//[CO20240518 - CANNOT do with fpos]bool is_frac = true;
+  //[no need to blow up memory]for(uint d=0; d < diff_vectors.size(); d++){
+    if(isTranslationVector((*this), cdiff, tolerance, skew)){  //CO20240518 - is_frac is wrong, removing
+      //[CO20240518 - this is wrong]candidate_lattice_vector.push_back((*this).f2c*diff_vectors[d]);
+      candidate_lattice_vector.push_back(cdiff);
     }
   }
 
@@ -14060,10 +14360,28 @@ void xstructure::GetPrimitive_20210322(double eps) { //DX20210406
   double volume_min = aurostd::det((*this).lattice);
   double volume_tmp = AUROSTD_MAX_DOUBLE;
   double amin = (*this).dist_nn_min;
-  double tol_vol = tolerance * amin * amin * amin;    // scale tolerance for volume
-  double atom_number_ratio = 1;                       // track atom ratio during reduction
+  double tol_vol = 3.0*(tolerance/amin)*(amin*amin*amin); //[CO20240518 - trying error propagation instead, the formula to the right doesn't make sense since tolerance is not a percentage, so units are wrong] //tolerance * amin * amin * amin;    // scale tolerance for volume
+  //error propagation (5. Powers, pg 4): https://foothill.edu/psme/daley/tutorials_files/10.%20Error%20Propagation.pdf
+  if(LDEBUG){
+    cerr << __AFLOW_FUNC__ << " tol_vol(old) = " << tolerance * amin * amin * amin << endl;
+    cerr << __AFLOW_FUNC__ << " tol_vol(new) = " << tol_vol << endl;
+  }
+  //[CO20261004 - computed in volume_criteria_2to5 below]double atom_number_ratio = 1;                       // track atom ratio during reduction
   double integer_tol = 0.05;                          // use somewhat large tol to find lattices
   double moduli_sum=AUROSTD_MAX_DOUBLE, moduli_sum_tmp=AUROSTD_MAX_DOUBLE; // ensures shortest sum of lattice vectors (chooses minimum Minkowski lattice, some noise can get introduced)
+  //CO20261004 - criteria 2) to 5) below, which depend only on the cell volume, for the test itself (margin=0) and for
+  // the volume prefilter (CO20260930, margin=1e-6), which checked a copy of them. margin widens each bound by that
+  // relative amount; with margin=0 every bound is the one of the test (x*(1.0+0.0)==x, tol+0.0*r==tol), so the
+  // test gives the same answer to the bit. The atom ratio is computed only when 2) and 3) pass, the only case in which
+  // the test reads it.
+  auto volume_criteria_2to5 = [&](double volume, double margin) -> bool {
+    const double ratio_vol = volume_orig/volume;
+    if(!(volume < volume_orig*(1.0+margin))) { return false; }                                   // 2) new_tol < orig_tol
+    if(!aurostd::isinteger(ratio_vol, integer_tol+margin*ratio_vol)) { return false; }            // 3) new and orig volumes related by integer multiple
+    const double atom_number_ratio = (double)natoms_min/aurostd::nint(ratio_vol);                 // track atom ratio during reduction
+    return aurostd::isinteger(atom_number_ratio, 0.05+margin*atom_number_ratio) &&               // 4) number of atoms is consistent with integer multiple
+      (atom_number_ratio-1.0) > -_ZERO_TOL_-margin;                                              // 5) didn't lose any atoms
+  };
 
   // ---------------------------------------------------------------------------
   // check possible lattices, upper triangular for-loop only
@@ -14082,18 +14400,29 @@ void xstructure::GetPrimitive_20210322(double eps) { //DX20210406
             lattice_tmp[1][3]*lattice_tmp[2][1]*lattice_tmp[3][2]-lattice_tmp[1][3]*lattice_tmp[2][2]*lattice_tmp[3][1]-              // FAST
             lattice_tmp[1][2]*lattice_tmp[2][1]*lattice_tmp[3][3]-lattice_tmp[1][1]*lattice_tmp[2][3]*lattice_tmp[3][2]);             // FAST
         if(aurostd::abs(volume_tmp) > tol_vol){
+          //CO20260930 START - skip triples that the volume criteria below already rule out
+          // Criteria 2-5 depend only on the cell volume. Minkowski and Niggli reduction are unimodular changes of
+          // basis, so they keep |volume| up to rounding. A triple whose unreduced volume fails them by more than a
+          // 1e-6 relative margin can never pass after reduction, so its reduction is skipped; every other triple is
+          // reduced and tested exactly as before, in the same order, so the chosen lattice is the same to the bit.
+          // On a 250-atom NaF phonon supercell at the loose tolerance this skips 94% of 333,375 reductions
+          // (219 s -> 3 s). Reference path: --sym_reference (SYM::useReferencePaths()).
+          // One difference on an error path: the reduction can throw (co-planar vectors, lattice not preserved). If
+          // it would throw on a skipped triple, the reference stops with that error while this returns the cell the
+          // remaining triples give. When the reference returns a cell, this returns the same cell.
+          if(!SYM::useReferencePaths()){
+            if(!volume_criteria_2to5(aurostd::abs(volume_tmp), 1e-6)){ SYM::exactPathCounts().prefilter_skips++; continue; }  //CO20261004 - was a copy of 2) to 5) with the margin
+          }
+          //CO20260930 END
           plattice=::MinkowskiBasisReduction(lattice_tmp);    // Minkowski first, "::" is needed to access outside xstructure scope
           plattice=::NiggliUnitCellForm(plattice);            // Niggli Second, "::" is needed to access outside xstructure scope
           volume_tmp = (plattice[1][1]*plattice[2][2]*plattice[3][3]+plattice[1][2]*plattice[2][3]*plattice[3][1]+  // FAST
               plattice[1][3]*plattice[2][1]*plattice[3][2]-plattice[1][3]*plattice[2][2]*plattice[3][1]-              // FAST
               plattice[1][2]*plattice[2][1]*plattice[3][3]-plattice[1][1]*plattice[2][3]*plattice[3][2]);             // FAST
-          atom_number_ratio = (double)natoms_min/aurostd::nint(volume_orig/volume_tmp);
+          //[CO20261004 - in volume_criteria_2to5]atom_number_ratio = (double)natoms_min/aurostd::nint(volume_orig/volume_tmp);
           moduli_sum_tmp = aurostd::modulus(plattice(1)) + aurostd::modulus(plattice(2)) + aurostd::modulus(plattice(3));
           if(volume_tmp > tol_vol &&                                                 // 1) tol > 0
-            volume_tmp < volume_orig &&                                            // 2) new_tol < orig_tol
-              aurostd::isinteger(volume_orig / volume_tmp, integer_tol) &&           // 3) new and orig volumes related by integer multiple
-              aurostd::isinteger(atom_number_ratio, 0.05) &&                         // 4) number of atoms is consistent with integer multiple
-              (atom_number_ratio-1.0)>-_ZERO_TOL_ &&                                 // 5) didn't lose any atoms
+              volume_criteria_2to5(volume_tmp, 0.0) &&                               // 2) to 5) //CO20261004 - shared with the prefilter above
               moduli_sum_tmp < moduli_sum){                                          // 6) ensure shortest sum of vectors (Minkowski should ensure this, but noise can be introduced)
                 moduli_sum = moduli_sum_tmp;
                 olattice=plattice;
@@ -14141,29 +14470,73 @@ void xstructure::GetPrimitive_20210322(double eps) { //DX20210406
   // first, check if the reduction factor (inverse of fraction) is an integer
   // then, check if that factor is consistent with the number of atoms
   // this method is less sensitive to the tolerance threshold
+  // CO20240620 - another improvement
+  // the original check did not scale well with supercells (AAPL distorted cells), as the fraction/multiple could be close to a integer 
+  // and still result in large difference in the number of atoms
+  // a better check is for an intensive property, like volume/atom, for which we can provide a meaningful tolerance
   double fraction=aurostd::det(prim.lattice)/aurostd::det((*this).lattice);
-  double reduction_factor = 1.0/fraction;
-  if(!aurostd::isinteger(reduction_factor,0.1)){
-    stringstream message;
-    message << "The original volume is not an integer multiple of the new volume: " << reduction_factor;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
-  }
-  uint reduction_factor_integer = (uint)round(reduction_factor);
-  if(abs(natoms_orig-(double)reduction_factor_integer*prim.atoms.size())>0.1) {
-    stringstream message;
-    message << "ERROR   " << __AFLOW_FUNC__ << endl;
-    message << "        supercell has the wrong number of atoms" << endl;
-    message << "        volume original    = " << (*this).Volume() << endl;
-    message << "        volume prim        = " << prim.Volume() << endl;
-    message << "        a.scale            = " << (*this).scale << endl;
-    message << "        b.scale            = " << prim.scale << endl;
-    message << "        a.atoms.size()     = " << (*this).atoms.size() << endl;
-    message << "        b.atoms.size()     = " << prim.atoms.size() << endl;
-    message << "        fraction           = " << fraction << endl;
-    message << "        reduction_factor   = " << reduction_factor << endl; //DX20210623
-    message << "        supercell atoms    = " << reduction_factor*prim.atoms.size() << endl; //DX20210623
-    message << prim << endl;
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
+  double multiple = 1.0/fraction;
+  if(true){
+    if(false){  //CO20240620 - this is a meaningful check, but defining a proper tolerance is challenging, come back
+      if(!aurostd::isinteger(multiple,0.1)){
+        stringstream message;
+        message << "The original volume is not an integer multiple of the new volume: " << multiple;
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_RUNTIME_ERROR_);
+      }
+    }
+    if(false){  //CO20240620 - does not scale well with supercell size, can get a handful of atoms that are "missing"
+      uint multiple_integer = (uint)round(multiple);
+      if(abs(natoms_orig-(double)multiple_integer*prim.atoms.size())>0.1) {
+        stringstream message;
+        //[CO20240619 - logger takes care of this]message << "ERROR   " << __AFLOW_FUNC__ << endl;
+        //[CO20240619 - logger takes care of this]message << "        supercell has the wrong number of atoms" << endl;
+        message << "primitive cell check: natoms(original)=" << (*this).atoms.size(); //CO20260930
+        message << ", natoms(primitive)=" << prim.atoms.size();
+        message << ", ratio V(original)/V(primitive)=" << multiple << " (nearest integer " << multiple_integer << ")";
+        message << ", expected natoms(original)=" << multiple_integer*prim.atoms.size();
+        message << "; V(original)=" << (*this).Volume() << ", V(primitive)=" << prim.Volume();
+        message << "; scale(original)=" << (*this).scale << ", scale(primitive)=" << prim.scale;
+        message << "; V(primitive)/V(original)=" << fraction << endl;
+        message << prim << endl;
+        if(LDEBUG){
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"supercell has the wrong number of atoms",std::cerr,_LOGGER_ERROR_);
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,std::cerr,_LOGGER_RAW_);
+        }
+        return; //CO20240619 - not a good transformed structure, do not primitivtize
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"supercell has the wrong number of atoms",_RUNTIME_ERROR_);
+      }
+    }
+    if(true){ //CO20240620 - check vol/atom, this is an intrinsic property for which we can create a meaningful tolerance
+      double vol_atom_orig=(*this).Volume()/(*this).atoms.size();
+      double vol_atom_new=prim.Volume()/prim.atoms.size();
+      if(abs(vol_atom_orig-vol_atom_new)>tol_vol){
+          stringstream message;
+          //[CO20240619 - logger takes care of this]message << "ERROR   " << __AFLOW_FUNC__ << endl;
+          //[CO20240619 - logger takes care of this]message << "        supercell has the wrong number of atoms" << endl;
+          message << "        volume original            = " << (*this).Volume() << endl;
+          message << "        volume prim                = " << prim.Volume() << endl;
+          message << "        a.scale                    = " << (*this).scale << endl;
+          message << "        b.scale                    = " << prim.scale << endl;
+          message << "        a.atoms.size()             = " << (*this).atoms.size() << endl;
+          message << "        b.atoms.size()             = " << prim.atoms.size() << endl;
+          message << "        vol/atom orig              = " << vol_atom_orig << endl;
+          message << "        vol/atom new               = " << vol_atom_new << endl;
+          message << "        vol/atom diff              = " << abs(vol_atom_orig-vol_atom_new) << endl;
+          message << "        tol_vol                    = " << tol_vol << endl;
+          message << prim << endl;
+          //CO20260929 - the warning is printed always (the details only with LDEBUG): this check applies to every structure, not only APL/AAPL supercells, and a cell that is kept unreduced should leave a trace
+          pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"supercell does not conserve volume/atom, keeping the original cell (not reduced)",std::cerr,_LOGGER_WARNING_);
+          if(LDEBUG){
+            pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,std::cerr,_LOGGER_RAW_);
+          }
+          //CO20260925 - do not throw, keep the original cell
+          //the candidate lattice passed the checks above, but TransformStructure() merged atoms that are distinct in the original cell
+          //this happens with APL/AAPL distorted supercells: the displaced atoms look equivalent within tolerance, the reduced cell loses them
+          //such a cell cannot be reduced consistently, so treat it as primitive (same outcome as a TransformStructure() failure above)
+          //[CO20260925 - OBSOLETE]throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"supercell does not conserve volume/atom",_RUNTIME_ERROR_);
+          return; //CO20240619 - not a good transformed structure, do not primitivize
+      }
+    }
   }
   // everything ok
   if(LDEBUG){ cerr << __AFLOW_FUNC__ << " END [ok]=" << fraction << endl; }
@@ -14402,13 +14775,20 @@ xstructure GetPrimitiveSINGLE(const xstructure& _a,double tolerance) {  // APRIL
   sstr.SetVolume(sstr.atoms.size());
   sstr=ReScale(sstr,1.0);
   sstr=BringInCell(sstr);
-  if(tolerance<=0.0) a.equiv_fpos_epsilon=_EQUIV_FPOS_EPS_; else a.equiv_fpos_epsilon=tolerance;
+  if(tolerance<=0.0) tolerance=_EQUIV_FPOS_EPS_; //[CO20240518 - OBSOLETE]a.equiv_fpos_epsilon=_EQUIV_FPOS_EPS_; else a.equiv_fpos_epsilon=tolerance;
   double sstr_volume=sstr.Volume();
+  
+  //CO20240518 START - dist_nn_min and skew
+  double dist_nn_min=AUROSTD_NAN;
+  if(a.dist_nn_min==AUROSTD_NAN){ dist_nn_min=SYM::minimumDistance(a); }
+  else{dist_nn_min=a.dist_nn_min;}
+  bool skew = SYM::isLatticeSkewed(a.lattice,dist_nn_min,tolerance);  //CO20240518
+  //CO20240518 START - dist_nn_min and skew
 
   _aflags aflags;
 
   xmatrix<double> plattice(3,3),olattice(3,3);
-  xvector<double> fdisp(3),cdisp(3);
+  xvector<double> cdisp(3);
   std::vector<xvector<double> > candidate_lattice_vector;
 
   int specie_min=100000,ispecie_min=0;
@@ -14426,14 +14806,15 @@ xstructure GetPrimitiveSINGLE(const xstructure& _a,double tolerance) {  // APRIL
     if(sstr.atoms.at(iat1).type==ispecie_min)
       for(uint iat2=0;iat2<sstr.atoms.size();iat2++)
         if(sstr.atoms.at(iat2).type==ispecie_min) {
-          fdisp=sstr.atoms.at(iat2).fpos-sstr.atoms.at(iat1).fpos;
-          cdisp=sstr.atoms.at(iat2).cpos-sstr.atoms.at(iat1).cpos;
-          if(aurostd::modulus(fdisp)>0.01 && aurostd::modulus(cdisp)>0.01)
-            if(IsTranslationFVector(sstr,fdisp))
+          //[CO20240518 - not a good idea]fdisp=sstr.atoms.at(iat2).fpos-sstr.atoms.at(iat1).fpos;
+          cdisp=SYM::CPOSDistFromFPOS(sstr.atoms[iat2].fpos,sstr.atoms[iat1].fpos,sstr.lattice,sstr.f2c,skew); //CO20240518 //[CO20240518 - need smallest distance]sstr.atoms.at(iat2).cpos-sstr.atoms.at(iat1).cpos;
+          if(aurostd::modulus(cdisp)>0.01)
+            //[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]if(IsTranslationFVector(sstr,fdisp))
+            if(isTranslationVector(sstr,cdisp,tolerance,skew)) //CO20240518 
               candidate_lattice_vector.push_back(cdisp);
         }
   if(LDEBUG) cout << "DEBUG" << candidate_lattice_vector.size() << endl;
-  int cnt=0;
+  //[CO20230626 - clang warning not used]int cnt=0;
   olattice=sstr.lattice;                      // the lattice is always a good lattice
   // now generate triplets
   for(uint iu=0;iu<candidate_lattice_vector.size();iu++) {
@@ -14451,7 +14832,7 @@ xstructure GetPrimitiveSINGLE(const xstructure& _a,double tolerance) {  // APRIL
                 plattice=NiggliUnitCellForm(plattice);           // Niggli Second
                 if(isdifferent(plattice,olattice,0.0001)) {
                   olattice=plattice;
-                  cnt++;
+                  //[CO20230626 - clang warning not used]cnt++;
                 }
               }
             }
@@ -14514,6 +14895,13 @@ xstructure GetPrimitive1(const xstructure& a) {  // MARCH 2009
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
   }
   double tolerance=a.equiv_fpos_epsilon;
+  
+  //CO20240518 START - dist_nn_min and skew
+  double dist_nn_min=AUROSTD_NAN;
+  if(a.dist_nn_min==AUROSTD_NAN){ dist_nn_min=SYM::minimumDistance(a); }
+  else{dist_nn_min=a.dist_nn_min;}
+  bool skew = SYM::isLatticeSkewed(a.lattice,dist_nn_min,tolerance);  //CO20240518
+  //CO20240518 START - dist_nn_min and skew
 
   cout.setf(std::ios::fixed,std::ios::floatfield);
   cout.precision(10);
@@ -14526,7 +14914,7 @@ xstructure GetPrimitive1(const xstructure& a) {  // MARCH 2009
   // identify the minimum set of atoms
 
   xmatrix<double> plattice(3,3),olattice(3,3);
-  xvector<double> fdisp(3),cdisp(3);
+  xvector<double> cdisp(3);
   std::vector<xvector<double> > candidate_lattice_vector;
 
   int specie_min=100000,ispecie_min=0;
@@ -14546,14 +14934,15 @@ xstructure GetPrimitive1(const xstructure& a) {  // MARCH 2009
       if(iat2!=iat1 &&
           sstr.atoms.at(iat1).type==ispecie_min &&
           sstr.atoms.at(iat2).type==ispecie_min) {
-        fdisp=sstr.atoms.at(iat2).fpos-sstr.atoms.at(iat1).fpos;
-        cdisp=sstr.atoms.at(iat2).cpos-sstr.atoms.at(iat1).cpos;
-        if(IsTranslationFVector(sstr,fdisp)) candidate_lattice_vector.push_back(cdisp);
+        //[CO20240518 - not a good idea]fdisp=sstr.atoms.at(iat2).fpos-sstr.atoms.at(iat1).fpos;
+        cdisp=SYM::CPOSDistFromFPOS(sstr.atoms[iat2].fpos,sstr.atoms[iat1].fpos,sstr.lattice,sstr.f2c,skew); //CO20240518 //[CO20240518 - need smallest distance]sstr.atoms.at(iat2).cpos-sstr.atoms.at(iat1).cpos;
+        //[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]if(IsTranslationFVector(sstr,fdisp)) candidate_lattice_vector.push_back(cdisp);
+        if(isTranslationVector(sstr,cdisp,tolerance,skew)) candidate_lattice_vector.push_back(cdisp);
       }
     }
   }
   //  cerr << candidate_lattice_vector.size() << endl;
-  int cnt=0;
+  //[CO20230626 - clang warning not used]int cnt=0;
   // now generate triplets
   for(uint iu=0;iu<candidate_lattice_vector.size();iu++) {
     for(uint i=1;i<=3;i++) plattice(1,i)=candidate_lattice_vector.at(iu)(i);
@@ -14568,7 +14957,7 @@ xstructure GetPrimitive1(const xstructure& a) {  // MARCH 2009
             if(isdifferent(plattice,olattice,0.0001)) {
               olattice=plattice;
               //      cerr << det(olattice) << " " << cnt<< endl;
-              cnt++;
+              //[CO20230626 - clang warning not used]cnt++;
             }
           }
         }
@@ -14659,6 +15048,13 @@ xstructure GetPrimitive2(const xstructure& a) {
     throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_VALUE_ILLEGAL_);
   }
   double tolerance=a.equiv_fpos_epsilon;
+  
+  //CO20240518 START - dist_nn_min and skew
+  double dist_nn_min=AUROSTD_NAN;
+  if(a.dist_nn_min==AUROSTD_NAN){ dist_nn_min=SYM::minimumDistance(a); }
+  else{dist_nn_min=a.dist_nn_min;}
+  bool skew = SYM::isLatticeSkewed(a.lattice,dist_nn_min,tolerance);  //CO20240518
+  //CO20240518 START - dist_nn_min and skew
 
   cout.setf(std::ios::fixed,std::ios::floatfield);
   cout.precision(10);
@@ -14669,7 +15065,7 @@ xstructure GetPrimitive2(const xstructure& a) {
   std::vector<xvector<double> > candidate_lattice_vector;
   xmatrix<double> plattice(3,3);
   vector<xmatrix<double> > plattice_list;
-  xvector<double> fdisp(3),cdisp(3);
+  xvector<double> cdisp(3);
 
   // Get all the data from the structure for easy use.
   // Set scale to 1 so you don't need to rescale coordinates.
@@ -14694,8 +15090,8 @@ xstructure GetPrimitive2(const xstructure& a) {
   for(uint ia=1;ia<sstr.atoms.size();ia++) {
     // Here we calculate all displacements from the first atom, i.e., the
     // first atom is considered the origin.
-    cdisp=sstr.atoms.at(ia).cpos-sstr.atoms.at(0).cpos;
-    if(IsTranslationCVector(sstr,cdisp)) candidate_lattice_vector.push_back(cdisp);
+    cdisp=SYM::CPOSDistFromFPOS(sstr.atoms[ia].fpos,sstr.atoms[0].fpos,sstr.lattice,sstr.f2c,skew); //CO20240518 //[CO20240518 - need smallest distance]sstr.atoms.at(ia).cpos-sstr.atoms.at(0).cpos;
+    if(isTranslationVector(sstr,cdisp,tolerance,skew)) candidate_lattice_vector.push_back(cdisp);
   }
   // Now the candidate_lattice_vector have been found and we must take all possible
   // traids of *distinct* vectors and get the smallest volume.
@@ -14882,7 +15278,7 @@ xstructure GetPrimitive3(const xstructure& a) {
   }
 
   cerr << candidate_lattice_vector.size() << endl;
-  int cnt=0;
+  //[CO20230626 - clang warning not used]int cnt=0;
   // now generate triplets
   for(uint iu=0;iu<candidate_lattice_vector.size();iu++) {
     for(uint i=1;i<=3;i++) plattice(1,i)=candidate_lattice_vector.at(iu)(i);
@@ -14897,7 +15293,7 @@ xstructure GetPrimitive3(const xstructure& a) {
             if(isdifferent(plattice,olattice,0.0001)) {
               olattice=plattice;
               //      cerr << det(olattice) << " " << cnt<< endl;
-              cnt++;
+              //[CO20230626 - clang warning not used]cnt++;
             }
           }
         }
@@ -16866,14 +17262,17 @@ void xstructure::xstructure2abinit(void) {
 // ***************************************************************************
 // Function xstructure2cif
 // ***************************************************************************
-void xstructure::xstructure2cif(void) { //DX20190131
+void xstructure::xstructure2cif(bool calculate_symmetry) { //DX20190131 //CO20261002 - the caller decides whether to find the space group
   ReScale(1.0);
   neg_scale=FALSE;
   coord_flag=_COORDS_FRACTIONAL_; 
   iomode=IOCIF;
-  if(!partial_occupation_flag){ //CO20220715
-    (*this).spacegroupnumber = (*this).SpaceGroup_ITC();
-    (*this).lattice = (*this).standard_lattice_ITC; // need to update the lattice; may have rotated
+  if(!calculate_symmetry){spacegroupnumber=1;}  //CO20261002 - write P1 with every atom listed
+  else if(!partial_occupation_flag){ //CO20220715
+    double tolerance=sym_eps;
+    if(tolerance>=AUROSTD_NAN){tolerance=SYM::defaultTolerance(*this);} //CO20250407 - setting default value for inputs from command-line
+    spacegroupnumber=SpaceGroup_ITC(tolerance,-1,setting_ITC,sym_eps_no_scan); //CO20261002 - as in pflow::CIF()
+    lattice=standard_lattice_ITC; // need to update the lattice; may have rotated
   }
   if(title.empty()) {buildGenericTitle();}  //CO20171008 - pushed all of this to a function
   return;
@@ -18099,39 +18498,40 @@ class compare_GetNeighData {
     }
 };
 
-//RF20200831 - checkStructure - START
-// **************************************************************************
-// checkStructure
-// **************************************************************************
-// rescale structure to 1 and check whether e.g. species and atoms are present
-void xstructure::checkStructure(){
-  bool LDEBUG = (FALSE || XHOST.DEBUG);
-  stringstream message;
-  (*this).ReScale(1.0); // rescales scaling factor in second line of POSCAR to 1, needed for correct distances
-  //throw some general information such as input structure
-  if(LDEBUG){
-    cerr << __AFLOW_FUNC__ << endl << "INPUT STRUCTURE:" << endl;
-    cerr << __AFLOW_FUNC__ << (*this) << endl;
-  }
-  // check whether the species vector is populated, otherwise throw error
-  if ((*this).species.size() == 0){
-    message << " BAD NEWS: It seems there are no species in the structure. Please adjust the structure and rerun.";
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
-  }
-  // check whether there are any atoms in the structure
-  if ((*this).atoms.size() == 0){
-    message << " BAD NEWS: It seems there are no atoms in the structure. Please adjust the structure and rerun.";
-    throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
-  }
-  // if species of atoms are not known like in VASP4 format, throw error
-  for(uint k=0,ksize=(*this).atoms.size();k<ksize;k++){
-    if ((*this).atoms[k].cleanname == ""){
-      message << " BAD NEWS: It seems you are providing a structure without complete species information as input. This implementation requires a structure with the species information included. For a VASP4 POSCAR, the species must be written on the right side next to the coordinates for each atom. Please adjust the structure and rerun.";
-      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
-    }
-  }
-}
-//RF20200831 - checkStructure - END
+//KC20220830 - moved to optimizeStructure() in aflow_cce.cpp
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]//RF20200831 - checkStructure - START
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]// **************************************************************************
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]// checkStructure
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]// **************************************************************************
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]// rescale structure to 1 and check whether e.g. species and atoms are present
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]void xstructure::checkStructure(){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  bool LDEBUG = (FALSE || XHOST.DEBUG);
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  stringstream message;
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  (*this).ReScale(1.0); // rescales scaling factor in second line of POSCAR to 1, needed for correct distances
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    //throw some general information such as input structure
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  if(LDEBUG){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    cerr << __AFLOW_FUNC__ << endl << "INPUT STRUCTURE:" << endl;
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    cerr << __AFLOW_FUNC__ << (*this) << endl;
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  }
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  // check whether the species vector is populated, otherwise throw error
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  if ((*this).species.size() == 0){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    message << "BAD NEWS: It seems there are no species in the structure. Please adjust the structure and rerun.";
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  }
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  // check whether there are any atoms in the structure
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  if ((*this).atoms.size() == 0){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    message << "BAD NEWS: It seems there are no atoms in the structure. Please adjust the structure and rerun.";
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  }
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  // if species of atoms are not known like in VASP4 format, throw error
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  for(uint k=0,ksize=(*this).atoms.size();k<ksize;k++){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    if ((*this).atoms[k].cleanname == ""){
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]      message << "BAD NEWS: It seems you are providing a structure without complete species information as input. This implementation requires a structure with the species information included. For a VASP4 POSCAR, the species must be written on the right side next to the coordinates for each atom. Please adjust the structure and rerun.";
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]      throw aurostd::xerror(_AFLOW_FILE_NAME_,__AFLOW_FUNC__,message,_INPUT_ILLEGAL_);
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]    }
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]  }
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]}
+//[KC20220830 - moved to optimizeStructure() in aflow_cce.cpp]//RF20200831 - checkStructure - END
 
 
 // **************************************************************************
@@ -18645,7 +19045,7 @@ vector<xvector<double> > GetBasisTransformationInternalTranslations(const xmatri
   xmatrix<double> lattice_frac = aurostd::eye<double>(3,3);
   xmatrix<double> lattice_shrink = inverse_transform*lattice_frac;
 
-  if(LDEBUG){ cerr << __AFLOW_FUNC__ << " shrunken lattice: " << lattice_shrink << endl; }
+  if(LDEBUG){ cerr << __AFLOW_FUNC__ << " shrunken lattice: " << endl << lattice_shrink << endl; }
 
   // ---------------------------------------------------------------------------
   // Now that we have the shortest internal translations from lattice shrink
@@ -18762,12 +19162,17 @@ void xstructure::ChangeBasis(const xmatrix<double>& transformation_matrix) {
   bool LDEBUG=(FALSE || XHOST.DEBUG);
   stringstream message;
 
+  //[CO20240619 - not necessary]xstructure xstr_orig;LightCopy((*this),xstr_orig);  //no need to copy symmetry operations
+  uint natoms_orig = (*this).atoms.size();
+  //[CO20240619 - not necessary]double scale_orig=(*this).scale;
+  //[CO20240619 - not necessary]double vol_orig=(*this).Volume();
+  xmatrix<double> lattice_orig = (*this).lattice;
+  
   if(LDEBUG){
     cerr << __AFLOW_FUNC__ << " structure BEFORE basis transformation:" << endl;
     cerr << (*this) << endl;
   }
 
-  uint natoms_orig = (*this).atoms.size();
   uint natoms_transformed = 0;
   bool is_integer_multiple_transformation = true;
   if((*this).dist_nn_min==AUROSTD_NAN || (*this).dist_nn_min==AUROSTD_MAX_DOUBLE){ (*this).dist_nn_min=SYM::minimumDistance((*this)); }
@@ -18780,7 +19185,6 @@ void xstructure::ChangeBasis(const xmatrix<double>& transformation_matrix) {
 
   // ---------------------------------------------------------------------------
   // transform the lattice 
-  xmatrix<double> lattice_orig = (*this).lattice;
   (*this).lattice = transformation_matrix*(*this).lattice;
   (*this).FixLattices();
 
@@ -18910,8 +19314,8 @@ void xstructure::TransformStructure(
   bool LDEBUG=(FALSE || XHOST.DEBUG);
 
   if(LDEBUG){
-    cerr << __AFLOW_FUNC__ << " basis transformation: " << transformation_matrix << endl;
-    cerr << __AFLOW_FUNC__ << " rotation (R): " << rotation << endl;
+    cerr << __AFLOW_FUNC__ << " basis transformation: " << endl << transformation_matrix << endl;
+    cerr << __AFLOW_FUNC__ << " rotation (R): " << endl << rotation << endl;
   }
 
   // ---------------------------------------------------------------------------
@@ -18947,9 +19351,11 @@ void xstructure::qm_clear(void) {
   qm_origin.clear();
   qm_forces_write=FALSE;
   qm_positions_write=FALSE;
+  qm_vmag_write=FALSE;  //CO20230915
   qm_atoms.clear();
   qm_forces.clear();
   qm_positions.clear();
+  qm_vmag.clear();  //CO20230915
   for(uint iat=0;iat<atoms.size();iat++) {
     qm_atoms.push_back(atoms.at(iat));          // just plug something, then I`ll clean
     qm_atoms.at(iat).cpos.clear();
@@ -18958,20 +19364,23 @@ void xstructure::qm_clear(void) {
     qm_forces.at(iat).clear();
     qm_positions.push_back(atoms.at(iat).cpos); // just plug something, then I`ll clean
     qm_positions.at(iat).clear();
+    qm_vmag.push_back(0.0); //CO20230915
   }
-  qm_E_cell=0.0;qm_dE_cell=0.0;qm_H_cell=0.0;qm_PV_cell=0.0;qm_mag_cell=0.0;qm_P=0.0;
-  qm_E_atom=0.0;qm_dE_atom=0.0;qm_H_atom=0.0;qm_PV_atom=0.0;qm_mag_atom=0.0; 
+  qm_E_cell=0.0;qm_dE_cell=0.0;qm_H_cell=0.0;qm_V_cell=0.0;qm_PV_cell=0.0;qm_mag_cell=0.0;qm_P=0.0; //CO20230917 - volume
+  qm_E_atom=0.0;qm_dE_atom=0.0;qm_H_atom=0.0;qm_V_atom=0.0;qm_PV_atom=0.0;qm_mag_atom=0.0;  //CO20230917 - volume
 
-  if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_clear():","[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
-  if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_clear():","[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
-  if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_clear():","[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_vmag.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[4] atoms.size()!=qm_vmag.size().",_VALUE_ERROR_);}  //CO20230915
 
 }
 
 void xstructure::qm_recycle(void) {
-  if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_recycle():","[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
-  if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_recycle():","[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
-  if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_recycle():","[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
+  if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+  if(qm_vmag.size() && atoms.size()!=qm_vmag.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[4] atoms.size()!=qm_vmag.size().",_VALUE_ERROR_);}  //CO20230915
   scale=qm_scale;
   lattice=qm_lattice;
   klattice=qm_klattice;
@@ -18988,10 +19397,10 @@ void xstructure::qm_recycle(void) {
 
 void xstructure::qm_load(const string& Directory,const string& suffix,int iomode) {
   double data_natoms=double(atoms.size());
-  if(iomode!=IOVASP_POSCAR) {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","Only IOVASP_POSCAR is supported.",_FILE_WRONG_FORMAT_);};
+  if(iomode!=IOVASP_POSCAR) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Only IOVASP_POSCAR is supported.",_FILE_WRONG_FORMAT_);};
   if(iomode==IOVASP_POSCAR) {
     xOUTCAR outcar;
-    if(aurostd::FileEmpty(Directory+"/OUTCAR"+suffix))   {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","Empty OUTCAR.",_FILE_CORRUPT_);}  //PN+JJPR FIXED BUG
+    if(aurostd::FileEmpty(Directory+"/OUTCAR"+suffix))   {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Empty OUTCAR.",_FILE_CORRUPT_);}  //PN+JJPR FIXED BUG
 
     outcar.GetPropertiesFile(Directory+"/OUTCAR"+suffix); //SD20221019 - don't perform natoms check yet
 
@@ -19001,24 +19410,28 @@ void xstructure::qm_load(const string& Directory,const string& suffix,int iomode
       message << "      Directory=" << Directory << endl;
       message << "      suffix=" << suffix << endl;
       message << "      iomode=" << iomode << endl;
-      throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():",message,_FILE_WRONG_FORMAT_);;
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,message,_FILE_WRONG_FORMAT_);;
     }
 
     //    cerr << atoms.size() << endl;
     qm_clear();
-    if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
-    if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
-    if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+    if(atoms.size()!=qm_atoms.size())     {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[1] atoms.size()!=qm_atoms.size().",_VALUE_ERROR_);}
+    if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[2] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
+    if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[3] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+    if(atoms.size()!=qm_vmag.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[4] atoms.size()!=qm_vmag.size().",_VALUE_ERROR_);} //CO20230915
 
     // NEW WITH xOUTCAR
     qm_forces.clear(); for(uint i=0;i<outcar.vforces.size();i++)  qm_forces.push_back(outcar.vforces.at(i)); 
     qm_positions.clear(); for(uint i=0;i<outcar.vpositions_cartesian.size();i++)  qm_positions.push_back(outcar.vpositions_cartesian.at(i)); 
-    if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","[4] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
-    if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","[5] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+    qm_vmag.clear(); for(uint i=0;i<outcar.vmag.size();i++)  qm_vmag.push_back(outcar.vmag.at(i));  //CO20230915
+    if(atoms.size()!=qm_forces.size())    {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[4] atoms.size()!=qm_forces.size().",_VALUE_ERROR_);}
+    if(atoms.size()!=qm_positions.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[5] atoms.size()!=qm_positions.size().",_VALUE_ERROR_);}
+    //if SPIN=OFF, qm_vmag will be empty
+    if(qm_vmag.size() && atoms.size()!=qm_vmag.size()) {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"[6] atoms.size()["+aurostd::utype2string(atoms.size())+"]!=qm_vmag.size()["+aurostd::utype2string(qm_vmag.size())+"].",_VALUE_ERROR_);} //CO20230915
 
     // NEW WITH xVASPRUNXML
     xVASPRUNXML vasprunxml;
-    if(aurostd::FileEmpty(Directory+"/vasprun.xml"+suffix))   {throw aurostd::xerror(__AFLOW_FILE__,XPID+"xstructure::qm_load():","Empty vasprun.xml.",_FILE_CORRUPT_);} //PN+JJPR FIXED BUG
+    if(aurostd::FileEmpty(Directory+"/vasprun.xml"+suffix))   {throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"Empty vasprun.xml.",_FILE_CORRUPT_);} //PN+JJPR FIXED BUG
     //vasprunxml.GetPropertiesFile(Directory+"/vasprun.xml");
     vasprunxml.GetPropertiesFile(Directory+"/vasprun.xml"+suffix); //PN+JJPR FIXED BUG
     qm_forces.clear(); for(uint i=0;i<vasprunxml.vforces.size();i++)  qm_forces.push_back(vasprunxml.vforces.at(i)); 
@@ -19040,6 +19453,7 @@ void xstructure::qm_load(const string& Directory,const string& suffix,int iomode
     // cerr << "DEBUG: xstructure::qm_clear(void)" << endl;
     // string CONTCAR_string="";
     xstructure b(CONTCAR_stringstream);                               // LOAD it in
+    qm_V_cell=qm_V_atom=b.GetVolume();qm_V_atom/=(double)b.atoms.size();  //CO20230917
     qm_scale=b.scale;
     qm_lattice=b.lattice;
     qm_klattice=b.klattice;

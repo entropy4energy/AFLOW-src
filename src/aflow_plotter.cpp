@@ -254,8 +254,12 @@ namespace plotter {
       aurostd::string2tokens(versionstring, vstring);
       pdflatex_version = aurostd::string2utype<uint>(vstring[1]);
     }
+      
+    string format = plotoptions.getattachedscheme("IMAGE_FORMAT");
+    if (format.empty()) format = "pdf";
 
-    string binaries = "gnuplot,convert";
+    string binaries = "gnuplot";  //CO20231106 - not necessarily needed: ",convert"
+    if(format!="pdf"){binaries+=",convert";};  //CO20231106
     // ME20200609 - old pdfatex versions cannot process eps files
     if (pdflatex_version >= 2010) {
       binaries += ",pdflatex,repstopdf";
@@ -276,12 +280,11 @@ namespace plotter {
       if(LDEBUG){cerr << __AFLOW_FUNC__ << " filename=" << filename << endl;}
       string filename_latex = plotoptions.getattachedscheme("FILE_NAME_LATEX");
       // PDF is default since we use pdflatex to compile
-      string format = plotoptions.getattachedscheme("IMAGE_FORMAT");
-      if (format.empty()) format = "pdf";
       string current_dir = aurostd::getPWD();  //[CO20191112 - OBSOLETE]aurostd::execute2string("pwd")
       // Create temp directory
       string directory_tmp = aurostd::TmpDirectoryCreate("plotLATEX") + "/";
-      chdir(directory_tmp.c_str());
+      int result=chdir(directory_tmp.c_str());
+      if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
       // Execute gnuplot and pdflatex
       string command="",output="";
       aurostd::stringstream2file(gpfile, filename + ".plt");
@@ -329,7 +332,8 @@ namespace plotter {
         aurostd::execute(command);
         if(LDEBUG) cerr << __AFLOW_FUNC__ << aurostd::execute("ls -las "+directory_tmp) << endl;
       }
-      chdir(current_dir.c_str());
+      result=chdir(current_dir.c_str());
+      if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
       aurostd::CopyFile(directory_tmp + filename_latex + "." + format,directory_work + "/" + filename + "." + format);
       if(LDEBUG) {cerr << __AFLOW_FUNC__ << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
       // Keep gnuplot file if aflow was called with --keep=gpl
@@ -363,7 +367,8 @@ namespace plotter {
   // [OBSOLETE]   string current_dir = aurostd::getPWD();  //[CO20191112 - OBSOLETE]aurostd::execute2string("pwd")
   // [OBSOLETE]  // Create temp directory
   // [OBSOLETE]   string directory_tmp = aurostd::TmpDirectoryCreate("plotLATEX") + "/";
-  // [OBSOLETE] chdir(directory_tmp.c_str());
+  // [OBSOLETE] int result=chdir(directory_tmp.c_str());
+  // [OBSOLETE] if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
   // [OBSOLETE] // Execute gnuplot and pdflatex
   // [OBSOLETE] aurostd::stringstream2file(gpfile, filename + ".plt");
   // [OBSOLETE]   aurostd::execute(XHOST.command("gnuplot") + " " + filename + ".plt");
@@ -372,7 +377,8 @@ namespace plotter {
   // [OBSOLETE]   if (format != "pdf") {
   // [OBSOLETE]     aurostd::execute(XHOST.command("convert") + " -quiet -density 300 -background white " + filename_latex + ".pdf " + filename_latex  + "." + format);
   // [OBSOLETE]   }
-  // [OBSOLETE]   chdir(current_dir.c_str());
+  // [OBSOLETE]   result=chdir(current_dir.c_str());
+  // [OBSOLETE]   if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
   // [OBSOLETE]   aurostd::CopyFile(directory_tmp + filename_latex + "." + format,directory_work + "/" + filename + "." + format);
   // [OBSOLETE]   if(LDEBUG) {cerr << __AFLOW_FUNC__ << " moving file to: " << directory_work + "/" + filename + "." + format << endl;}
   // [OBSOLETE]   // Keep gnuplot file if aflow was called with --keep=gpl

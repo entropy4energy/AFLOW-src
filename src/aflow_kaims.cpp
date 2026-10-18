@@ -183,7 +183,7 @@ namespace KBIN{
     if(LDEBUG) cerr << "DEBUG: KBIN::AIMS_Directory (BEGIN)" << endl;
     string subS,subS1,subS2;
     ostringstream aus;
-    string::iterator pos;
+    //[CO20230626 - clang warning not used]string::iterator pos;
     bool Krun=TRUE;
 
     ifstream FileAFLOWIN;
@@ -322,7 +322,7 @@ namespace KBIN{
           aus << "XXXXX  MAKING DIRECTORY = " << xaims.Directory << "  " << Message(__AFLOW_FILE__,aflags) << endl;
           aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
           string str="mkdir "+xaims.Directory;
-          system(str.c_str());
+          aurostd::execute(str.c_str());  //CO20250406
         }
         // some check
         if(!FileAFLOWIN) {                                                                                      // ******* _AFLOWIN_ does not exist

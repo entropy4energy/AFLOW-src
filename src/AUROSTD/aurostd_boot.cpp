@@ -89,6 +89,8 @@ using aurostd::floor;
 using aurostd::ceil;
 using aurostd::getElements; //CO20200624
 
+template bool aurostd::iszero<double>(const aurostd::xvector<double>&,double);  //CO20261005 - was instantiated only inside the floating-point getSmithNormalForm(); APL, ovasp and others call it
+
 template<class utype> bool initialize_scalar(utype d) {
   string s="";
   stringstream ss;
@@ -457,6 +459,51 @@ template<class utype> bool initialize_xscalar_xvector_xmatrix_xtensor(utype x) {
   //[OBSOLETE ME20180705]t8.clear();t8.set(x);t8.reset();t8=nint(t8);t8=sign(t8);t8=abs(t8);t8=floor(t8);t8=ceil(t8);//t8=round(t8);t8=trunc(t8);
   //[OBSOLETE ME20180705]int i8[8+1];aurostd::xtensor8debug(t8,"");utype ******** b8;aurostd::allocate_xtensor8corpus(b8,i8,i8,i8);
 
+  // START ST20250331 New instantiations for -O1 to work
+  // This is just created by instantiating each of the template the linker complains about.
+  // HACK std::cout produces a side effect that compiler isn't allowed to optimize out.
+  // This way we make sure the function templates are actually instantiated
+
+  aurostd::xvector<utype> v1(3);
+  v1[0] = 1.0; v1[1] = 2.0; v1[2] = 3.0;
+  utype modsq = aurostd::modulussquare(v1);
+  std::cout << modsq;
+  aurostd::xtensor<utype> tens;
+  int dummy;
+  utype dummyd;
+  auto subptr = new aurostd::_subtensor<utype>(dummy, &dummyd, tens);
+  std::cout << subptr;
+  delete subptr;
+  aurostd::xcomplex<utype> a_utype(1.0, 2.0), b_utype(1.0, 2.0);
+  bool eq_utype = aurostd::isequal(a_utype, b_utype);
+  std::cout << eq_utype;
+  utype a = 1.0, b = 2.0;
+  bool diff = aurostd::isdifferent(a, b);
+  std::cout << diff;
+  int nck = aurostd::nCk<int>(5, 2);
+  std::cout << nck;
+  aurostd::xcomplex<utype> c_utype(4.0, 2.0);
+  utype dd = 2.0;
+  auto result = c_utype / dd;
+  std::cout << result;
+  aurostd::xvector<int> vec_int(3);
+  vec_int[0] = 1; vec_int[1] = 2; vec_int[2] = 3;
+  bool ident = aurostd::identical(vec_int, 1);
+  std::cout << ident;
+  int comb = aurostd::combinations<int>(5, 2);
+  std::cout << comb;
+  aurostd::xvector<utype> foo;
+  utype fooprod = aurostd::elements_product(foo);
+  std::cout << fooprod;
+
+  // END ST20250331 New instantiations for -O1 to work
+
+  // ST20250602 Fix the following linker error
+  // undefined reference to `unsigned int aurostd::sum<unsigned int>(aurostd::xvector<unsigned int> const&)'
+  xvector<unsigned int> xvui;
+  unsigned int sumxvui = aurostd::sum(xvui);
+  std::cout << sumxvui;
+
   return TRUE;
 }
 
@@ -605,6 +652,8 @@ bool initialize_templates_never_call_this_procedure(bool flag) {
     o+=initialize_scalar(uint(1));
     //  o+=initialize_xscalar_xvector_xmatrix_xtensor(uint(1));
     uint uigcd=1;_GCD(uigcd,uigcd,uigcd,uigcd,uigcd);_GCD(uigcd,uigcd,uigcd);  //CO20191201
+    aurostd::xvector<uint> xvuint;o+=sum(xvuint); //CO20250321
+    aurostd::reduceByGCD(xvuint,xvuint);  //CO20250321
     aurostd::xmatrix<uint> mxuint; //CO20190520
     uint auint=1;getEHermite(auint,auint,mxuint); //CO20191201
     getSmithNormalForm(mxuint,mxuint,mxuint,mxuint); //CO20191201

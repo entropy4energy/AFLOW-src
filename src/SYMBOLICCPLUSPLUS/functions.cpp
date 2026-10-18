@@ -607,7 +607,7 @@ namespace symbolic{ //DX20200625
 
   Symbolic Derivative::integrate(const Symbolic &s) const
   {
-    int n = 0, n1;
+    int n = 0, n1 = 0; // ST20250331 Fix compiler warning -Wmaybe-uninitialized
     std::list<Symbolic>::const_iterator i, i1 = parameters.end();
     std::list<Symbolic>::iterator j;
 
@@ -664,7 +664,7 @@ namespace symbolic{ //DX20200625
 
   Symbolic Integral::df(const Symbolic &s) const
   {
-    int n = 0, n1;
+    int n = 0, n1 = 0; // ST20250331 Fix compiler warning -Wmaybe-uninitialized
     std::list<Symbolic>::const_iterator i, i1 = parameters.end();
     std::list<Symbolic>::iterator j;
 

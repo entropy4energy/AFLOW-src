@@ -17,10 +17,15 @@
 // Cv:    isochoric heat capacity (in kB)
 // Svib:  vibrational entropy (in kB)
 //
-// For the calculations, frequencies are assumed to be in THz divided by 2pi (as
-// is standard for the APL DOS calculator).
+// Frequency convention: the stored frequencies are ordinary (linear) frequencies
+// f = omega/(2pi) in THz -- NOT angular frequencies omega. (This is what the APL
+// DOS calculator produces.) Consistently, every energy below is formed as E = h*f
+// with Planck's h, not hbar: e.g. PLANCKSCONSTANTEV_h*freq*THz2Hz is in eV, and
+// the Debye temperatures (getDebyeTemperature/getDebyeWallerTemperature) use
+// theta = (h/kB)*f_D = BEfactor_h_THz*f_D, with no extra 2pi factor.
 
 #include "aflow_apl.h"
+#include <limits>  //TL20260608 - quiet_NaN() invalid-moment sentinel
 
 using std::vector;
 using std::string;
@@ -333,6 +338,66 @@ namespace apl {
     return getScalingFactor(unit) * cv;
   }
 
+  //getFrequencyMoment////////////////////////////////////////////////////////
+  // Calculates <f^power> from the positive-frequency DOS in THz.
+  double ThermalPropertiesCalculator::getFrequencyMoment(const vector<double>& freq,
+      const vector<double>& dos,
+      double power) {
+    if (freq.size() != dos.size()) {
+      string message = "Frequency and DOS vectors have different sizes.";
+      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _INDEX_MISMATCH_);
+    }
+
+    double stepDOS = getStepDOS(freq);
+    double norm = 0.0;
+    double moment = 0.0;
+    for (uint i = 0; i < freq.size(); i++) {
+      if (freq[i] < _FLOAT_TOL_) continue;
+      norm += dos[i];
+      moment += dos[i] * pow(freq[i], power);
+    }
+    norm *= stepDOS;
+    moment *= stepDOS;
+    if (norm < _FLOAT_TOL_) return std::numeric_limits<double>::quiet_NaN();  //TL20260608 - NaN so std::isnan guards catch it (AUROSTD_NAN is finite 1E9)
+    return moment/norm;
+  }
+
+  //getDebyeTemperature///////////////////////////////////////////////////////
+  // True Debye temperature theta_D from the +2 (second) frequency moment of the
+  // phonon DOS, in K. "+2 moment" means the moment <f^2> = INT g(f) f^2 df (with
+  // g normalized to INT g df = 1); the +2 is the exponent of f in the integrand.
+  // For an ideal Debye DOS g(f) = 3 f^2 / f_D^3 the moment relation
+  // <f^n> = 3/(n+3) f_D^n gives, at n = +2, <f^2> = (3/5) f_D^2, so
+  //   f_D = sqrt((5/3) <f^2>)  and  theta_D = (h/kB) f_D  [BEfactor_h_THz = h/kB].
+  // This is the calorimetric/elastic-style Debye temperature; contrast with the
+  // -2 moment used by getDebyeWallerTemperature() (theta_DWF). Returns NaN if the
+  // moment is undefined (so addToAPLOut() skips the line).
+  double ThermalPropertiesCalculator::getDebyeTemperature() {
+    double moment2 = getFrequencyMoment(_freqs_0K, _dos_0K, 2.0);
+    if (std::isnan(moment2) || moment2 < _FLOAT_TOL_) return std::numeric_limits<double>::quiet_NaN();
+    // Debye DOS: <f^2> = (3/5) f_D^2.
+    return BEfactor_h_THz * sqrt((5.0/3.0) * moment2);
+  }
+
+  //getDebyeWallerTemperature/////////////////////////////////////////////////
+  // Debye-Waller temperature theta_DWF (the descriptor previously called theta_M)
+  // from the -2 (inverse-square) frequency moment of the phonon DOS, in K.
+  // "-2 moment" means the moment <f^-2> = INT g(f) f^-2 df (with g normalized to
+  // INT g df = 1); the -2 is the exponent of f in the integrand. For an ideal
+  // Debye DOS g(f) = 3 f^2 / f_D^3 the relation <f^n> = 3/(n+3) f_D^n gives, at
+  // n = -2, <f^-2> = 3 / f_DWF^2, so
+  //   f_DWF = sqrt(3 / <f^-2>)  and  theta_DWF = (h/kB) f_DWF  [BEfactor_h_THz = h/kB].
+  // The inverse-square moment is the one that controls the harmonic mean-square
+  // displacement <u^2> and hence the Debye-Waller factor, which is why theta_DWF
+  // (low-frequency-weighted) differs from the +2-moment theta_D from
+  // getDebyeTemperature(). Returns NaN if undefined (so addToAPLOut() skips it).
+  double ThermalPropertiesCalculator::getDebyeWallerTemperature() {
+    double moment_minus2 = getFrequencyMoment(_freqs_0K, _dos_0K, -2.0);
+    if (std::isnan(moment_minus2) || moment_minus2 < _FLOAT_TOL_) return std::numeric_limits<double>::quiet_NaN();
+    // Debye DOS: <f^-2> = 3/f_DWF^2.
+    return BEfactor_h_THz * sqrt(3.0/moment_minus2);
+  }
+
   //getStepDOS////////////////////////////////////////////////////////////////
   // Calculates the step size of the DOS. While it may be redundant to do
   // this for every temperature when the 0 K DOS is used, it is essential when
@@ -410,6 +475,14 @@ namespace apl {
     apl_outfile << "[APL_THERMO_RESULTS]START" << std::endl;
     apl_outfile << "energy_zero_point_cell_apl=" << std::setprecision(8) << U0 << " (meV/cell)" << std::endl;
     if (natoms > 0) apl_outfile << "energy_zero_point_atom_apl=" << std::setprecision(8) << (U0/natoms) << " (meV/atom)" << std::endl;
+    // True Debye temperature theta_D from the +2 (second) frequency moment:
+    // <f^2> = (3/5) f_D^2. See getDebyeTemperature().
+    double debye_temperature = getDebyeTemperature();
+    if (!std::isnan(debye_temperature)) apl_outfile << "apl_debye=" << std::setprecision(8) << debye_temperature << " (K)" << std::endl;  //TL20260623 - matches agl_debye/ael_debye_temperature naming
+    // Debye-Waller temperature theta_DWF (=theta_M) from the -2 (inverse-square)
+    // frequency moment: <f^-2> = 3 / f_DWF^2. See getDebyeWallerTemperature().
+    double debye_waller_temperature = getDebyeWallerTemperature();
+    if (!std::isnan(debye_waller_temperature)) apl_outfile << "apl_debye_DWF=" << std::setprecision(8) << debye_waller_temperature << " (K)" << std::endl;  //TL20260623 - displacement-weighted Debye temperature
     for (uint t = 0; t < temperatures.size(); t++) {
       if (aurostd::isequal(temperatures[t], 300.0)) {
         apl_outfile << "energy_free_vibrational_cell_apl_300K=" << std::setprecision(8) << Fvib[t] << " (meV/cell)" << std::endl;

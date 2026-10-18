@@ -63,6 +63,18 @@ namespace aurostd {
     ss << in;
     return ((bool)(ss >> num));
   }
+  /// @brief strict conversion of a string to a finite double //CO20261004
+  /// @param in one number, optionally padded with spaces or tabs
+  /// @return the number, or AUROSTD_NAN when the string is empty, has characters after the number, or is nan/inf
+  /// @note string2utype<double>() turns nan/inf into 0 and isfloat() accepts a partial parse such as "1.5abc"
+  double string2finite(const string& in){ //CO20261004
+    const string s=RemoveWhiteSpacesFromTheFrontAndBack(in);
+    if(s.empty()){return AUROSTD_NAN;}
+    char* end=nullptr;
+    const double x=std::strtod(s.c_str(),&end);
+    if(end==s.c_str() || *end!='\0' || !std::isfinite(x)){return AUROSTD_NAN;}
+    return x;
+  }
 }
 
 // ----------------------------------------------------------------------------

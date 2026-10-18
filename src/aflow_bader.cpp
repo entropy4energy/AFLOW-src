@@ -548,7 +548,8 @@ namespace bader_functions {
     string BADER_RUN_DIRECTORY = aurostd::TmpDirectoryCreate("BADER");
     oss << __AFLOW_FUNC__ << " changing directories to " << BADER_RUN_DIRECTORY << " to execute bader command." << endl;
     string work_dir=aurostd::getPWD(); //[CO20191112 - OBSOLETE]aurostd::execute2string("pwd");
-    chdir(BADER_RUN_DIRECTORY.c_str());
+    int result=chdir(BADER_RUN_DIRECTORY.c_str());
+    if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
     //FORTRAN has a problem with strings/paths longer than 128 characters, so make everything local
     aurostd::CopyFile(required_files.at(0), "CHGCAR");
     aurostd::CopyFile(ref_file, "REFERENCE");
@@ -572,7 +573,8 @@ namespace bader_functions {
         aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
         oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-        chdir(work_dir.c_str());//directory.c_str());
+        result=chdir(work_dir.c_str());//directory.c_str());
+        if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
         oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
         if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {  //CLEAN UP BEFORE RETURNING FALSE
@@ -616,7 +618,8 @@ namespace bader_functions {
       aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
       oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-      chdir(work_dir.c_str());//directory.c_str());
+      result=chdir(work_dir.c_str());//directory.c_str());
+      if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
       oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
       if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {  //CLEAN UP BEFORE RETURNING FALSE
@@ -660,7 +663,8 @@ namespace bader_functions {
       aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
       oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-      chdir(work_dir.c_str());//directory.c_str());
+      result=chdir(work_dir.c_str());//directory.c_str());
+      if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
       oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
       if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {
@@ -772,7 +776,8 @@ namespace bader_functions {
           aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
           oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-          chdir(work_dir.c_str());//directory.c_str());
+          result=chdir(work_dir.c_str());//directory.c_str());
+          if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
           oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
           if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {  //CLEAN UP BEFORE RETURNING FALSE
@@ -855,7 +860,8 @@ namespace bader_functions {
           aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
           oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-          chdir(work_dir.c_str());//directory.c_str());
+          result=chdir(work_dir.c_str());//directory.c_str());
+          if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
           oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
           if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {  //CLEAN UP BEFORE RETURNING FALSE
@@ -1002,7 +1008,8 @@ namespace bader_functions {
         aurostd::RemoveFile(remove_files);  //CLEAN UP BEFORE RETURNING FALSE
 #endif
         oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-        chdir(work_dir.c_str());//directory.c_str());
+        result=chdir(work_dir.c_str());//directory.c_str());
+        if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
         oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
         if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {  //CLEAN UP BEFORE RETURNING FALSE
@@ -1025,7 +1032,8 @@ namespace bader_functions {
       }
     }
     oss << __AFLOW_FUNC__ << " changing directories back to original directory " << directory << "." << endl;
-    chdir(work_dir.c_str());//directory.c_str());
+    result=chdir(work_dir.c_str());//directory.c_str());
+    if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
     oss << __AFLOW_FUNC__ << " removing temporary directory " << BADER_RUN_DIRECTORY << "." << endl;
 #ifndef _AFLOW_TEMP_PRESERVE_
     if(!aurostd::RemoveDirectory(BADER_RUN_DIRECTORY)) {
@@ -2732,21 +2740,20 @@ namespace pflow {
     }
     bader_functions::FixDirectory(directory);
 
-    //string command="java -jar Jmol.jar -ionx";
-    string command;
+    //string command="java -Djava.awt.headless=true -jar Jmol.jar -ionx"; //CO20230527 - Djava.awt.headless=true runs without DISPLAY
+    string command="";
+    string command_java=XHOST.command("java");
+    string options_java="-Djava.awt.headless=true"; //CO20230527 - Djava.awt.headless=true runs without $DISPLAY
     //Look for JmolData.jar first
-    if((XHOST.hostname == "nietzsche.mems.duke.edu" || XHOST.hostname == "aflowlib.duke.edu") && aurostd::FileExist("/usr/local/bin/JmolData.jar")) {
-      command = "java -jar /usr/local/bin/JmolData.jar";
-      //command="/usr/local/bin/jmol";
-    } else if(aurostd::IsCommandAvailable("JmolData.jar")) {
-      command = "java -jar " + XHOST.command("JmolData.jar");
+    if(aurostd::IsCommandAvailable("JmolData.jar")) { //CO20261002
+      command = command_java + " " + options_java + " -jar " + XHOST.command("JmolData.jar");
       //Look for jmol instead
     } else if(aurostd::IsCommandAvailable("jmol")) {
-      command = XHOST.command("jmol");
+      command = XHOST.command("jmol") + " " + options_java;  //CO20230527 - jmol script collects -D commands and puts them before -jar
     } else if(aurostd::IsCommandAvailable("jmol.sh")) {
-      command = XHOST.command("jmol.sh");
+      command = XHOST.command("jmol.sh") + " " + options_java; //CO20230527 - jmol script collects -D commands and puts them before -jar
     } else if(aurostd::IsCommandAvailable("Jmol.jar")) {
-      command = "java -jar " + XHOST.command("Jmol.jar");
+      command = command_java + " " + options_java + " -jar " + XHOST.command("Jmol.jar");
     } else {
       oss << endl;
       oss << __AFLOW_FUNC__ << " ERROR: Unable to locate either JmolData (preferred), jmol, jmol.sh, or Jmol.jar in path." << " "; //<< endl //CO20180502;

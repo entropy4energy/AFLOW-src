@@ -67,11 +67,104 @@ const int ZERO_RANGE_TOL = 1;
 //  };
 //} // namespace chull
 
+namespace pocc {
+  namespace unittest {
+    // Required here so the qualified DEED test friendship below is self-contained.
+    // The POCC-owned unit-test declaration is also grouped with its peers in aflow_pocc.h.
+    void deedTest(uint&,vector<vector<string> >&,vector<string>&);
+  }
+}
+
 namespace chull {
   class ChullPoint; //forward declaration
   class ConvexHull; //forward declaration
+  // Owns validation and serialization of DEED-only rendering options.
+  class DEEDPlotConfig {
+    public:
+      //NECESSARY PUBLIC CLASS METHODS - START
+      //constructors - START
+      DEEDPlotConfig();
+      DEEDPlotConfig(const DEEDPlotConfig& b);
+      //constructors - STOP
+      ~DEEDPlotConfig();
+      const DEEDPlotConfig& operator=(const DEEDPlotConfig& b);
+      void clear();
+      //NECESSARY PUBLIC CLASS METHODS - STOP
+      int getSchemaVersion() const;
+      bool getEnabledInterpolation() const;
+      const string& getInterpolationMode() const;
+      double getBorderWhiteBandThickness() const;
+      double getDataDistanceWhiteFadeRadius() const;
+      double getDataDistanceWhiteFadeMaxOpacity() const;
+      uint getInterpolationGridDensity() const;
+      double getInterpolationIDWPower() const;
+      uint getInterpolationMinPoints() const;
+      bool getShowStructureMarkers() const;
+      const string& getStructureMarkerMode() const;
+      bool getShowStructureLegend() const;
+      const string& getStructureSymbolKey() const;
+      bool getMarkerUseColormap() const;
+      const string& getMarkerDrawColor() const;
+      const string& getMarkerFillColor() const;
+      double getMarkerSizePt() const;
+      double getMarkerLineWidthPt() const;
+      bool getShowVertexMarkers() const;
+      const string& getVertexDrawColor() const;
+      const string& getVertexFillColor() const;
+      double getVertexMarkerSizePt() const;
+      double getVertexLineWidthPt() const;
+      const vector<string>& getMarkerSymbolCycle() const;
+      const std::map<string,string>& getMarkerSymbolOverrides() const;
+      static string getConfigFilename();
+      static string getGuideFilename();
+      static uint getMaxInterpolationGridDensity();
+      aurostd::JSON::object toJSON() const;
+      string guideText() const;
+      void writeFiles(const string& directory,bool write_config,bool write_guide) const;
+      bool loadFile(const string& path,vector<string>& warnings);
+
+    private:
+      int schema_version;
+      bool enabled_interpolation;
+      string interpolation_mode;
+      double border_white_band_thickness;
+      double data_distance_white_fade_radius;
+      double data_distance_white_fade_max_opacity;
+      uint interpolation_grid_density;
+      double interpolation_idw_power;
+      uint interpolation_min_points;
+      bool show_structure_markers;
+      string structure_marker_mode;
+      bool show_structure_legend;
+      string structure_symbol_key;
+      bool marker_use_colormap;
+      string marker_draw_color;
+      string marker_fill_color;
+      double marker_size_pt;
+      double marker_line_width_pt;
+      bool show_vertex_markers;
+      string vertex_draw_color;
+      string vertex_fill_color;
+      double vertex_marker_size_pt;
+      double vertex_line_width_pt;
+      vector<string> marker_symbol_cycle;
+      std::map<string,string> marker_symbol_overrides;
+      //NECESSARY PRIVATE CLASS METHODS - START
+      void free();
+      void copy(const DEEDPlotConfig& b);
+      //NECESSARY PRIVATE CLASS METHODS - STOP
+      static string normalizeInterpolationMode(const string& mode);
+      static string normalizeMarkerMode(const string& mode);
+      static string normalizeStructureSymbolKey(const string& mode);
+  };
   bool convexHull(const aurostd::xoption& vpflow);
   bool convexHull(const string& input,const aurostd::xoption& vpflow,const _aflags& aflags,ostream& oss=cout,bool silence_flag_check=false);
+  ////////////////////////////////////////////////////////////////////////////////
+  // database derived properties (hull distance and DEED) //CO20261004
+  vector<string> getAffectedAlloys(const vector<string>& changed_alloys,const vector<string>& database_alloys);  //HP20260820 //CO20261004
+  vector<string> getMaximalAlloys(const vector<string>& alloys);  //HP20260820 //CO20261004
+  bool getDatabaseDerivedProperties(const string& alloy,const string& database_file,vector<aflowlib::_aflowlib_entry>& entries,ostream& oss=cout);  //CO20261004
+  int updateDatabaseDerivedProperties(aflowlib::AflowDB& db,const string& derived_file,ostream& oss=cout);  //CO20261004
   ////////////////////////////////////////////////////////////////////////////////
   // gets path to redirect output
   string getPath(bool add_backslash=true);
@@ -253,6 +346,7 @@ namespace chull {
       bool getMostRelaxedXstructure(xstructure& xstr) const;
       uint getDim() const;
       bool isUnary() const;
+      bool isMaterialPageAvailable() const;
       double getFormationEnthalpy() const;
       double getEntropicTemperature() const;
       double getEntropyFormingAbility() const;
@@ -263,7 +357,6 @@ namespace chull {
       double getRelativeStabilityCriterion() const;
       double getNPlus1EnthalpyGain(char units=_std_) const;
       double getEntropyStabilizationCoefficient(char units=_std_) const;
-
       //setters
       void setHullCoords();
       void setHullCoords(const xvector<double>& coords);
@@ -496,6 +589,13 @@ namespace chull {
       //getters
       xvector<int> getElementsPresent() const;
       uint getDim() const;
+      xvector<double> getStoichiometry() const;
+      double getDEED() const;
+      const vector<double>& getDEEDCandidates() const;
+      uint getDEEDPointIndex() const;
+      bool canReportDEED() const;
+      static bool isValidDEEDValue(double value);
+      static bool isValidDEEDRank(double rank);
 
       //attributes
       bool m_initialized;
@@ -528,11 +628,25 @@ namespace chull {
       uint m_i_icsd_g_state;      //canonical icsd entry (lowest number)
 
       friend class ConvexHull;  //ConvexHull defines everything!
+      friend void pocc::unittest::deedTest(uint&,vector<vector<string> >&,vector<string>&);
     private:
       //NECESSARY private CLASS METHODS - START
       void free();
       void copy(const CoordGroup& b);
       //NECESSARY private CLASS METHODS - STOP
+      // A composition group owns DEED selection and candidates; ChullPoint remains generic.
+      double m_deed;
+      double m_deed_rank;
+      uint m_deed_point_index;
+      vector<double> m_deed_candidates;
+      void clearDEED();
+      bool addDEEDCandidate(double deed_value,double rank=AUROSTD_MAX_DOUBLE,uint point_index=AUROSTD_MAX_UINT);
+      uint selectCloserDEEDPoint(uint current,uint candidate,const vector<ChullPoint>& points) const;
+      uint findClosestPoccParentDEEDPoint(const vector<ChullPoint>& points) const;
+      uint findDEEDPointIndexByEntry(const vector<ChullPoint>& points,const aflowlib::_aflowlib_entry& entry) const;
+      uint findDEEDPointIndexByIdentifiers(const vector<ChullPoint>& points,const string& auid,const string& aurl,const string& compound,const string& prototype) const;
+      bool pointCanRepresentDEED(const ChullPoint& point) const;
+      bool pointMatchesDEEDIdentifiers(const ChullPoint& point,const string& auid,const string& aurl,const string& compound,const string& prototype) const;
   };
 } // namespace chull
 
@@ -752,6 +866,7 @@ namespace chull {
       double getDistanceToHull(uint i_point,bool redo=false,bool get_signed_distance=false) const;  //CO20190808
       double getDistanceToHull(const ChullPoint& point,bool redo=false,bool get_signed_distance=false) const; //CO20190808
       vector<double> getDistancesToHull(const vector<string>& vauid,bool redo=false) const;
+      void getDatabaseDerivedProperties(vector<aflowlib::_aflowlib_entry>& entries) const;  //CO20261004
       vector<uint> extractDecompositionPhases(const ChullFacet& facet) const;
       vector<uint> getDecompositionPhases(uint i_point) const;
       vector<uint> getDecompositionPhases(const ChullPoint& point) const;
@@ -780,6 +895,8 @@ namespace chull {
       vector<double> getNPlus1EnthalpyGain(const vector<uint>& vcpoint,ConvexHull& fake_hull,bool hull_set) const;
       void getJoinedFacets(vector<vector<uint> > &facet_collection, const double angle_threshold = PI/180); //HE20210510 - 0.018 radians ~ 1 degree
 
+      void reorderUnariesLIB2(vector<vector<vector<aflowlib::_aflowlib_entry> > >& entries,vector<string>& velements); //CO20261002 - public for its unit test
+
       //writer
       bool write(filetype ftype=latex_ft) const;
     private:
@@ -796,6 +913,12 @@ namespace chull {
       //aflowrc definitions we don't want to redefine over and over again, just once at initialization
       bool m_allow_all_formation_energies;
       vector<string> m_allowed_dft_types;
+
+      // DEED inputs may contain valid compositions that are not present in the
+      // database-backed hull. Keep their composition state separate from the
+      // thermodynamic coordinate groups so DEED ingestion cannot alter hull geometry.
+      vector<CoordGroup> m_deed_coord_groups;
+      friend void pocc::unittest::deedTest(uint&,vector<vector<string> >&,vector<string>&);
 
       //temporary variables that come with every new calculate() command
       uint h_dim;                                       //projected hull dimensionality
@@ -912,6 +1035,21 @@ namespace chull {
       void setNPlus1EnthalpyGain(uint i_point);
       void setNPlus1EnthalpyGain(uint i_point,ConvexHull& fake_hull,bool hull_set);
       void setNPlus1EnthalpyGain();
+      void clearDEED();
+      bool applyDEED(const xvector<double>& representative_stoich,double deed_value);
+      bool getDEEDStoichiometry(const aflowlib::_aflowlib_entry& entry,xvector<double>& stoich) const;
+      bool findDEEDCoordGroupIndex(const xvector<double>& representative_stoich,uint& i_coord_group) const;
+      bool ensureDEEDCoordGroup(const xvector<double>& representative_stoich,uint& i_coord_group);
+      double getDEEDHullDistanceRank(const xvector<double>& stoich,double enthalpy_formation_atom,bool signed_distance=false) const;  //CO20261004 - signed_distance for the tiles' hull loss
+      bool coordGroupCanReportDEED(uint i_coord_group) const;
+      string getCoordGroupDEEDLabel(uint i_coord_group) const;
+      static void appendLatexPlotPackages(std::stringstream& doc_header_TEX_ss,bool image_only,uint dimension);
+      static void appendLatexAxisCommonSettings(std::stringstream& axis_settings_TEX_ss,uint dimension);
+      bool setDEEDFromJSON(uint& matched_count,std::string& source_description);
+      bool setDEEDFromEntries(aflowlib::EntryLoader::Source source,uint& matched_count,std::string& source_description);
+      void writeDEEDJSON() const;
+      static string normalizeDEEDSource(const string& source);
+      void setDEED();
       void cleanHull(); //clean state of hull
 
       //writer functions
@@ -925,6 +1063,7 @@ namespace chull {
       string prettyPrintPrototype(const ChullPoint& point, bool double_back_slash,bool icsd_label_skim=false) const;
       string prettyPrintPrototype(const aflowlib::_aflowlib_entry& entry, bool double_back_slash,bool icsd_label_skim=false) const;
       //[CO20190419 - moved to aurostd_main.cpp]string fixStringLatex(const string& input, bool double_back_slash,bool symmetry_string) const;
+      double getPlotColumnValue(const ChullPoint& point,const string& column_header) const;
       string getPlotHeaderPDF(char function_mode,const string& column_header,bool points_color_gradient=DEFAULT_CHULL_LATEX_COLOR_GRADIENT) const;
       string getPlotPointContentPDF(const ChullPoint& point,bool zero_end_point=true,bool zero_dist_2_hull=false) const;
       string getNodeCoordPosition(const ChullPoint& point) const;

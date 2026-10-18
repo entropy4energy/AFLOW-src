@@ -151,7 +151,10 @@ static const vector<std::string> BRAVAIS_LATTICES = {"BCC","BCT","CUB","FCC","HE
 
 //MONITOR_VASP
 #define VERBOSE_MONITOR_VASP false
+#define VERBOSE_XVASP_AFIX (false || VERBOSE_MONITOR_VASP)
 #define AFLOW_MEMORY_TAG "AFLOW ERROR: AFLOW_MEMORY"
+#define _VASP_STRESS_RELAXED_KB_ 10.0  //CO20261010 - largest stress component (kB) of a relaxed cell: --xplug's test and KBIN::VASP_RelaxationConverged()
+#define _VASP_RELAX_CONTINUE_MAX_ 2  //CO20261010 - times the last relaxation continues while not converged (KBIN::VASP_RelaxContinue())
 
 // --------------------------------------------------------------------------
 // definitions for MULTHREADS
@@ -169,32 +172,36 @@ namespace AFLOW_PTHREADS {
 
 extern string _AFLOWIN_; 
 extern string _AFLOWLOCK_; 
+extern string _AFLOWENDOUT_;  //CO20240608
 extern const string _LOCK_LINK_SUFFIX_; //SD20220224
 
 const string VASP_KEYWORD_EXECUTION=" Executing: ";
 
-#define _AFLOWIN_DEFAULT_     string("aflow.in")  //CO20210302
-#define _AFLOWIN_AEL_DEFAULT_ string("ael_aflow.in")  //CO20210302
-#define _AFLOWIN_AGL_DEFAULT_ string("agl_aflow.in")  //CO20210302
-#define _AFLOWIN_QHA_DEFAULT_ string("aflow_qha.in")  //CO20210302 - moved from APL/aflow_qha.cpp
+#define _AFLOWIN_DEFAULT_     DEFAULT_FILE_AFLOWIN //[CO20240406 - OBSOLETE]//string("aflow.in")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWIN_AEL_DEFAULT_ string("ael_aflow.in")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWIN_AGL_DEFAULT_ string("agl_aflow.in")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWIN_QHA_DEFAULT_ string("aflow_qha.in")  //CO20210302 - moved from APL/aflow_qha.cpp
 
-#define _AFLOWIN_AEL_VARIANTS_ string("ael_aflow.in,aflow_ael.in")  //CO20210302
-#define _AFLOWIN_AGL_VARIANTS_ string("agl_aflow.in,aflow_agl.in")  //CO20210302
+//[CO20240406 - OBSOLETE]#define _AFLOWIN_AEL_VARIANTS_ string("ael_aflow.in,aflow_ael.in")  //CO20210302
+//[CO20240406 - OBSOLETE]#define _AFLOWIN_AGL_VARIANTS_ string("agl_aflow.in,aflow_agl.in")  //CO20210302
 
-#define _AFLOWLOCK_DEFAULT_     string("LOCK")  //CO20210302
-#define _AFLOWLOCK_AEL_DEFAULT_ string("ael.LOCK")  //CO20210302
-#define _AFLOWLOCK_AGL_DEFAULT_ string("agl.LOCK")  //CO20210302
-#define _AFLOWLOCK_QHA_DEFAULT_ string("LOCK.qha")  //CO20210302 - moved from APL/aflow_qha.cpp
+#define _AFLOWLOCK_DEFAULT_     DEFAULT_FILE_AFLOWLOCK  //[CO20240406 - OBSOLETE]//string("LOCK")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWLOCK_AEL_DEFAULT_ string("ael.LOCK")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWLOCK_AGL_DEFAULT_ string("agl.LOCK")  //CO20210302
+//[CO20240407 - OBSOLETE]#define _AFLOWLOCK_QHA_DEFAULT_ string("LOCK.qha")  //CO20210302 - moved from APL/aflow_qha.cpp
 
-#define _AFLOWLOCK_AEL_VARIANTS_ string("ael.LOCK,LOCK.ael")  //CO20210302
-#define _AFLOWLOCK_AGL_VARIANTS_ string("agl.LOCK,LOCK.agl")  //CO20210302
+//[CO20240406 - OBSOLETE]#define _AFLOWLOCK_AEL_VARIANTS_ string("ael.LOCK,LOCK.ael")  //CO20210302
+//[CO20240406 - OBSOLETE]#define _AFLOWLOCK_AGL_VARIANTS_ string("agl.LOCK,LOCK.agl")  //CO20210302
+
+#define _AFLOWENDOUT_DEFAULT_     DEFAULT_AFLOW_END_OUT  //CO20240608
 
 // --------------------------------------------------------------------------
 // definitions for aflow
 // aflow2 default definitions
-#define AFLOW_MATERIALS_SERVER_DEFAULT        string("materials.duke.edu")
-#define AFLOW_WEB_SERVER_DEFAULT              string("nietzsche.mems.duke.edu")
-#define AFLOWLIB_SERVER_DEFAULT               string("aflowlib.duke.edu")
+#define AFLOW_MATERIALS_SERVER_DEFAULT        string("s4e.ai") //CO20261002
+#define AFLOW_WEB_SERVER_DEFAULT              string("s4e.ai") //CO20261002
+#define AFLOWLIB_SERVER_DEFAULT               string("s4e.ai") //CO20261002
+#define AFLOWLIB_SERVER_LEGACY                string("aflowlib.duke.edu") //CO20261003 - used only when asked for by name: --server=aflowlib or --server=aflowlib.duke.edu
 #define AFLOWLIB_MATERIALS_SERVER             string("aflow.org")
 #define AFLOWLIB_CONSORTIUM_STRING            string("aflow.org")
 #define _XENTRY_ string("index.php")
@@ -371,6 +378,7 @@ class _XHOST {
     vector<string> LOGGER_BLACKLIST;  //HE+ME20220305 - for logging
     bool GENERATE_AFLOWIN_ONLY; //CT20180719
     bool POSTPROCESS; //CO20200624 - generic postprocessing, including --lib2raw and --lib2lib
+    bool AVOID_LIB2LIB; //CO20250712 - avoid lib2lib(), good for debugging
     bool ARUN_POSTPROCESS; //CT20181212 - this is for the --postprocess flag needed for AEL/AGL, can be extended to other modules too
     bool AVOID_RUNNING_VASP; //CO20200624
     bool PSEUDOPOTENTIAL_GENERATOR; //SC20200327
@@ -666,6 +674,7 @@ class _aflags {
     bool AFLOW_FORCE_RUN;                               // Force run also in database
     bool AFLOW_PERFORM_DIRECTORY;                       // Directory is specified (sometimes it is useful).
     bool AFLOW_PERFORM_FILE;                            // File is specified (sometimes it is useful).
+    bool AFLOW_PERFORM_FILE_MIX;                        // File is specified (sometimes it is useful).  //CO20260101
     bool AFLOW_PERFORM_ORDER_SORT;                      // Sorts the _AFLOWIN_ in the list
     bool AFLOW_PERFORM_ORDER_REVERSE;                   // Reverse the _AFLOWIN_ in the list
     bool AFLOW_PERFORM_ORDER_RANDOM;                    // Randomize the _AFLOWIN_ in the list
@@ -818,6 +827,7 @@ class _kflags {
     int    KBIN_MPI_NCPUS;
     string KBIN_MPI_NCPUS_STRING; //ME20181216
     int    KBIN_MPI_NCPUS_ORIG; //CO20210804 - repurposing
+    int    KBIN_MPI_HOSTLIST_OFFSETS; //CO20210804 - repurposing
     string KBIN_MPI_START;
     string KBIN_MPI_STOP;
     string KBIN_MPI_COMMAND;
@@ -866,11 +876,17 @@ class _kflags {
     //DX20210122 [OBSOLETE] double KBIN_NEIGHBORS_RADIUS;
     //DX20210122 [OBSOLETE] double KBIN_NEIGHBORS_DRADIUS;
     // pocc operation lists
+    bool   KBIN_CCE_CORRECTABLE;  //CO20221024
     bool   KBIN_POCC;
     bool   KBIN_POCC_CALCULATION;
     string KBIN_POCC_TEMPERATURE_STRING;  //CO20191114
     string KBIN_POCC_ARUNS2SKIP_STRING;   //CO20200627
     bool   KBIN_POCC_EXCLUDE_UNSTABLE; //ME20210927
+    string KBIN_POCC_SAMPLE_NUMBER_STRING;   //TL20260204
+    string KBIN_POCC_SAMPLE_RATE_STRING;     //TL20260205
+    string KBIN_POCC_SAMPLE_HASH_STRING;     //TL20260303
+    bool   KBIN_POCC_SKIP_SITE_CONFIGURATIONS; //TL20260310
+    string KBIN_POCC_ENUMERATOR_STRING;      //CO20261005 - [AFLOW_POCC]ENUMERATOR=UFF|ENUM|COMPARE
     // frozsl operation lists
     bool   KBIN_FROZSL;
     bool   KBIN_FROZSL_DOWNLOAD;
@@ -964,10 +980,13 @@ class _vflags {
     xoption KBIN_VASP_FORCE_OPTION_SPIN;          // SPIN 
     bool KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_1;
     bool KBIN_VASP_FORCE_OPTION_SPIN_REMOVE_RELAX_2;
+    bool KBIN_VASP_FORCE_OPTION_RECYCLE_SPIN;     //CO20230826
     // xoption KBIN_VASP_FORCE_OPTION_TRISTATE;      //  SYM 
     xoption KBIN_VASP_FORCE_OPTION_BADER;         // BADER=ON | OFF | NONE
     xoption KBIN_VASP_FORCE_OPTION_ELF;           // ELF=ON | OFF | NONE
-    xoption KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM;   // AUTO_MAGMOM
+    //[CO20250829 - OBSOLETE]xoption KBIN_VASP_FORCE_OPTION_AUTO_MAGMOM;   // AUTO_MAGMOM
+    xoption KBIN_VASP_FORCE_OPTION_MAGMOM;        // MAGMOM //CO20230826
+    xoption KBIN_VASP_FORCE_OPTION_MAGMOM_MULT;   // MAGMOM //CO20230826
     xoption KBIN_VASP_FORCE_OPTION_SYM;           // SYM
     xoption KBIN_VASP_FORCE_OPTION_WAVECAR;       // WAVECAR
     xoption KBIN_VASP_FORCE_OPTION_CHGCAR;        // CHGCAR
@@ -1155,6 +1174,9 @@ uint AFLOW_monitor(const vector<string>& argv);
 double AFLOW_checkMEMORY(const string& progname="",double=102.0);
 bool CheckMaterialServer(const string& message);  //CO20200624
 bool CheckMaterialServer(void);
+bool isDataServer(void);  //CO20261004
+bool isDataServer(const string& user,const string& auid_directory);  //CO20261004
+string getAUIDPrefix(void); //CO20230525
 string aflow_get_time_string(void);
 string aflow_convert_time_ctime2aurostd(const string& time_LOCK); //CO20200624
 string aflow_get_time_string_short(void);
@@ -1170,6 +1192,8 @@ bool AFLOW_VASP_instance_running(const string& pgid); //SD20220330
 bool AFLOW_MONITOR_instance_running(const _aflags& aflags); //CO20210315
 bool VASP_instance_running(const string& vasp_bin); //CO20210315
 bool VASP_instance_running(const string& vasp_bin,const string& pgid); //SD20220330
+bool resetAFLOWFiles(const vector<string>& vlines,ostream& oss=cout); //CO20240608
+bool resetAFLOWFiles(const vector<string>& vlines,ofstream& FileMESSAGE,ostream& oss=cout);  //CO20240608
 void AFLOW_monitor_VASP();  //CO20210315
 void AFLOW_monitor_VASP(const string& directory);  //CO20210315
 
@@ -1190,6 +1214,7 @@ namespace aflowrc {
   bool read(std::ostream& oss,bool AFLOWRC_VERBOSE);
   bool write_default(std::ostream& oss,bool AFLOWRC_VERBOSE);
   bool print_aflowrc(std::ostream& oss,bool AFLOWRC_VERBOSE);
+  bool AFLUXServerLists(string& server_list,string& path_list); //CO20261004
 } // namespace aflowrc
 
 // --------------------------------------------------------------------------
@@ -1703,7 +1728,7 @@ class xstructure {
     void GetPrimitiveStructures(vector<xstructure>& structures,
         uint start_index=0,
         uint end_index=AUROSTD_MAX_UINT); //DX20201006
-    uint GetPrimitiveCell(void);                                  // Make it primitive, if possible. Returns 1 if routine fails (RHT)   //RHT
+    //[CO20240518 - REMOVING, abuses distance operations by performing in f-space]uint GetPrimitiveCell(void);                                  // Make it primitive, if possible. Returns 1 if routine fails (RHT)   //RHT
     double MinDist(void);                                         // get minimum interatomic distance -- CO20171024
     void ReScale(const double &in_scale);                         // Change scale but keep volume fixed
     void SetScale(const double &in_scale);                        // Change scale
@@ -1777,7 +1802,7 @@ class xstructure {
     void xstructure2itc(void);                                    // some wrap up IOs to convert format to ITC  //CO20220613
     void xstructure2abinit(void);                                 // some wrap up IOs to convert format to ABINIT
     void xstructure2aims(void);                                   // some wrap up IOs to convert format to AIMS
-    void xstructure2cif(void);                                    // some wrap up IOs to convert format to CIF //DX20190123
+    void xstructure2cif(bool calculate_symmetry=true);            // some wrap up IOs to convert format to CIF //DX20190123 //CO20261002 - calculate_symmetry
     void xstructure2abccar(void);                                 // some wrap up IOs to convert format to ABCCAR //DX20190123
     void xstructure2elk(void);                                    // some wrap up IOs to convert format to ELK //DX20200313
     void xstructure2atat(void);                                   // some wrap up IOs to convert format to ATAT //SD20220123
@@ -1904,14 +1929,17 @@ class xstructure {
     bool qm_forces_write;                                         // QM FORCES calculation
     std::vector<xvector<double> > qm_positions;                   // QM POSITIONS calculation
     bool qm_positions_write;                                      // QM POSITIONS calculation
-    double qm_E_cell,qm_dE_cell,qm_H_cell,qm_PV_cell,qm_P,qm_mag_cell;                     // QM energetics PER CELL
-    double qm_E_atom,qm_dE_atom,qm_H_atom,qm_PV_atom,qm_mag_atom;                     // QM energetics ATOMIC
+    double qm_E_cell,qm_dE_cell,qm_H_cell,qm_V_cell,qm_PV_cell,qm_P,qm_mag_cell;      // QM energetics PER CELL //CO20230917 - volume
+    double qm_E_atom,qm_dE_atom,qm_H_atom,qm_V_atom,qm_PV_atom,qm_mag_atom;           // QM energetics ATOMIC //CO20230917 - volume
+    vector<double> qm_vmag;                                       //CO20230915 - QM MAGNETIC MOMENTS OF EACH ATOM - vmag from OUTCAR
+    bool qm_vmag_write;                                           //CO20230915 - QM MAGNETIC MOMENTS OF EACH ATOM - vmag from OUTCAR
     // ----------------------------------------------------------------------------------------
     // KPOINTS                                                    // --------------------------------------
     int kpoints_mode;                                             // mode of kpoints
     int    kpoints_k1,kpoints_k2,kpoints_k3;                      // parameters that are plug during
     double kpoints_s1,kpoints_s2,kpoints_s3;                      // parameters that are plug during
     int kpoints_kmax,kpoints_kppra;                               // load/unload and calculations
+    int kpoints_kppra_orig;                                       //CO20260124 - for MEMORY fix constraints
     string kpoints_kscheme;                                       // of ab-initio
     // ---------------------- SYMMETRY --------------------------------------------------------
     // A=U*B but in A and B we plug vectors as columns watch lattice is per row Uc=A*inv(B)
@@ -2041,7 +2069,7 @@ class xstructure {
     // std::vector<vector<double> > rshell;                       // vector of shells
     // std::vector<vector<int> > nshell;                          // vector of density in shells
     // int nbins;                                                 // number of bins
-    void checkStructure();                                       //RF20200831; rescale structure to 1 and check whether e.g. species and atoms are present
+    //[KC20220902 - OBSOLETE] void checkStructure();                                       //RF20200831; rescale structure to 1 and check whether e.g. species and atoms are present
     //
     void GetNeighbors(deque<deque<uint> >& i_neighbors,deque<deque<double> >& distances,double rmin=0.0,bool prim=true,bool unique_only=true);  //CO20200912
     void GetNeighbors(deque<_atom>& atoms_cell,deque<deque<uint> >& i_neighbors,deque<deque<double> >& distances,double rmin=0.0,bool prim=true,bool unique_only=true);  //CO20200912
@@ -2472,7 +2500,9 @@ string KPPRA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const int& 
 string KPPRA(xstructure& str,const int& _NK);
 string KPPRA_DELTA(int& k1,int& k2,int& k3,const xmatrix<double>& rlattice,const double& DK);
 string KPPRA_DELTA(xstructure& str,const double& DK);
-int GetNBANDS(int electrons,int nions,int spineach,bool ispin=true,int NPAR=1);  //CO20210315 - spin==true is safer, added NPAR
+int GetNBANDS(int electrons,int nions,int spineach,bool ispin=true,int NCORE=1);  //CO20210315 - spin==true is safer, added NPAR //CO20260124 - switching to NCORE per VASP wiki for NBANDS https://www.vasp.at/wiki/NBANDS
+int GetNBANDS_VASP(int electrons,int nions,int spineach,bool ispin=true,int NCORE=1); //CO20260124
+int GetNBANDS_OCC(double electrons,int nions,double magmom,bool ispin=true,bool noncollinear=false,int NCORE=1); //CO20261009 - default NBANDS from the occupied bands
 double GetZVAL(const stringstream& sss,vector<double>& vZVAL);
 double GetZVAL(const _xvasp& xvasp,vector<double>& vZVAL);
 double GetZVAL(const string& directory,vector<double>& vZVAL);
@@ -2529,6 +2559,8 @@ xmatrix<double> CC2FF(const xmatrix<double>& lattice,const xmatrix<double>& cmat
 //DX20190905 START
 //BringInCellInPlace() overloads
 void BringInCellInPlace(double&, double=_ZERO_TOL_, double=1.0, double=0.0);  //ME+DX20190409
+void BringInCellInPlace_20250724(double&, double=_ZERO_TOL_, double=1.0, double=0.0);  //CO20250724
+void BringInCellInPlace_20250101(double&, double=_ZERO_TOL_, double=1.0, double=0.0);  //ME+DX20190409
 void BringInCellInPlace(xvector<double>&, double=_ZERO_TOL_, double=1.0, double=0.0);  //ME+DX20190409
 void BringInCellInPlace(_atom& atom_in, const xmatrix<double>& lattice, double tolerance=_ZERO_TOL_, double upper_bound=1.0, double lower_bound=0.0); //DX20190904
 void BringInCellInPlace(xstructure& xstr, double tolerance=_ZERO_TOL_, double upper_bound=1.0, double lower_bound=0.0); //DX20190904
@@ -2584,6 +2616,7 @@ xmatrix<double> NiggliUnitCellForm(const xmatrix<double>& lattice);
 // minkowsky
 xstructure MinkowskiBasisReduction(const xstructure& a);
 xmatrix<double> MinkowskiBasisReduction(const xmatrix<double>& lattice);
+uint LatticePointGroupOrder(const xmatrix<double>& lattice); //CO20261009 - number of point operations of a lattice (AFLOW-SYM)
 // optimal lattice reduction
 xstructure LatticeReduction(const xstructure& a);
 xmatrix<double> LatticeReduction(const xmatrix<double>& lattice);
@@ -2618,9 +2651,9 @@ xstructure GetPrimitive(const xstructure& a,double tol);
 xstructure GetPrimitive1(const xstructure& a);
 xstructure GetPrimitive2(const xstructure& a);
 xstructure GetPrimitive3(const xstructure& a);
-bool isTranslationVector(const xstructure& xstr, const xvector<double>& vec, double tolerance=0.5, bool is_frac=false); //DX20210316
-bool IsTranslationFVector(const xstructure& a,const xvector<double>& ftvec);
-bool IsTranslationCVector(const xstructure& a,const xvector<double>& ctvec);
+bool isTranslationVector(const xstructure& xstr, const xvector<double>& cvec, double tolerance=0.5,bool skew=false); //DX20210316 //CO20240518 - removing is_frac, operations are not applied equivalently in f-space //bool is_frac=false  //CO20240519 - adding skew
+//[CO20240518 - NOT A GOOD IDEA, f-space does not work like this]bool IsTranslationFVector(const xstructure& a,const xvector<double>& ftvec);
+//[CO20240518 - OBSOLETE]bool IsTranslationCVector(const xstructure& a,const xvector<double>& ctvec);
 // other eggs
 xstructure ReScale(const xstructure& a,const double& in_scale);
 xstructure SetScale(const xstructure& a,const double& in_scale);
@@ -2942,8 +2975,16 @@ namespace anrl {
 //[CO20200502 - DUPLICATE?]string aflow_get_time_string_short(void);
 //[CO20200502 - DUPLICATE?]string strPID(void);
 //[CO20200502 - DUPLICATE?]string strTID(void);  //CO20200502 - threadID
-int AFLOW_main(vector<string> &argv);
+int AFLOW_main(const vector<string> &argv);
+//CO20261017 - this fork of AFLOW, named in one place: the banners print these
+#define AFLOW_FORK_NAME "entropy4energy/AFLOW-src"
+#define AFLOW_FORK_GROUP "Entropy for Energy Laboratory, Johns Hopkins University"
+#define AFLOW_FORK_URL "https://github.com/entropy4energy/AFLOW-src"
+#define AFLOW_FORK_FIRST_YEAR "2022"
 namespace aflow {
+  string BaseVersion(void);  //CO20261017 - the AFLOW release this fork builds on (AFLOW_VERSION before the +)
+  string ForkYears(void);    //CO20261017 - the years of this fork's changes, up to the year of the build
+  string ForkNotice(void);   //CO20261017 - one line: what this fork is, what it builds on, and by whom
   string License_Preamble_aflow(void);
   string Intro_aflow(string x);
   string Intro_sflow(string x);
@@ -2953,7 +2994,9 @@ namespace aflow {
 int VASP_Main(vector<string> argv);
 int GRND_Main(vector<string> argv);
 namespace KBIN {
-  int KBIN_Main(vector<string> argv);
+  _aflags loadAflagsFromARGV(const vector<string>& argv);  //CO20240620
+  int KBIN_Main(const vector<string>& argv);
+  string machineName(const string& name_from_argv,const string& machine_templates);  //CO20261004
 }
 string MessageTime(void);
 string MessageHostTime(const _aflags& aflags);
@@ -3158,19 +3201,11 @@ namespace ALIEN {
 }
 
 // ----------------------------------------------------------------------------
-// aflow_matlab.cpp aflow_matlab_funcs.cpp
+// aflow_matlab.cpp
 bool KBIN_MATLAB_Extract(string AflowIn,ifstream &FileAFLOWIN,ofstream &FileMESSAGE,_aflags &aflags,_kflags &kflags);
 bool KBIN_MATLAB_Run(_kflags &kflags);
 _kflags KBIN_MATLAB_Get_Matlabflags_from_AflowIN(string &AflowIn);
 bool KBIN_MATLAB_Directory(ofstream &FileMESSAGE,_aflags &aflags,_kflags &kflags);
-string MATLAB_FUNCS_param(void);
-//string MATLAB_FUNCS_plotband(string DIRECTORY,string OPTION1);
-string MATLAB_FUNCS_plotband(void);
-
-// ----------------------------------------------------------------------------
-// aflow_gnuplot_plotbz.cpp
-//string GNUPLOT_FUNCS_plotbz(string DIRECTORY,string OPTION1);
-string GNUPLOT_FUNCS_plotbz(void);
 
 // ----------------------------------------------------------------------------
 // aflow_ifrozsl.cpp
@@ -3207,8 +3242,8 @@ namespace KBIN {
   bool VASP_Directory(ofstream& FileERROR,_aflags& aflags,_kflags& kflags);
   void VASP_BackupOriginal(_aflags aflags);
   // [OBSOLETE] G++6 not needed  void VASP_Wait(_xvasp& xvasp,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);
-  void VASP_ProcessWarnings(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,aurostd::xoption& xmessage,aurostd::xoption& xwarning,ofstream &FileMESSAGE); //CO20210315
-  void VASP_ProcessWarnings(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,aurostd::xoption& xmessage,aurostd::xoption& xwarning,aurostd::xoption& xmonitor,ofstream &FileMESSAGE); //CO20210315
+  void VASP_ProcessWarnings(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,aurostd::xoption& xmessage,aurostd::xoption& xwarning,const aurostd::xoption& xfixed,ofstream &FileMESSAGE); //CO20210315
+  void VASP_ProcessWarnings(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,aurostd::xoption& xmessage,aurostd::xoption& xwarning,const aurostd::xoption& xfixed,aurostd::xoption& xmonitor,ofstream &FileMESSAGE); //CO20210315
   bool VASP_Error2Fix(const string& error,_xvasp &xvasp,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);  //CO20210315
   bool VASP_Error2Fix(const string& error,const string& mode,_xvasp &xvasp,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);  //CO20210315
   bool VASP_Error2Fix(const string& error,int& submode,_xvasp &xvasp,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);  //CO20210315
@@ -3218,6 +3253,8 @@ namespace KBIN {
   bool VASP_Error2Fix(const string& error,int& submode,bool try_last_ditch_efforts,_xvasp &xvasp,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);  //CO20210315
   bool VASP_Error2Fix(const string& error,const string& mode,int& submode,bool try_last_ditch_efforts,_xvasp &xvasp,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);  //CO20210315
   bool VASP_FixErrors(_xvasp &xvasp,aurostd::xoption& xmessage,aurostd::xoption& xwarning,aurostd::xoption& xfixed,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE); //CO20210315
+  void getVASPRunCommand(ostringstream& aus_exec,const _kflags& kflags,const _aflags& aflags,bool create_binary_softlink); //CO20240603
+  void getVASPRunCommand(ostringstream& aus_exec,ostringstream& aus,const _xvasp &xvasp,const _kflags& kflags,const _aflags& aflags,ofstream &FileMESSAGE,bool create_binary_softlink=false); //CO20240603
   bool VASP_Run(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,_vflags &vflags,ofstream &FileMESSAGE);
   bool VASP_Run(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,_vflags &vflags,string relaxA,string relaxB,bool qmwrite,ofstream &FileMESSAGE);
   bool VASP_Run(_xvasp &xvasp,_aflags &aflags,_kflags &kflags,_vflags &vflags,string relaxA,bool qmwrite,ofstream &FileMESSAGE);
@@ -3234,23 +3271,45 @@ namespace KBIN {
   void VASP_Recycle(const _xvasp& xvasp,int relax_number);  //CO20210315
   void VASP_RecycleExtraFile(const _xvasp& xvasp,const string& xfile,const string& relax);  //CO20210315
   void VASP_RecycleExtraFile(const _xvasp& xvasp,const string& xfile,int relax_number); //CO20210315
+  bool VASP_OUTCARComplete(const string& outcar);  //CO20261006
+  uint VASP_RelaxationsComplete(const string& directory,const string& prefix,uint nrelax);  //CO20261006
+  uint VASP_IonicSteps(const string& oszicar);  //CO20261006
+  uint VASP_NextPartNumber(const string& directory);  //CO20261006
+  uint VASP_ArchiveSegment(const string& directory,const string& from_suffix,const string& label,bool with_inputs,bool drop_large);  //CO20261006
+  string VASP_RestartPackName(const string& aflowin);  //CO20261006
+  bool VASP_RestartUnpack(const string& directory,ostream& oss);  //CO20261006
+  string VASP_ResumeStageLabel(const string& directory,bool has_static,bool has_bands);  //CO20261006
+  bool VASP_RestartStructureSound(const xstructure& xstr,const xstructure& reference,string& reason);  //CO20261006
+  bool VASP_ResumePrepare(const string& directory,const string& prefix,uint nrelax,bool has_static,bool has_bands,ostream& oss);  //CO20261006
+  void VASP_ResumeRelaxations(_xvasp& xvasp,_aflags& aflags,_vflags& vflags,uint ncomplete,bool ibzkpt_update,ofstream& FileMESSAGE);  //CO20261006
+  bool XVASP_INCAR_ExtraICHARG1(const _xvasp& xvasp);  //CO20261006
+  uint VASP_DemoteStages(const string& directory);  //CO20261006
+  bool VASP_KeptFile(const string& filename);  //CO20261006
+  bool VASP_OUTCARStress(const string& outcar,vector<double>& stress);  //CO20261010
+  bool VASP_RelaxationConverged(const string& directory,const string& relax,string& reason);  //CO20261010
+  bool VASP_RelaxContinue(_xvasp& xvasp,_aflags& aflags,_kflags& kflags,_vflags& vflags,const string& relax,ofstream& FileMESSAGE);  //CO20261010
   uint VASP_getNELM(const string& outcar); //CO20200624
+  bool VASP_OSZICARStepLine(const string& line,string& step);  //CO20261010
   uint VASP_getNSTEPS(const string& oszicar);  //CO20200624
   bool VASP_OSZICARUnconverging(const string& dir,uint cutoff=3);
   bool VASP_OSZICARUnconverged(const string& oszicar,const string& outcar);
   void GetStatDiel(string& outcar, xvector<double>& eigr, xvector<double>& eigi); // CAMILO
   void GetDynaDiel(string& outcar, xvector<double>& eigr, xvector<double>& eigi); // CAMILO
-  string BIN2VASPVersion(const string& binfile);  //SD20220331
-  string BIN2VASPVersionNumber(const string& binfile);  //SD20220331
-  double BIN2VASPVersionDouble(const string& binfile);  //SD20220331
+  string BIN2VASPVersion_RunVASP(const string& binfile);  //CO20231206  //CO20240603 - avoid using, may crash on compute nodes and waste CPUS, better to use getVASPVersion(kflags,aflags))
+  string BIN2VASPVersion_ReadBIN(const string& binfile);  //SD20220331  //CO20240603 - avoid using, may not grab the right version number, better to use getVASPVersion(kflags,aflags))
+  string BIN2VASPVersionNumber(const string& binfile);  //SD20220331  //CO20240603 - avoid using, may not grab the right version number, better to use getVASPVersion(kflags,aflags))
+  double BIN2VASPVersionDouble(const string& binfile);  //SD20220331  //CO20240603 - avoid using, may not grab the right version number, better to use getVASPVersion(kflags,aflags))
   string OUTCAR2VASPVersion(const string& outcar);  //CO20210315
   string OUTCAR2VASPVersionNumber(const string& outcar);  //CO20210315
   double OUTCAR2VASPVersionDouble(const string& outcar);  //CO20210315
   string VASPVersionString2Number(const string& vasp_version);  //CO20210315
   double VASPVersionString2Double(const string& vasp_version);  //CO20210315
-  string getVASPVersion(const string& binfile);  //ME20190219
-  string getVASPVersionNumber(const string& binfile);  //CO20200610
-  double getVASPVersionDouble(const string& binfile);  //CO20200610
+  string getVASPVersion(const _kflags& kflags,const _aflags& aflags);  //CO20240603 - preferred approach
+  string getVASPVersionNumber(const _kflags& kflags,const _aflags& aflags);  //CO20200610 - preferred approach
+  double getVASPVersionDouble(const _kflags& kflags,const _aflags& aflags);  //CO20200610 - preferred approach
+  string getVASPVersion(const string& binfile);  //ME20190219 //CO20240603 - avoid using this approach, see cpp
+  string getVASPVersionNumber(const string& binfile);  //CO20200610 //CO20240603 - avoid using this approach, see cpp
+  double getVASPVersionDouble(const string& binfile);  //CO20200610 //CO20240603 - avoid using this approach, see cpp
 }
 
 // ----------------------------------------------------------------------------
@@ -3272,7 +3331,7 @@ namespace KBIN {
   bool VASP_Produce_POSCAR(_xvasp& xvasp,const string& AflowIn,ofstream& FileERROR,_aflags& aflags,_kflags& kflags,_vflags& vflags);
   bool VASP_Produce_POSCAR(_xvasp& xvasp);
   bool VASP_Modify_POSCAR(_xvasp& xvasp,const string& AflowIn,ofstream& FileERROR,_aflags& aflags,_vflags& vflags);
-  void convertPOSCARFormat(_xvasp&, const _kflags&);  //ME20190220 //CO20210713 - aflags //SD20220923 - updated for vasp6.3
+  void convertPOSCARFormat(_xvasp&, const _kflags&, const _aflags&);  //ME20190220 //CO20210713 - aflags //SD20220923 - updated for vasp6.3 //CO20240603 - adding aflags for getVaspVersion()
   bool VASP_Convert_Unit_Cell(_xvasp&, _vflags&, _aflags&, ofstream&, ostringstream&); //ME20181216
   bool VASP_Reread_POSCAR(_xvasp& xvasp); //CO20210315
   bool VASP_Reread_POSCAR(_xvasp& xvasp,ofstream &FileMESSAGE,_aflags &aflags);
@@ -3302,7 +3361,7 @@ namespace KBIN {
   bool VASP_SplitAlloyPseudoPotentials(vector<string> alloy, vector<string> &species_ppsA, vector<string> &species_ppsB);
   bool VASP_SplitAlloyPseudoPotentials(vector<string> alloy, vector<string> &species_ppsA, vector<string> &species_ppsB, vector<string> &species_ppsC);
   void XVASP_Get_NPAR_NCORE(const _xvasp& xvasp,const _aflags& aflags,int& NPAR,int& NCORE);  //CO20210315
-  void XVASP_MPI_Autotune(_xvasp& xvasp,_aflags &aflags,bool VERBOSE);
+  void XVASP_MPI_Autotune(_xvasp& xvasp,_aflags &aflags,_vflags& vflags,bool VERBOSE);  //CO20231208 - adding full vflags
   void XVASP_INCAR_System_Auto(_xvasp& xvasp,bool VERBOSE);
   void XVASP_INCAR_Relax_ON(_xvasp& xvasp,bool VERBOSE);
   void XVASP_INCAR_Relax_ON(_xvasp& xvasp,_vflags& vflags,int number); // for steps
@@ -3317,9 +3376,12 @@ namespace KBIN {
   int XVASP_INCAR_GetNBANDS(const _xvasp& xvasp,const _aflags& aflags,bool ispin=true); //CO20210315 - spin==true is safer
   string INCAR_IALGO2ALGO(int ialgo); //CO20210315
   bool XVASP_INCAR_Read_MAGMOM(_xvasp& xvasp);  //CO20210315
+  bool XVASP_INCAR_Read_MAGMOM(_xvasp& xvasp,vector<double>& vmag);  //CO20210315
+  bool XVASP_INCAR_Read_MAGMOM(const string& magmoms_str,vector<double>& vmags);  //CO20210315
   bool XVASP_INCAR_PREPARE_GENERIC(const string& command,_xvasp& xvasp,const _vflags& vflags,const string& svalue,int ivalue,double dvalue,bool bvalue);
+  bool CONSOLIDATE_MAGMOM(const vector<double>& vmag,vector<double>& vmag_uniq,vector<uint>& vmult);  //CO20230913
   void XVASP_INCAR_ADJUST_ICHARG(_xvasp&, _vflags&, _aflags&, int,bool write_incar, ofstream&);  //ME20191028 //CO20210315 - write_incar
-  void XVASP_INCAR_SPIN_REMOVE_RELAX(_xvasp& xvasp,_aflags &aflags,_vflags& vflags,int step,bool write_incar,ofstream &FileMESSAGE);  //CO20210315 - write_incar
+  void XVASP_INCAR_SPIN_FIX_RELAX(_xvasp& xvasp,_aflags &aflags,_vflags& vflags,int step,bool write_incar,ofstream &FileMESSAGE);  //CO20210315 - write_incar
   void XVASP_KPOINTS_IBZKPT_UPDATE(_xvasp& xvasp,_aflags &aflags,_vflags& vflags,int step,bool write_incar,ofstream &FileMESSAGE);  //CO20210315 - write_incar
   void XVASP_INCAR_LDAU_OFF(_xvasp& xvasp,bool VERBOSE);
   void XVASP_INCAR_LDAU_ON(_xvasp& xvasp,_vflags& vflags,uint type);
@@ -3343,6 +3405,8 @@ namespace KBIN {
   // bool XVASP_KPOINTS_EVEN(_xvasp& xvasp); TO REMOVE
   // bool XVASP_KPOINTS_ODD(_xvasp& xvasp); TO REMOVE
   bool XVASP_KPOINTS_IncludesGamma(const _xvasp& xvasp);  //CO20210315
+  bool XVASP_KPOINTS_SymmetricGrid(_xvasp& xvasp);  //CO20261009 - the smallest larger grid whose k-lattice keeps the lattice class
+  uint XVASP_CrystalPointGroupOrder(const _xvasp& xvasp);  //CO20261009 - number of point operations of the crystal (AFLOW-SYM), 0 if unknown
   bool XVASP_KPOINTS_OPERATION(_xvasp& xvasp,const string& operation);
   // bool XVASP_KPOINTS_Kshift_Gamma_EVEN(_xvasp& xvasp); TO REMOVE
   // bool XVASP_KPOINTS_Kshift_Gamma_ODD(_xvasp& xvasp); TO REMOVE
@@ -3402,6 +3466,9 @@ bool AVASP_MakePrototype_AFLOWIN(_AVASP_PROTO *PARAMS);
 bool AVASP_MakePrototype_AFLOWIN_20181226(_AVASP_PROTO *PARAMS);
 bool AVASP_MakePrototype_AFLOWIN_20180101(_AVASP_PROTO *PARAMS);
 bool AVASP_MakePrototypeICSD_AFLOWIN(_AVASP_PROTO *PARAMS,bool flag_AFLOW_IN_ONLY_IF_MISSING);
+//TL20250827 - Returns MAGMON default for a chemical element symbol (cleaned), sets found=true if available
+double AVASP_Get_MAGMOM_for_Element(const string& element);
+double AVASP_Get_MAGMOM_for_Element(const string& element, bool& found);
 void AVASP_Get_LDAU_Parameters(string species,bool &LDAU,vector<string>& vLDAUspecies,
     vector<uint>& vLDAUtype,vector<int>& vLDAUL, vector<double>& vLDAUU, vector<double> &vLDAUJ);
 string AVASP_Get_PseudoPotential_PAW_PBE_KIN(string species);
@@ -4336,6 +4403,8 @@ namespace estructure {
 // aflow_poccupation_params.cpp
 namespace pocc {
   bool poccInput(); //CO20170805
+  string getPOccEnumerator(const string& input);  //CO20261009 - UFF, ENUM or COMPARE from any spelling (empty: UFF); throws otherwise (aflow_pocc_enumeration.cpp)
+  string getPOccEnumeratorForAflowIn();  //CO20261009 - the enumerator a new aflow.in records: --pocc_enumerator= or DEFAULT_POCC_ENUMERATOR
 
   string ReturnAtomSpecies(string atom);
   string ReturnAtomSpeciesPotential(string atom);
@@ -4531,6 +4600,18 @@ namespace SYM {
   void CalculateSitePointGroup2(xstructure &a,bool ComMidss); // for --agroup2 and --agroup2m
   //DX START
   //xstructure and _sym_op
+  struct ExactPathCounts {                            //CO20260930 - for the unit tests: how often the new code met the cases where it could differ
+    unsigned long long grid_calls=0;                  // getFullSymBasis() calls that used the cell list
+    unsigned long long grid_neighbor_bin_matches=0;   // atoms matched in a neighboring bin, not the image's own (the bin width matters)
+    //[CO20261004 - the cell list calls MapAtomWithBasis(); symmetry_exact_mapping counts ties and skew/spin/map_types=false searches itself]unsigned long long grid_lower_index_replacements=0;
+    //[CO20261004 - see above]unsigned long long grid_general_searches=0;
+    unsigned long long prefilter_skips=0;             // GetPrimitive_20210322() triples skipped by the volume prefilter
+  };
+  ExactPathCounts& exactPathCounts();               //CO20260930 - this thread's counts
+  void setReferencePaths(bool on);                  //CO20260930 - run the symmetry code as before the exact speedups (--sym_reference)
+  void setReferencePathsThisThread(int on);         //CO20260930 - same, for the calling thread only (-1 follows the global setting)
+  bool useReferencePaths();                         //CO20260930
+  double fractionalDistanceNoSkew(const xvector<double>& fpos1,const xvector<double>& fpos2,const xmatrix<double>& f2c); //CO20260930 - FPOSMatch's distance, no temporaries
   bool getFullSymBasis(const xstructure& a, _sym_op& symOp,bool map_types,vector<int>& basis_atoms_map,vector<int>& basis_types_map);
   bool getFullSymBasis(const xstructure& a, _sym_op& symOp,bool map_types,double tolerance,vector<int>& basis_atoms_map,vector<int>& basis_types_map); //CO20190520 - removed pointers for bools and doubles, added const where possible
   bool getFullSymBasis(const xstructure& a, _sym_op& symOp,bool map_types,bool skew,double tolerance,vector<int>& basis_atoms_map,vector<int>& basis_types_map); //CO20190520 - removed pointers for bools and doubles, added const where possible
@@ -5505,6 +5586,7 @@ namespace unittest {
           const string& check_description, uint& passed_checks, vector<vector<string> >& results);
       void checkEqual(const string &calculated, const string &expected, const string& check_function,
           const string& check_description, uint& passed_checks, vector<vector<string> >& results);
+      bool checkChaosApiKey(uint& passed_checks, vector<vector<string> >& results); //CO20261004 - CHAOS API key at hand when a default AFLUX server is s4e.ai
 
 
     // Test functions ---------------------------------
@@ -5519,14 +5601,26 @@ namespace unittest {
 
       // database
       void schemaTest(uint&, vector<vector<string> >&, vector<string>&);
+      void poccHEAFieldsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
+      void poccDescriptorsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261015
+      void derivedPropertiesTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
 
       // xstructure
       void atomicEnvironmentTest(uint&, vector<vector<string> >&, vector<string>&);
       void xstructureParserTest(uint&, vector<vector<string> >&, vector<string>&);
       void xstructureTest(uint&, vector<vector<string> >&, vector<string>&);
+      void aaplLatticeTypeTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261018
+      void jhuPrototypeTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void mostRelaxedStructureTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
+      void relaxResumeTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261006
+      void vaspRelaxContinueTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261010
 
       // structure generation
       void ceramgenTest(uint&, vector<vector<string> >&, vector<string>&);
+      void wyckoffLibraryTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void sqliteErrorTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void prototypeParameterTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261003
+      void redecorationTest(uint&, vector<vector<string> >&, vector<string>&); //CO20260930
       void prototypeGeneratorTest(uint&, vector<vector<string> >&, vector<string>&);
 
       // ovasp
@@ -5534,6 +5628,42 @@ namespace unittest {
 
       // entryLoader
       void entryLoaderTest(uint&, vector<vector<string> >&, vector<string>&);
+      void aurlHostTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void chaosKeyTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void chullUnaryOrderTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261002
+      void chullLinksTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261006
+      void afluxIdQueryTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261003
+      void afluxResponseKeysTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261007
+      void afluxFiltersTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261018
+      void chaosPathTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261008
+      void serverOptionTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261003
+      void chaosRunsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
+      void machineServerTest(uint&, vector<vector<string> >&, vector<string>&); //CO20261004
+
+      //AFLUX // WJ20231103 
+      void AFLUXTest(uint& passed_checks, vector<vector<string> >& results, vector<string>& errors);
+
+      // APL
+      void aplThermalTest(uint&, vector<vector<string> >&, vector<string>&);
+
+      // KKSYM and the KPOINTS fixes
+      void vaspKpointsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261009
+      // VASP force options
+      void vaspPreservedTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
+      void vaspNbandsTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261009
+      // lib2raw //CO20260929 - see the notes above each test in aflow_unit_test.cpp
+      void lib2rawBaderChildrenTest(uint&, vector<vector<string> >&, vector<string>&);
+      void getPrimitiveKeepCellTest(uint&, vector<vector<string> >&, vector<string>&);
+      void bringInCellFarComponentTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20260930
+      void latticeDimensionSphereTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261018
+      void glideEquidistantPointTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20260930
+      void poscarOrigRepairTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20260930
+      void symmetryExactDistanceTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20260930
+      void symmetryExactMappingTest(uint&, vector<vector<string> >&, vector<string>&);   //CO20260930
+      void symmetryExactPathsTest(uint&, vector<vector<string> >&, vector<string>&);     //CO20260930
+      void symmetryExactAllGroupsTest(uint&, vector<vector<string> >&, vector<string>&); //CO20260930
+      void rhlMirrorOriginShiftTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261003
+      void enthalpyReferencesTest(uint&, vector<vector<string> >&, vector<string>&);  //CO20261004
   };
 
 }

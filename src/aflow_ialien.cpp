@@ -40,7 +40,8 @@ namespace ALIEN {
       aus << "XXXXX  MAKING DIRECTORY = " << xalien.Directory << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
       string str="mkdir "+xalien.Directory;
-      system(str.c_str());
+      int result=system(str.c_str());
+      if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"system returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
     }
     DirectoryStream.close();
     // ALIEN ALIEN WRITE
@@ -163,7 +164,7 @@ namespace ALIEN {
         Krun=FALSE;
         return Krun;
       }
-      if(!alienflags.KBIN_ALIEN_INPUT_FILE_COMMAND_FLAG && (alienflags.KBIN_ALIEN_INPUT_FILE_FILE_FLAG || !alienflags.KBIN_ALIEN_INPUT_FILE_FILE_FLAG)) {
+      if(!alienflags.KBIN_ALIEN_INPUT_FILE_COMMAND_FLAG) { //CO20261017 - was && (FILE_FLAG || !FILE_FLAG), always true
         if(alienflags.KBIN_ALIEN_INPUT_FILE_FILE_FLAG) {
           file=alienflags.KBIN_ALIEN_INPUT_FILE_FILE_VALUE;
           aus << "00000  MESSAGE INPUT  generation EXTERNAL from file=" << file << endl;

@@ -43,7 +43,7 @@ namespace KBIN {
       aus << "XXXXX  MAKING DIRECTORY = " << xaims.Directory << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
       string str="mkdir "+xaims.Directory;
-      system(str.c_str());
+      aurostd::execute(str.c_str());  //CO20250406
     }
     DirectoryStream.close();
     bool Krun=TRUE;
@@ -63,7 +63,7 @@ namespace KBIN {
       aus << "XXXXX  MAKING DIRECTORY = " << xaims.Directory << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
       string str="mkdir "+xaims.Directory;
-      system(str.c_str());
+      aurostd::execute(str.c_str());  //CO20250406
     }
     DirectoryStream.close();
     bool Krun=TRUE;
@@ -85,7 +85,7 @@ namespace KBIN {
       aus << "XXXXX  MAKING DIRECTORY = " << xaims.Directory << endl;
       aurostd::PrintMessageStream(aus,XHOST.QUIET); // return FALSE;
       string str="mkdir "+xaims.Directory;
-      system(str.c_str());
+      aurostd::execute(str.c_str());  //CO20250406
     }
     DirectoryStream.close();
     bool Krun=TRUE;

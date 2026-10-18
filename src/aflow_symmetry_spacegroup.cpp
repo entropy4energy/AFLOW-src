@@ -789,311 +789,311 @@ namespace SYM {
 //DX20210611 [OBSOLETE - integrated into structure printing function in aflow_xatom]   }
 //DX20210611 [OBSOLETE - integrated into structure printing function in aflow_xatom] } // namespace SYM
 
-// **************************************************************************************************************************************************
-// Primitive Cell Routine (Created by RHT, slightly different from SC version)
-// **************************************************************************************************************************************************
-uint xstructure::GetPrimitiveCell(void) {
-  bool LDEBUG = (FALSE || XHOST.DEBUG);
-  if(LDEBUG) {
-    cerr << "xstructure::GetPrimitiveCell(): Original structure (before primitivization): " << endl;
-    cerr << (*this) << endl;
-  }
-  (*this).ReScale(1.0);//DX20180526
-  xmatrix<double> prim_lattice = (*this).lattice;
-  double prim_det = aurostd::det(prim_lattice);
-
-  vector<xvector<double> > lattice_basis;
-  lattice_basis.push_back(SYM::extract_row(prim_lattice, 1));
-  lattice_basis.push_back(SYM::extract_row(prim_lattice, 2));
-  lattice_basis.push_back(SYM::extract_row(prim_lattice, 3));
-  xmatrix<double> lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
-
-  xmatrix<double> f2c = trasp(lattice_basis_xmat);
-  xmatrix<double> c2f = inverse(trasp(lattice_basis_xmat));
-  //DX20210315 [OBSOLETE - now using transformation method for cell conversion] bool skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL to (*this).sym_eps
-  vector<xvector<double> > diff_vectors;
-
-  // Determine the Greatest Common Denominator between the atom types
-  int atoms_GCD = 0;
-  deque<deque<_atom> > orig_split_atom_types;
-  SYM::getAtomGCD((*this).atoms, orig_split_atom_types, atoms_GCD);
-  (*this).BringInCell();
-
-  int atom_count = (*this).atoms.size();
-  deque<_atom> atomic_basis_;
-  //DX20210129 [OBSOLETE] deque<int> basistypes;
-
-  // Copy deque<_atoms> atoms (IN XSTRUCTURE) to atomic_basis_ to manipulate free of xstructure
-  for (int i = 0; i < atom_count; i++) {
-    _atom tmp_atom = (*this).atoms[i]; //DX20191011 - initialized here instead of explicitly setting individual attributes below
-    //DX20191011 [OBSOLETE] tmp_atom.fpos = (*this).atoms[i].fpos;
-    //DX20191011 [OBSOLETE] tmp_atom.cpos = (*this).atoms[i].cpos;
-    //DX20191011 [OBSOLETE] tmp_atom.type = (*this).atoms[i].type;
-    //DX20191011 [OBSOLETE] tmp_atom.spin = (*this).atoms[i].spin; //DX20170921 - magnetic sym
-    //DX20191011 [OBSOLETE] tmp_atom.spin_is_given = (*this).atoms[i].spin_is_given; //DX20170921 - magnetic sym
-    //DX20191011 [OBSOLETE] tmp_atom.noncoll_spin = (*this).atoms[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
-    //DX20191011 [OBSOLETE] tmp_atom.noncoll_spin_is_given = (*this).atoms[i].noncoll_spin_is_given; //DX20171205 - magnetic sym (non-collinear)
-    string tmpname = (*this).atoms[i].name;
-    SYM::cleanupstring(tmpname);
-    tmp_atom.name = tmpname;
-    atomic_basis_.push_back(tmp_atom);
-  }
-
-  // ===== Expand the lattice and atomic basis ===== //
-  // Expand crystal structure (expanded_basis) to check which atoms are inside reduced.
-  // You must do this because reducing the cell often changes the orientation (not simply shrinking)
-  // so atoms may be added that were not in the original representation.
-  deque<_atom> expanded_basis;
-  vector<xvector<double> > big_expanded;  //just lattice points
-  int q = 3;
-  big_expanded = SYM::expand_lattice(q, q, q, prim_lattice);
-  expanded_basis = SYM::add_basis(big_expanded, prim_lattice, (*this));
-
-  ////print(expanded_basis);
-  //double prim_det=aurostd::det(prim_lattice);
-
-  // Search only over smallest subset of atoms (no need to search over any other for periodic structures)
-  deque<deque<_atom> > atoms_by_type = SYM::break_up_by_type(atomic_basis_);
-  deque<int> numofatoms;
-  uint smallest_group = atoms_by_type[0].size();
-  uint index_for_smallest_group = 0;
-  for (uint i = 1; i < atoms_by_type.size(); i++) {
-    if(atoms_by_type[i].size() < smallest_group) {
-      smallest_group = atoms_by_type[i].size();
-      index_for_smallest_group = i;
-    }
-  }
-
-  bool foundbasis = false;
-  // If there is only one atom or one least frequently occuring atom, then the cell cannot be further reduced
-  if(atom_count == 1 || atoms_by_type[index_for_smallest_group].size() == 1) {
-    prim_lattice = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
-    foundbasis = true;
-    sort(atomic_basis_.begin(), atomic_basis_.end(), sortAtomsTypes);
-    //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(atomic_basis_);
-    //DX20210129 [OBSOLETE] basistypes = numofatoms;
-  }
-
-  deque<_atom> newbasis;
-  lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
-  f2c = trasp(lattice_basis_xmat);
-  c2f = inverse(trasp(lattice_basis_xmat));
-  //DX20210315 [OBSOLETE - now using transformation method for cell conversion] skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL_ to (*this).sym_eps
-  vector<_atom> full_basis;  //basis that has been reduced modulo 1
-  vector<xvector<double> > lattice_vector_candidates;
-
-  // ===== Find all possible translation vectors in crystal ===== //
-  if(foundbasis == false) {
-    for (uint i = 0; i < atomic_basis_.size(); i++) {
-      _atom tmp = atomic_basis_[i]; //DX20191011 - initialized instead of setting individually below
-      //DX20190905 [OBSOLETE-no more mod_one_xvec] tmp.fpos = SYM::mod_one_xvec(atomic_basis_[i].fpos);
-      tmp.fpos = ::BringInCell(atomic_basis_[i].fpos); //DX20190905 - new BringInCell function and go outside xstructure scope
-      //DX20191011 [OBSOLETE] tmp.name = atomic_basis_[i].name;
-      //DX20191011 [OBSOLETE] tmp.type = atomic_basis_[i].type;
-      //DX20191011 [OBSOLETE] tmp.spin = atomic_basis_[i].spin; //DX20170921 - magnetic sym
-      //DX20191011 [OBSOLETE] tmp.spin_is_given = atomic_basis_[i].spin_is_given; //DX20170921 - magnetic sym
-      //DX20191011 [OBSOLETE] tmp.noncoll_spin = atomic_basis_[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
-      //DX20191011 [OBSOLETE] tmp.noncoll_spin_is_given = atomic_basis_[i].noncoll_spin_is_given; //DX20171205 - magnetic sym (non-collinear)
-      full_basis.push_back(tmp);
-    }
-    vector<xvector<double> > diff_vectors;
-    vector<uint> atom_pos;
-    for (uint i = 0; i < atoms_by_type[index_for_smallest_group].size(); i++) {
-      //DX20190905 [OBSOLETE-no more mod_one_xvec] xvector<double> tmp = SYM::mod_one_xvec(atoms_by_type[index_for_smallest_group][i].fpos - atoms_by_type[index_for_smallest_group][0].fpos); //need to bring in cell, otherwise, checking larger cells not smaller
-      xvector<double> tmp = atoms_by_type[index_for_smallest_group][i].fpos - atoms_by_type[index_for_smallest_group][0].fpos; //need to bring in cell, otherwise, checking larger cells not smaller //DX20190905
-      BringInCellInPlace(tmp); //DX20190905
-      diff_vectors.push_back(tmp);
-      atom_pos.push_back(i);
-    }
-
-    // ---------------------------------------------------------------------------
-    // translate by difference vectors and check if equivalent
-    // (i.e., check if diff vector is a lattice vector) 
-    bool is_frac = true;
-    for (uint d = 1; d < diff_vectors.size(); d++) {  //use d=0 if we do double for loop
-      if(isTranslationVector((*this), diff_vectors[d], (*this).sym_eps, is_frac)){
-        lattice_vector_candidates.push_back(diff_vectors[d]);
-      }
-    }
-    //add the original lattice vectors' translations to pool of potential translations:
-    xvector<double> a1;
-    a1(1) = 1;
-    a1(2) = 0;
-    a1(3) = 0;
-    xvector<double> a2;
-    a2(1) = 0;
-    a2(2) = 1;
-    a2(3) = 0;
-    xvector<double> a3;
-    a3(1) = 0;
-    a3(2) = 0;
-    a3(3) = 1;
-    lattice_vector_candidates.push_back(a1);
-    lattice_vector_candidates.push_back(a2);
-    lattice_vector_candidates.push_back(a3);
-    vector<double> moduli;
-    uint num_of_candidates = lattice_vector_candidates.size();
-    //Choose smallest L.I. potential lattice vectors. If there are only three, then these three (the original lattice three) must be the reduced basis.
-    if(num_of_candidates == 3) {
-      prim_lattice = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
-      foundbasis = true;
-      sort(atomic_basis_.begin(), atomic_basis_.end(), sortAtomsTypes);
-      //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(atomic_basis_);
-      //DX20210129 [OBSOLETE] basistypes = numofatoms;
-
-    } else {
-      //Here because the original poscar is not primitive
-      //Get vector of moduli of lattice vector candidates:
-      xmatrix<double> nonsimp_reduced_basis;
-      nonsimp_reduced_basis = prim_lattice;
-      for (uint i = 0; i < num_of_candidates; i++) {
-        moduli.push_back(aurostd::modulus(lattice_vector_candidates[i] * lattice_basis_xmat));
-      }
-      //Define max value inorder to find minimum in loop below:
-      double sum_mods = 1e9;
-      double amin = aurostd::min(aurostd::modulus(lattice_basis[0]), aurostd::min(aurostd::modulus(lattice_basis[1]), aurostd::modulus(lattice_basis[2])));
-      amin = (*this).dist_nn_min;  //DX TEST
-      double tol_vol = (*this).sym_eps * amin * amin * amin; //DX20190215 - _SYM_TOL_ to (*this).sym_eps
-
-      //DX20180503 - FASTER MIN CART DISTANCE CALCULATOR - START
-      //DX20180503 - only calculate multiplication once (time-saver)
-      vector<xvector<double> > candidates_cpos;
-      vector<double> candidates_mods;
-      for(uint a=0;a<lattice_vector_candidates.size();a++){
-        xvector<double> tmp = lattice_vector_candidates[a] * lattice_basis_xmat;
-        candidates_cpos.push_back(tmp); candidates_mods.push_back(aurostd::modulus(tmp));
-      }
-      //DX20180503 - FASTER MIN CART DISTANCE CALCULATOR - END
-
-      for (uint i = 0; i < candidates_cpos.size(); i++) {
-        for (uint j = i+1; j < candidates_cpos.size(); j++) {
-          for (uint k = j+1; k < candidates_cpos.size(); k++) {
-            xmatrix<double> candidate_lattice = SYM::xvec2xmat(candidates_cpos[i], candidates_cpos[j], candidates_cpos[k]);
-            double det = aurostd::determinant(candidate_lattice);
-            if(aurostd::abs(det) > tol_vol){  //DX20180613 - can be left handed; Minkowski/Niggli will fix; necessary since we aren't checking permutations of vectors
-              candidate_lattice=::MinkowskiBasisReduction(candidate_lattice);      // Minkowski first  //DX20180526
-              candidate_lattice=::NiggliUnitCellForm(candidate_lattice);           // Niggli Second //DX20180526
-              det = aurostd::determinant(candidate_lattice);
-              //In order to find minimum, determinant should be positive,less than the first, and an integer multiple of less than first
-              double atom_number_ratio = (double)smallest_group/aurostd::nint(prim_det/det); // atom ratio before and after reducing //DX20180723
-              //DX [OBSOLETE] 20180723 - if(det > tol_vol && det < prim_det && aurostd::isinteger(prim_det / det, 0.05)) //DX20180614 - now it should be right-handed
-              if(det > tol_vol && det < prim_det && aurostd::isinteger(prim_det / det, 0.05) && aurostd::isinteger(atom_number_ratio, 0.05) && (atom_number_ratio-1.0)>-_ZERO_TOL_) //DX20180614 - now it should be right-handed // check atom ratio after reducing //DX20180723
-              { //CO20200106 - patching for auto-indenting
-                //double sum_candidate_mods = candidates_mods[i] + candidates_mods[j] + candidates_mods[k];
-                double sum_candidate_mods = aurostd::modulus(candidate_lattice(1)) + aurostd::modulus(candidate_lattice(2)) + aurostd::modulus(candidate_lattice(3)); //DX20180613 - need to recalculate mods, they may have changed during Minkowski/Niggli 
-                //candidate_lattice=::MinkowskiBasisReduction(candidate_lattice);      // Minkowski first  //DX20180526
-                //candidate_lattice=::NiggliUnitCellForm(candidate_lattice);           // Niggli Second //DX20180526
-                if(sum_candidate_mods < sum_mods) {
-                  sum_mods = sum_candidate_mods; 
-                  nonsimp_reduced_basis = candidate_lattice;
-                }
-              }
-            }
-          }
-        }
-      }
-      prim_lattice = nonsimp_reduced_basis;
-      lattice_basis[0] = SYM::extract_row(prim_lattice, 1);
-      lattice_basis[1] = SYM::extract_row(prim_lattice, 2);
-      lattice_basis[2] = SYM::extract_row(prim_lattice, 3);
-
-      lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
-
-      // ---------------------------------------------------------------------------
-      //DX20210316 - used transformation method (more efficient)
-      xmatrix<double> transformation_matrix = GetBasisTransformation((*this).lattice, lattice_basis_xmat);
-      xmatrix<double> rotation_matrix = aurostd::eye<double>(3,3);
-      xstructure prim = (*this);
-      // try to primitivize, it may fail, so return original structure
-      try{
-        prim.TransformStructure(transformation_matrix, rotation_matrix);
-        (*this) = prim;
-      }
-      catch(aurostd::xerror& re){}
-      return 0;
-
-      //DX20210315 - foldInCell method (too slow for large, skewed cells)
-      //DX20210315 [OBSOLETE]xmatrix<double> f2c = trasp(lattice_basis_xmat);
-      //DX20210315 [OBSOLETE]xmatrix<double> c2f = inverse(trasp(lattice_basis_xmat));
-      //DX20210315 [OBSOLETE]bool skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL_ to (*this).sym_eps
-      //DX20210315 [OBSOLETE]xmatrix<double> PL_inv = aurostd::inverse(prim_lattice);
-      //DX20210315 [OBSOLETE]double same_atom_tol = (*this).dist_nn_min - 0.1;  //min_dist itself will consider nn atom to be the same, needs to be slightly smaller.`
-      //DX20210315 [OBSOLETE]//Now get atoms inside of new, reduced basis:
-      //DX20210315 [OBSOLETE]//[CO20190520]newbasis = foldAtomsInCell(expanded_basis, c2f, f2c, skew, same_atom_tol); //CO20180409
-      //DX20210315 [OBSOLETE]newbasis = ::foldAtomsInCell(expanded_basis, (*this).lattice, lattice_basis_xmat, skew, same_atom_tol,false); //CO20180409 //DX20190619 - false->do not check min dists (expensive)
-
-      //DEBUG
-      //cerr << "newbasis.size(): " << newbasis.size() << endl;
-      //for(uint n=0;n<newbasis.size();n++){
-      //  cerr << newbasis[n].fpos << endl;
-      //}
-      //DEBUG
-
-      //DX20210315 [OBSOLETE]bool consistent_ratio = SYM::GCD_conventional_atomic_basis(newbasis, orig_split_atom_types, atoms_GCD);
-      //DX20210315 [OBSOLETE]if(consistent_ratio == false) {
-      //DX20210315 [OBSOLETE]  foundbasis = false;
-      //DX20210315 [OBSOLETE]} else {
-      //DX20210315 [OBSOLETE]  //Overwrite basis types (update it for primitive cell):
-      //DX20210315 [OBSOLETE]  sort(newbasis.begin(), newbasis.end(), sortAtomsTypes);
-      //DX20210315 [OBSOLETE]  //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(newbasis);
-      //DX20210315 [OBSOLETE]  //DX20210129 [OBSOLETE] basistypes = numofatoms;
-      //DX20210315 [OBSOLETE]  atomic_basis_.clear();
-      //DX20210315 [OBSOLETE]  atomic_basis_ = newbasis;
-      //DX20210315 [OBSOLETE]  if(atomic_basis_.size() == 0) {
-      //DX20210315 [OBSOLETE]    moduli.clear();
-      //DX20210315 [OBSOLETE]  }
-      //DX20210315 [OBSOLETE]  foundbasis = true;
-      //DX20210315 [OBSOLETE]}
-      //DX20210315 [OBSOLETE]cerr << "(*this): " << (*this) << endl;
-    }
-  }
-
-  if(foundbasis == false) { return 1; }
-
-  // ===== Put contents back in xstructure ===== //
-  //DX20210129 [OBSOLETE] deque<int> numtypes;
-  //DX20210129 [OBSOLETE] for (uint i = 0; i < basistypes.size(); i++) {
-  //DX20210129 [OBSOLETE]   numtypes.push_back(basistypes[i]);
-  //DX20210129 [OBSOLETE] }
-
-  (*this).lattice = prim_lattice;
-  if(newbasis.size() > 0) {  //IF A NEW BASIS EXISTS (CELL WAS NOT PRIMITIVE) THEN OVERWRITE a.atoms
-    sort(newbasis.begin(), newbasis.end(), sortAtomsTypes);
-    (*this).ReplaceAtoms(newbasis, false);
-    //DX20210129 [OBSOLETE] // cerr << "USING NEW BASIS" << endl;
-    //DX20210129 [OBSOLETE] // Remove old basis
-    //DX20210129 [OBSOLETE] while ((*this).atoms.size() > 0) {
-    //DX20210129 [OBSOLETE]   (*this).RemoveAtom((uint)0);
-    //DX20210129 [OBSOLETE] }
-    //DX20210129 [OBSOLETE] (*this).species.clear(); //DX
-    //DX20210129 [OBSOLETE] for (uint i = 0; i < newbasis.size(); i++) {
-    //DX20210129 [OBSOLETE]   _atom tmp_atom = newbasis[i]; //DX20191011 - initialized instead of setting individually below
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.fpos = newbasis[i].fpos;
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.cpos = newbasis[i].cpos;
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.name = newbasis[i].name;
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.type = newbasis[i].type;
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.name_is_given = true;
-    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.spin = newbasis[i].spin; //DX20170921 - magnetic sym
-    //DX20210129 [OBSOLETE]   tmp_atom.spin_is_given = false; //DX20170921 - magnetic sym
-    //DX20210129 [OBSOLETE]   if(aurostd::abs(tmp_atom.spin)>_ZERO_TOL_){
-    //DX20210129 [OBSOLETE]     tmp_atom.spin_is_given = true; //DX20170921 - magnetic sym
-    //DX20210129 [OBSOLETE]   }
-    //DX20210129 [OBSOLETE]   tmp_atom.noncoll_spin = newbasis[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
-    //DX20210129 [OBSOLETE]   tmp_atom.noncoll_spin_is_given = false; //DX20171205 - magnetic sym (non-collinear)
-    //DX20210129 [OBSOLETE]   if(aurostd::abs(tmp_atom.noncoll_spin(1))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(2))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(3))>_ZERO_TOL_){
-    //DX20210129 [OBSOLETE]     tmp_atom.noncoll_spin_is_given = true; //DX20171205 - magnetic sym (non-collinear) //DX20191108 - fixed typo, should be noncoll_spin_is_given not spin_is_given
-    //DX20210129 [OBSOLETE]   }
-    //DX20210129 [OBSOLETE]   (*this).AddAtom(tmp_atom,false);  //CO20230319 - add by type
-    //DX20210129 [OBSOLETE] }
-  }
-  //DX20210129 [OBSOLETE] (*this).num_each_type = numtypes;
-  //DX20210129 [moved earlier] (*this).lattice = prim_lattice;
-  if(LDEBUG) {
-    cerr << "xstructure::GetPrimitiveCell(): New primitivized cell:" << endl;
-    cerr << (*this) << endl;
-  }
-  return 0;
-}
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]// **************************************************************************************************************************************************
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]// Primitive Cell Routine (Created by RHT, slightly different from SC version)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]// **************************************************************************************************************************************************
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]uint xstructure::GetPrimitiveCell(void) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  bool LDEBUG = (FALSE || XHOST.DEBUG);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(LDEBUG) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    cerr << "xstructure::GetPrimitiveCell(): Original structure (before primitivization): " << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    cerr << (*this) << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  (*this).ReScale(1.0);//DX20180526
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  xmatrix<double> prim_lattice = (*this).lattice;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  double prim_det = aurostd::det(prim_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  vector<xvector<double> > lattice_basis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  lattice_basis.push_back(SYM::extract_row(prim_lattice, 1));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  lattice_basis.push_back(SYM::extract_row(prim_lattice, 2));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  lattice_basis.push_back(SYM::extract_row(prim_lattice, 3));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  xmatrix<double> lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  xmatrix<double> f2c = trasp(lattice_basis_xmat);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  xmatrix<double> c2f = inverse(trasp(lattice_basis_xmat));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210315 [OBSOLETE - now using transformation method for cell conversion] bool skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL to (*this).sym_eps
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  vector<xvector<double> > diff_vectors;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // Determine the Greatest Common Denominator between the atom types
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  int atoms_GCD = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<deque<_atom> > orig_split_atom_types;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  SYM::getAtomGCD((*this).atoms, orig_split_atom_types, atoms_GCD);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  (*this).BringInCell();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  int atom_count = (*this).atoms.size();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<_atom> atomic_basis_;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE] deque<int> basistypes;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // Copy deque<_atoms> atoms (IN XSTRUCTURE) to atomic_basis_ to manipulate free of xstructure
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  for (int i = 0; i < atom_count; i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    _atom tmp_atom = (*this).atoms[i]; //DX20191011 - initialized here instead of explicitly setting individual attributes below
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.fpos = (*this).atoms[i].fpos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.cpos = (*this).atoms[i].cpos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.type = (*this).atoms[i].type;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.spin = (*this).atoms[i].spin; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.spin_is_given = (*this).atoms[i].spin_is_given; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.noncoll_spin = (*this).atoms[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20191011 [OBSOLETE] tmp_atom.noncoll_spin_is_given = (*this).atoms[i].noncoll_spin_is_given; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    string tmpname = (*this).atoms[i].name;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    SYM::cleanupstring(tmpname);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    tmp_atom.name = tmpname;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    atomic_basis_.push_back(tmp_atom);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // ===== Expand the lattice and atomic basis ===== //
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // Expand crystal structure (expanded_basis) to check which atoms are inside reduced.
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // You must do this because reducing the cell often changes the orientation (not simply shrinking)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // so atoms may be added that were not in the original representation.
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<_atom> expanded_basis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  vector<xvector<double> > big_expanded;  //just lattice points
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  int q = 3;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  big_expanded = SYM::expand_lattice(q, q, q, prim_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  expanded_basis = SYM::add_basis(big_expanded, prim_lattice, (*this));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  ////print(expanded_basis);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //double prim_det=aurostd::det(prim_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // Search only over smallest subset of atoms (no need to search over any other for periodic structures)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<deque<_atom> > atoms_by_type = SYM::break_up_by_type(atomic_basis_);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<int> numofatoms;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  uint smallest_group = atoms_by_type[0].size();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  uint index_for_smallest_group = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  for (uint i = 1; i < atoms_by_type.size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    if(atoms_by_type[i].size() < smallest_group) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      smallest_group = atoms_by_type[i].size();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      index_for_smallest_group = i;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  bool foundbasis = false;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // If there is only one atom or one least frequently occuring atom, then the cell cannot be further reduced
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(atom_count == 1 || atoms_by_type[index_for_smallest_group].size() == 1) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    prim_lattice = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    foundbasis = true;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    sort(atomic_basis_.begin(), atomic_basis_.end(), sortAtomsTypes);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(atomic_basis_);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] basistypes = numofatoms;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  deque<_atom> newbasis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  f2c = trasp(lattice_basis_xmat);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  c2f = inverse(trasp(lattice_basis_xmat));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210315 [OBSOLETE - now using transformation method for cell conversion] skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL_ to (*this).sym_eps
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  vector<_atom> full_basis;  //basis that has been reduced modulo 1
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  vector<xvector<double> > lattice_vector_candidates;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // ===== Find all possible translation vectors in crystal ===== //
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(foundbasis == false) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    for (uint i = 0; i < atomic_basis_.size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      _atom tmp = atomic_basis_[i]; //DX20191011 - initialized instead of setting individually below
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20190905 [OBSOLETE-no more mod_one_xvec] tmp.fpos = SYM::mod_one_xvec(atomic_basis_[i].fpos);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      tmp.fpos = ::BringInCell(atomic_basis_[i].fpos); //DX20190905 - new BringInCell function and go outside xstructure scope
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.name = atomic_basis_[i].name;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.type = atomic_basis_[i].type;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.spin = atomic_basis_[i].spin; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.spin_is_given = atomic_basis_[i].spin_is_given; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.noncoll_spin = atomic_basis_[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20191011 [OBSOLETE] tmp.noncoll_spin_is_given = atomic_basis_[i].noncoll_spin_is_given; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      full_basis.push_back(tmp);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    vector<xvector<double> > diff_vectors;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    vector<uint> atom_pos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    for (uint i = 0; i < atoms_by_type[index_for_smallest_group].size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20190905 [OBSOLETE-no more mod_one_xvec] xvector<double> tmp = SYM::mod_one_xvec(atoms_by_type[index_for_smallest_group][i].fpos - atoms_by_type[index_for_smallest_group][0].fpos); //need to bring in cell, otherwise, checking larger cells not smaller
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      xvector<double> tmp = atoms_by_type[index_for_smallest_group][i].fpos - atoms_by_type[index_for_smallest_group][0].fpos; //need to bring in cell, otherwise, checking larger cells not smaller //DX20190905
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      BringInCellInPlace(tmp); //DX20190905
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      diff_vectors.push_back(tmp);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      atom_pos.push_back(i);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    // ---------------------------------------------------------------------------
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    // translate by difference vectors and check if equivalent
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    // (i.e., check if diff vector is a lattice vector) 
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    bool is_frac = true;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    for (uint d = 1; d < diff_vectors.size(); d++) {  //use d=0 if we do double for loop
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      if(isTranslationVector((*this), diff_vectors[d], (*this).sym_eps, is_frac)){  //CO20240518 - THIS IS WRONG, YOU CANNOT DO THESE SHIFTS IN F-SPACE, is_frac should always be false
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        lattice_vector_candidates.push_back(diff_vectors[d]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //add the original lattice vectors' translations to pool of potential translations:
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    xvector<double> a1;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a1(1) = 1;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a1(2) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a1(3) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    xvector<double> a2;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a2(1) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a2(2) = 1;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a2(3) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    xvector<double> a3;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a3(1) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a3(2) = 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    a3(3) = 1;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    lattice_vector_candidates.push_back(a1);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    lattice_vector_candidates.push_back(a2);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    lattice_vector_candidates.push_back(a3);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    vector<double> moduli;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    uint num_of_candidates = lattice_vector_candidates.size();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //Choose smallest L.I. potential lattice vectors. If there are only three, then these three (the original lattice three) must be the reduced basis.
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    if(num_of_candidates == 3) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      prim_lattice = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      foundbasis = true;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      sort(atomic_basis_.begin(), atomic_basis_.end(), sortAtomsTypes);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(atomic_basis_);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210129 [OBSOLETE] basistypes = numofatoms;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    } else {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //Here because the original poscar is not primitive
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //Get vector of moduli of lattice vector candidates:
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      xmatrix<double> nonsimp_reduced_basis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      nonsimp_reduced_basis = prim_lattice;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      for (uint i = 0; i < num_of_candidates; i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        moduli.push_back(aurostd::modulus(lattice_vector_candidates[i] * lattice_basis_xmat));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //Define max value inorder to find minimum in loop below:
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      double sum_mods = 1e9;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      double amin = aurostd::min(aurostd::modulus(lattice_basis[0]), aurostd::min(aurostd::modulus(lattice_basis[1]), aurostd::modulus(lattice_basis[2])));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      amin = (*this).dist_nn_min;  //DX TEST
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      double tol_vol = (*this).sym_eps * amin * amin * amin; //DX20190215 - _SYM_TOL_ to (*this).sym_eps
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20180503 - FASTER MIN CART DISTANCE CALCULATOR - START
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20180503 - only calculate multiplication once (time-saver)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      vector<xvector<double> > candidates_cpos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      vector<double> candidates_mods;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      for(uint a=0;a<lattice_vector_candidates.size();a++){
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        xvector<double> tmp = lattice_vector_candidates[a] * lattice_basis_xmat;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        candidates_cpos.push_back(tmp); candidates_mods.push_back(aurostd::modulus(tmp));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20180503 - FASTER MIN CART DISTANCE CALCULATOR - END
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      for (uint i = 0; i < candidates_cpos.size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        for (uint j = i+1; j < candidates_cpos.size(); j++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]          for (uint k = j+1; k < candidates_cpos.size(); k++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]            xmatrix<double> candidate_lattice = SYM::xvec2xmat(candidates_cpos[i], candidates_cpos[j], candidates_cpos[k]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]            double det = aurostd::determinant(candidate_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]            if(aurostd::abs(det) > tol_vol){  //DX20180613 - can be left handed; Minkowski/Niggli will fix; necessary since we aren't checking permutations of vectors
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              candidate_lattice=::MinkowskiBasisReduction(candidate_lattice);      // Minkowski first  //DX20180526
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              candidate_lattice=::NiggliUnitCellForm(candidate_lattice);           // Niggli Second //DX20180526
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              det = aurostd::determinant(candidate_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              //In order to find minimum, determinant should be positive,less than the first, and an integer multiple of less than first
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              double atom_number_ratio = (double)smallest_group/aurostd::nint(prim_det/det); // atom ratio before and after reducing //DX20180723
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              //DX [OBSOLETE] 20180723 - if(det > tol_vol && det < prim_det && aurostd::isinteger(prim_det / det, 0.05)) //DX20180614 - now it should be right-handed
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              if(det > tol_vol && det < prim_det && aurostd::isinteger(prim_det / det, 0.05) && aurostd::isinteger(atom_number_ratio, 0.05) && (atom_number_ratio-1.0)>-_ZERO_TOL_) //DX20180614 - now it should be right-handed // check atom ratio after reducing //DX20180723
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              { //CO20200106 - patching for auto-indenting
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                //double sum_candidate_mods = candidates_mods[i] + candidates_mods[j] + candidates_mods[k];
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                double sum_candidate_mods = aurostd::modulus(candidate_lattice(1)) + aurostd::modulus(candidate_lattice(2)) + aurostd::modulus(candidate_lattice(3)); //DX20180613 - need to recalculate mods, they may have changed during Minkowski/Niggli 
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                //candidate_lattice=::MinkowskiBasisReduction(candidate_lattice);      // Minkowski first  //DX20180526
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                //candidate_lattice=::NiggliUnitCellForm(candidate_lattice);           // Niggli Second //DX20180526
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                if(sum_candidate_mods < sum_mods) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                  sum_mods = sum_candidate_mods; 
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                  nonsimp_reduced_basis = candidate_lattice;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]                }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]              }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]            }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]          }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      prim_lattice = nonsimp_reduced_basis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      lattice_basis[0] = SYM::extract_row(prim_lattice, 1);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      lattice_basis[1] = SYM::extract_row(prim_lattice, 2);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      lattice_basis[2] = SYM::extract_row(prim_lattice, 3);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      lattice_basis_xmat = SYM::xvec2xmat(lattice_basis[0], lattice_basis[1], lattice_basis[2]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      // ---------------------------------------------------------------------------
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210316 - used transformation method (more efficient)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      xmatrix<double> transformation_matrix = GetBasisTransformation((*this).lattice, lattice_basis_xmat);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      xmatrix<double> rotation_matrix = aurostd::eye<double>(3,3);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      xstructure prim = (*this);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      // try to primitivize, it may fail, so return original structure
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      try{
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        prim.TransformStructure(transformation_matrix, rotation_matrix);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]        (*this) = prim;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      catch(aurostd::xerror& re){}
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      return 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 - foldInCell method (too slow for large, skewed cells)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]xmatrix<double> f2c = trasp(lattice_basis_xmat);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]xmatrix<double> c2f = inverse(trasp(lattice_basis_xmat));
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]bool skew = SYM::isLatticeSkewed(lattice_basis_xmat, (*this).dist_nn_min, (*this).sym_eps); //DX20190215 - _SYM_TOL_ to (*this).sym_eps
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]xmatrix<double> PL_inv = aurostd::inverse(prim_lattice);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]double same_atom_tol = (*this).dist_nn_min - 0.1;  //min_dist itself will consider nn atom to be the same, needs to be slightly smaller.`
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]//Now get atoms inside of new, reduced basis:
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]//[CO20190520]newbasis = foldAtomsInCell(expanded_basis, c2f, f2c, skew, same_atom_tol); //CO20180409
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]newbasis = ::foldAtomsInCell(expanded_basis, (*this).lattice, lattice_basis_xmat, skew, same_atom_tol,false); //CO20180409 //DX20190619 - false->do not check min dists (expensive)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DEBUG
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //cerr << "newbasis.size(): " << newbasis.size() << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //for(uint n=0;n<newbasis.size();n++){
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //  cerr << newbasis[n].fpos << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //}
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DEBUG
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]bool consistent_ratio = SYM::GCD_conventional_atomic_basis(newbasis, orig_split_atom_types, atoms_GCD);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]if(consistent_ratio == false) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  foundbasis = false;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]} else {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  //Overwrite basis types (update it for primitive cell):
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  sort(newbasis.begin(), newbasis.end(), sortAtomsTypes);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  //DX20210129 [OBSOLETE] numofatoms = ::GetNumEachType(newbasis);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  //DX20210129 [OBSOLETE] basistypes = numofatoms;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  atomic_basis_.clear();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  atomic_basis_ = newbasis;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  if(atomic_basis_.size() == 0) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]    moduli.clear();
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]  foundbasis = true;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]}
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]      //DX20210315 [OBSOLETE]cerr << "(*this): " << (*this) << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(foundbasis == false) { return 1; }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  // ===== Put contents back in xstructure ===== //
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE] deque<int> numtypes;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE] for (uint i = 0; i < basistypes.size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE]   numtypes.push_back(basistypes[i]);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE] }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  (*this).lattice = prim_lattice;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(newbasis.size() > 0) {  //IF A NEW BASIS EXISTS (CELL WAS NOT PRIMITIVE) THEN OVERWRITE a.atoms
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    sort(newbasis.begin(), newbasis.end(), sortAtomsTypes);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    (*this).ReplaceAtoms(newbasis, false);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] // cerr << "USING NEW BASIS" << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] // Remove old basis
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] while ((*this).atoms.size() > 0) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   (*this).RemoveAtom((uint)0);
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] (*this).species.clear(); //DX
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] for (uint i = 0; i < newbasis.size(); i++) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   _atom tmp_atom = newbasis[i]; //DX20191011 - initialized instead of setting individually below
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.fpos = newbasis[i].fpos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.cpos = newbasis[i].cpos;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.name = newbasis[i].name;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.type = newbasis[i].type;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.name_is_given = true;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   //DX20191011 [OBSOLETE] tmp_atom.spin = newbasis[i].spin; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   tmp_atom.spin_is_given = false; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   if(aurostd::abs(tmp_atom.spin)>_ZERO_TOL_){
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]     tmp_atom.spin_is_given = true; //DX20170921 - magnetic sym
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   tmp_atom.noncoll_spin = newbasis[i].noncoll_spin; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   tmp_atom.noncoll_spin_is_given = false; //DX20171205 - magnetic sym (non-collinear)
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   if(aurostd::abs(tmp_atom.noncoll_spin(1))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(2))>_ZERO_TOL_ || aurostd::abs(tmp_atom.noncoll_spin(3))>_ZERO_TOL_){
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]     tmp_atom.noncoll_spin_is_given = true; //DX20171205 - magnetic sym (non-collinear) //DX20191108 - fixed typo, should be noncoll_spin_is_given not spin_is_given
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE]   (*this).AddAtom(tmp_atom,false);  //CO20230319 - add by type
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    //DX20210129 [OBSOLETE] }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [OBSOLETE] (*this).num_each_type = numtypes;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  //DX20210129 [moved earlier] (*this).lattice = prim_lattice;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  if(LDEBUG) {
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    cerr << "xstructure::GetPrimitiveCell(): New primitivized cell:" << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]    cerr << (*this) << endl;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  }
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]  return 0;
+//[CO20240518 - REMOVING, abuses distance operations by performing in f-space]}
 
 // **************************************************************************************************************************************************
 // Shift Origin (with L input)
@@ -1258,9 +1258,9 @@ namespace SYM {
     for (uint i = 0; i < primitive_atomic_basis.size(); i++) {
       for (uint j = i + 1; j < primitive_atomic_basis.size(); j++) {
         if(SYM::MapAtom(primitive_atomic_basis[i], primitive_atomic_basis[j], FALSE, LPRIM, f2c, skew, sym_tol)) { //DX20190215 - added sym_tol //DX20190619 - LPRIM and f2c as input
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: WARNING: Atoms occupying the same space (given tolerance " << sym_tol << "). Check structure [dir=" << xstr.directory << "]." << endl; } //DX20190215 - _SYM_TOL_ to sym_tol
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: atom #" << i << " symbol: " << primitive_atomic_basis[i].name << " coord: " << primitive_atomic_basis[i].fpos << endl; }
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: atom #" << j << " symbol: " << primitive_atomic_basis[j].name << " coord: " << primitive_atomic_basis[j].fpos << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " WARNING: Atoms occupying the same space (given tolerance " << sym_tol << "). Check structure [dir=" << xstr.directory << "]." << endl; } //DX20190215 - _SYM_TOL_ to sym_tol
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " atom #" << i << " symbol: " << primitive_atomic_basis[i].name << " coord: " << primitive_atomic_basis[i].fpos << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " atom #" << j << " symbol: " << primitive_atomic_basis[j].name << " coord: " << primitive_atomic_basis[j].fpos << endl; }
           atoms_overlapping = true;
         }
       }
@@ -1334,17 +1334,17 @@ namespace SYM {
       rot_ops_vec = triplet_operations(expanded_lattice_1, expanded_cell_1, L, Linv, rot_lattice_vectors, radius, skew, sym_tol); //DX20190215 - added sym_tol
     }
     if(LDEBUG) {
-      cerr << "SYM::ConventionalCell: Number of mirror operations: " << mirror_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
+      cerr << __AFLOW_FUNC__ << " Number of mirror operations: " << mirror_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
       for(uint m=0;m<mirror_ops_vec.size();m++){
-        cerr << "SYM::ConventionalCell: mirror #" << m+1 << " : " << mirror_ops_vec[m] << endl;
+        cerr << __AFLOW_FUNC__ << " mirror #" << m+1 << " : " << mirror_ops_vec[m] << endl;
       }
-      cerr << "SYM::ConventionalCell: Number of twofold operations: " << twofold_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
+      cerr << __AFLOW_FUNC__ << " Number of twofold operations: " << twofold_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
       for(uint m=0;m<twofold_ops_vec.size();m++){
-        cerr << "SYM::ConventionalCell: twofold operator #" << m+1 << " : " << twofold_ops_vec[m] << endl;
+        cerr << __AFLOW_FUNC__ << " twofold operator #" << m+1 << " : " << twofold_ops_vec[m] << endl;
       }
-      cerr << "SYM::ConventionalCell: Number of n-fold (n>2) operations: " << rot_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
+      cerr << __AFLOW_FUNC__ << " Number of n-fold (n>2) operations: " << rot_ops_vec.size() << " [dir=" << xstr.directory << "]." << endl;
       for(uint m=0;m<rot_ops_vec.size();m++){
-        cerr << "SYM::ConventionalCell: n-fold (n>2) operator #" << m+1 << " : " << rot_ops_vec[m] << endl;
+        cerr << __AFLOW_FUNC__ << " n-fold (n>2) operator #" << m+1 << " : " << rot_ops_vec[m] << endl;
       }
     }
     // Note: It will not always work to check the lattice symmetry to get to correct crystal system.
@@ -1471,10 +1471,10 @@ namespace SYM {
       // ********************************************************************************************************************************
 
       // DEBUG
-      // cerr << "SYM::ConventionalCell: mcount: " << mcount << endl;
-      // cerr << "SYM::ConventionalCell: twofold: " << twofold_ops_vec.size() << endl;
-      // cerr << "SYM::ConventionalCell: fourcount: " << fourcount << endl;
-      // cerr << "SYM::ConventionalCell: crystalsystem: " << crystalsystem << endl;
+      // cerr << __AFLOW_FUNC__ << " mcount: " << mcount << endl;
+      // cerr << __AFLOW_FUNC__ << " twofold: " << twofold_ops_vec.size() << endl;
+      // cerr << __AFLOW_FUNC__ << " fourcount: " << fourcount << endl;
+      // cerr << __AFLOW_FUNC__ << " crystalsystem: " << crystalsystem << endl;
       // DEBUG
       if(lattice_vectors_found == false) {
         // *****************************************************************************************************************************
@@ -1483,7 +1483,7 @@ namespace SYM {
 
         // =============== CUBIC =============== //
         if((mcount == 9 && fourcount == 3) || crystalsystem == "CUBIC") {
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: CUBIC [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " CUBIC [dir=" << xstr.directory << "]." << endl; }
           symmetryfound = true;
           crystalsystem = "CUBIC";
 
@@ -1497,7 +1497,7 @@ namespace SYM {
         else if(((mcount == 7 || mcount == 8) && three_six_count != 0)|| crystalsystem == "TRIGONAL" || crystalsystem == "HEXAGONAL") {
           symmetryfound = true;
           crystalsystem = "HEXAGONAL";
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: HEX [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " HEX [dir=" << xstr.directory << "]." << endl; }
           if(!findTrigonalLattice(rot_lattice_vectors, rot_ops_vec, big_expanded, candidate_lattice_vectors, candidate_lattice_chars, sym_tol)) { //DX20190215 - added sym_tol
             symmetryfound = false;
             return xstr_out;
@@ -1517,7 +1517,7 @@ namespace SYM {
             determineLatticeCentering(bravais_basis, bravais_count, c2f, f2c, skew, big_expanded, crystalsystem, candidate_lattice_chars, sym_tol); //DX20190215 - added sym_tol
             if(bravais_count == 3){ // if three lattice points in the cell, then the system is rhl
               //use rhombohedral setting
-              if(LDEBUG) { cerr << "SYM::ConventionalCell: Crystal system is trigonal with three lattice points and setting=1, using rhombohedral setting [dir=" << xstr.directory << "]." << endl; }
+              if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Crystal system is trigonal with three lattice points and setting=1, using rhombohedral setting [dir=" << xstr.directory << "]." << endl; }
               if(!findRhombohedralSetting(big_expanded, candidate_lattice_vectors, candidate_lattice_chars, sym_tol)) { //DX20190215 - added sym_tol
                 symmetryfound = false;
                 return xstr_out;
@@ -1534,7 +1534,7 @@ namespace SYM {
         { //CO20200106 - patching for auto-indenting
           symmetryfound = true;
           crystalsystem = "TETRAGONAL";
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: TET [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " TET [dir=" << xstr.directory << "]." << endl; }
 
           if(!findTetragonalLattice(rot_lattice_vectors, twofold_lattice_vectors, rot_ops_vec, twofold_ops_vec, big_expanded,
                 candidate_lattice_vectors, candidate_lattice_chars, sym_tol)) { //DX20190215 - added sym_tol
@@ -1546,7 +1546,7 @@ namespace SYM {
         // =============== ORTHORHOMBIC/RHOMBOHEDRAL =============== //
         else if(((mcount >= 3 && mcount <= 5) && continue_ortho && fourcount == 0) || crystalsystem == "ORTHORHOMBIC") {
           symmetryfound = true;
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: ORTHO/RHOMB [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " ORTHO/RHOMB [dir=" << xstr.directory << "]." << endl; }
           // ===== Check between orthorhombic and rhombohedral ===== //
           // To discern between rhombohedral and orthorhombic lattices by mirror planes,
           // check the orthogonality defect. (Rhombohedral mirror planes are not mutually orthogonal).
@@ -1569,7 +1569,7 @@ namespace SYM {
 
           // =============== ORTHORHOMBIC =============== //
           //  if(continue_ortho == true) {  //[CO20200106 - close bracket for indenting]}
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: ORTHO true: [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " ORTHO true: [dir=" << xstr.directory << "]." << endl; }
           crystalsystem = "ORTHORHOMBIC";
 
           if(!findOrthorhombicLattice(twofold_lattice_vectors, mirror_lattice_vectors, candidate_lattice_vectors, candidate_lattice_chars, sym_tol)) { //DX20190215 - added sym_tol
@@ -1585,7 +1585,7 @@ namespace SYM {
           // Need a slightly larger expansion to get lattice basis in HEX setting
           // Using 'r' to denote rhombohedral in primitive lattice cell and 'R' to denote rhombodehral with hexagonal axes
           crystalsystem = "TRIGONAL";
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: RHOMB [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " RHOMB [dir=" << xstr.directory << "]." << endl; }
 
           if(!findRhombohedralLattice(rot_lattice_vectors, rot_ops_vec, big_expanded, candidate_lattice_vectors, candidate_lattice_chars, sym_tol)) { //DX20190215 - added sym_tol
             symmetryfound = false;
@@ -1618,7 +1618,7 @@ namespace SYM {
         { //CO20200106 - patching for auto-indenting
           symmetryfound = true;
           crystalsystem = "MONOCLINIC";
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: MONO [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " MONO [dir=" << xstr.directory << "]." << endl; }
 
           if(!findMonoclinicLattice(mirror_lattice_vectors, twofold_lattice_vectors, big_expanded,
                 candidate_lattice_vectors, candidate_lattice_chars, cell_choice, sym_tol)) { //DX20180816 - added cell choice //DX20190215 - added sym_tol
@@ -1631,7 +1631,7 @@ namespace SYM {
         else if(mcount == 0 || crystalsystem == "TRICLINIC") {
           symmetryfound = true;
           crystalsystem = "TRICLINIC";
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: TRI [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " TRI [dir=" << xstr.directory << "]." << endl; }
 
           if(!findTriclinicLattice(L, candidate_lattice_vectors,
                 candidate_lattice_chars)) {
@@ -1640,7 +1640,7 @@ namespace SYM {
           }
         }
         else {
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: Could not identify crystal system, i.e., symmetry operation counts do not match with any of the crystal systems [dir=" << xstr.directory << "]." << endl;}
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Could not identify crystal system, i.e., symmetry operation counts do not match with any of the crystal systems [dir=" << xstr.directory << "]." << endl;}
         }
       }  //end of lattice_vectors_found if statement
       // *****************************************************************************************************************************
@@ -1659,12 +1659,29 @@ namespace SYM {
       //lattice_vector_choices.clear(); //DX20220827
       for (uint i = start_index; i < candidate_lattice_vectors.size(); i++) {
         xmatrix<double> CL = candidate_lattice_vectors[i];
+        //CO20261018 - a candidate whose vectors are nearly coplanar is not a cell: skip it. inverse() refuses only det==0,
+        //and with fused multiply-adds (Apple clang on arm64) the determinant of coplanar vectors comes out as a residue
+        //(in a Linux build with fused multiply-adds, -2.8e-15 for a tetragonal candidate of the OZr_sv mC6 structure of
+        //the xstructure unit test, normalized volume 2e-17); the centering search then asked LatticeDimensionSphere()
+        //for about 1e16 cells along each vector, and on macOS the cell lists filled memory
+        if(aurostd::abs(det(CL)) <= 1e-6*aurostd::modulus(CL(1))*aurostd::modulus(CL(2))*aurostd::modulus(CL(3))) {
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " candidate " << (i+1) << " skipped: its vectors are nearly coplanar (det=" << det(CL) << ")" << endl;}
+          continue;
+        }
         if(LDEBUG) {
-          cerr << "SYM::ConventionalCell: Possible conventional lattice vectors (choice " << (i+1) << " of " << candidate_lattice_vectors.size() << "): [dir=" << xstr.directory << "]." << endl;
+          cerr << __AFLOW_FUNC__ << " Possible conventional lattice vectors (choice " << (i+1) << " of " << candidate_lattice_vectors.size() << "): [dir=" << xstr.directory << "]." << endl;
           cerr << CL << endl;
+          cerr << __AFLOW_FUNC__ << " det=" << det(CL) << endl;
         }
         f2c = trasp(CL);
-        c2f = inverse(trasp(CL));
+        try {
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " starting inverse calculation" << endl;}
+          c2f = inverse(trasp(CL));
+          if(LDEBUG) {cerr << __AFLOW_FUNC__ << " inverse calculation finished" << endl;}
+        }
+        catch (const aurostd::xerror& err) { // possibly a singular matrix
+          continue;
+        }
         skew = SYM::isLatticeSkewed(CL, xstr_out.dist_nn_min, sym_tol); //DX20190215 - _SYM_TOL_ to sym_tol
         // ===== Find number of lattice points in cell (lattice centering) ===== //
         vector<xvector<double> > bravais_basis;
@@ -1702,7 +1719,7 @@ namespace SYM {
         //DX20210315 [OBSOLETE]  consistent_ratio = GCD_conventional_atomic_basis(conventional_basis_atoms, prim_split_atom_types, prim_GCD);
         //DX20210315 [OBSOLETE]}
         //DX20210315 [OBSOLETE]if(consistent_ratio == false) {
-        //DX20210315 [OBSOLETE]  if(LDEBUG) { cerr << "SYM::ConventionalCell: WARNING: Conventional cell atomic basis ratio is inconsistent with the primitive cell! Recalculating. [dir=" << xstr.directory << "]." << endl; }
+        //DX20210315 [OBSOLETE]  if(LDEBUG) { cerr << __AFLOW_FUNC__ << " WARNING: Conventional cell atomic basis ratio is inconsistent with the primitive cell! Recalculating. [dir=" << xstr.directory << "]." << endl; }
         //DX20210315 [OBSOLETE]  symmetryfound = false;
         //DX20210315 [OBSOLETE]  continue;
         //DX20210315 [OBSOLETE]}
@@ -1734,7 +1751,7 @@ namespace SYM {
         //DX20210315 [OBSOLETE]// Check if AddAtom removed atoms
         //DX20210315 [OBSOLETE]if(xstr_out.atoms.size() != conventional_basis_atoms.size()){
         //DX20210315 [OBSOLETE]  if(LDEBUG) {
-        //DX20210315 [OBSOLETE]    cerr << "SYM::ConventionalCell: AddAtom() removed conventional basis atoms due to the tolerance value. Change the tolerance." << endl;
+        //DX20210315 [OBSOLETE]    cerr << __AFLOW_FUNC__ << " AddAtom() removed conventional basis atoms due to the tolerance value. Change the tolerance." << endl;
         //DX20210315 [OBSOLETE]  }
         //DX20210315 [OBSOLETE]  symmetryfound = false;
         //DX20210315 [OBSOLETE]  return xstr_out;
@@ -1754,7 +1771,7 @@ namespace SYM {
         xstr_out.crystal_system_ITC = crystalsystem;
         orient(xstr_out);
         if(LDEBUG) {
-          cerr << "SYM::ConventionalCell: Oriented conventional cell: " << endl;
+          cerr << __AFLOW_FUNC__ << " Oriented conventional cell: " << endl;
           cerr << xstr_out << endl;
         }
         xstr = xstr_out;
@@ -1770,7 +1787,7 @@ namespace SYM {
         //DX20210316 [OBSOLETE] string pearson_symbol = getPearsonSymbol(xstr_out.bravais_label_ITC, lattice_char, conventional_basis_atoms);
         string pearson_symbol = getPearsonSymbol(xstr_out.bravais_label_ITC, lattice_char, xstr_out.atoms);
 
-        if(LDEBUG) { cerr << "SYM::ConventionalCell: Pearson: " << pearson_symbol << " [dir=" << xstr.directory << "]." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Pearson: " << pearson_symbol << " [dir=" << xstr.directory << "]." << endl; }
         checkops = check_ccell(xstr_out,ITC_sym_info); //DX20190215 - add ITC sym info
 
         // Store lattice symmetry operators only if not reformed (lattice symmetry should not know anything about crystal symmetry)
@@ -1784,7 +1801,7 @@ namespace SYM {
         crystal_sym_mats = checkops.crystal_sym_mats;
 
         if(checkops.latticesystem == "REDO") {
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: Symmetry check failed... [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Symmetry check failed... [dir=" << xstr.directory << "]." << endl; }
         }
         if(checkops.commensurate == true) {
           //cerr <<"reform unnecessary" << endl;
@@ -1806,7 +1823,7 @@ namespace SYM {
         // ========== If all combinations of cell orientations are exhausted, reform the lattice ========== //
         if(i == candidate_lattice_vectors.size() - 1 && (checkops.commensurate == false || checkops.latticesystem == "REDO")) {  //added redo as test
           if(foundspacegroup_global) { last_orientation = true; return xstr_out; } //DX20220924
-          if(LDEBUG) { cerr << "SYM::ConventionalCell: All permutations of cell checked. Need to reform the lattice based on the crystal symmetry [dir=" << xstr.directory << "]." << endl; }
+          if(LDEBUG) { cerr << __AFLOW_FUNC__ << " All permutations of cell checked. Need to reform the lattice based on the crystal symmetry [dir=" << xstr.directory << "]." << endl; }
           //cerr << "i: " << i << endl;
           //cerr << "checkops.latticesystem: " << checkops.latticesystem << endl;
           //cerr << "checkops.crystalsystem: " << checkops.crystalsystem << endl;
@@ -1869,7 +1886,7 @@ namespace SYM {
           // If we could not match all operations from the old representation to the new, then we need to change the tolerance
           if(!all_matched_mirror || !all_matched_twofold || !all_matched_rot) {
             if(LDEBUG) {
-              cerr << "SYM::ConventionalCell: WARNING: Couldn't match new mirror operations to old vectors. Changing tolerance." << endl;
+              cerr << __AFLOW_FUNC__ << " WARNING: Couldn't match new mirror operations to old vectors. Changing tolerance." << endl;
             }
             symmetryfound = false;
             return xstr_out;
@@ -1891,7 +1908,7 @@ namespace SYM {
       }  //END CLs
       if(latticesystem == "REDO") {
         //cerr << "NEED TO REDO" << endl;
-        if(LDEBUG) { cerr << "SYM::ConventionalCell: Could not find lattice consistent with crystal symmetry [dir=" << xstr.directory << "]." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Could not find lattice consistent with crystal symmetry [dir=" << xstr.directory << "]." << endl; }
         symmetryfound = false;
         return xstr_out;
       }
@@ -1903,7 +1920,7 @@ namespace SYM {
       // ============================== If symmetryfound = false, need to readjust tolerances ============================== //
       // **********************************************************************************************************************
       else if(symmetryfound == false) {
-        if(LDEBUG) { cerr << "SYM::ConventionalCell: Conventional cell consistent with crystal symmetry is found [dir=" << xstr.directory << "]." << endl; }
+        if(LDEBUG) { cerr << __AFLOW_FUNC__ << " Conventional cell consistent with crystal symmetry is found [dir=" << xstr.directory << "]." << endl; }
         return xstr_out;
       }
       // if we made it here, we've reformed the lattice and this is not the last orientation
@@ -3112,11 +3129,11 @@ namespace SYM {
       ident_trans = 0;
       // ===== There must be an identity operator otherwise a tolerance problem ===== //
       while (ident_trans == 0) {
-        int symcount = 0;
+        //[CO20230626 - clang warning not used]int symcount = 0;
 
         // ===== Loop over symmetry elements ===== //
         for (uint i = 0; i < SYMINDEX.size(); i++) {
-          symcount++;
+          //[CO20230626 - clang warning not used]symcount++;
           xmatrix<double> Rf = ITC_sym_info.sym_mats[SYMINDEX[i]];  //Uf  //CO
           string sym_symbol = ITC_sym_info.symbol[SYMINDEX[i]];
           //cerr << i << " testing " << ITC_sym_info.symbol[SYMINDEX[i]] << endl;
@@ -3445,7 +3462,7 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
 { //CO20200106 - patching for auto-indenting
   bool LDEBUG = (FALSE || XHOST.DEBUG);
   stringstream message;
-  if(use_tol < _ZERO_TOL_) {
+  if(abs(use_tol) < _ZERO_TOL_) {
     cerr << __AFLOW_FUNC__ << " ERROR: Tolerance cannot be zero (i.e. less than 1e-10) [dir=" << (*this).directory << "]." << endl;
     return 0;
   }
@@ -3456,7 +3473,7 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   }
   min_dist = (*this).dist_nn_min;
   if(use_tol > min_dist) {
-    cerr << __AFLOW_FUNC__ << " ERROR: The tolerance cannot be larger than the minimum interatomic distance (" << min_dist << " Angstroms). [dir= " << (*this).directory << "]" << endl;
+    cerr << __AFLOW_FUNC__ << " ERROR: The tolerance (" << use_tol << " Angstroms) cannot be larger than the minimum interatomic distance (" << min_dist << " Angstroms). [dir= " << (*this).directory << "]" << endl;
     return 0;
   }
 
@@ -4446,7 +4463,7 @@ uint xstructure::SpaceGroup_ITC(double& use_tol, const int& manual_it, const int
   // === Add Wyckoff positions === //
   wss << endl
     << "Direct(WYCCAR)" << endl;
-  wss << woss.str();  //<< endl;
+  wss << woss_min.str();  //<< endl; //KC20221222 - added woss_min for aflow --wyckoff --print-json
 
   vector<string> wyccar_string_vec;
   aurostd::stream2vectorstring(wss, wyccar_string_vec);

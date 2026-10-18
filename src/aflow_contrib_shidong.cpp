@@ -44,7 +44,7 @@ bool ACEGetStructureType(const string& structure_type_in) {
 // ***************************************************************************
 vector<cestructure>  ReadInFitStructure(istream & ins, string & structure_type) {
   vector<cestructure> str_out_list;
-  uint LineCounter = 1;
+  //[CO20230626 - clang warning not used]uint LineCounter = 1;
   string line_content;
   string alloy_name, structure_name;
   double stoich_b, fit_quantity;
@@ -106,7 +106,7 @@ vector<cestructure>  ReadInFitStructure(istream & ins, string & structure_type) 
       }
 
     }
-    LineCounter++;
+    //[CO20230626 - clang warning not used]LineCounter++;
     //cout << LineCounter << " " << structure_name << endl;
   }
 
@@ -922,7 +922,10 @@ vector<int> GeneticAlgorithm( vector<cestructure> & str_list,
   int best=0;
   vector<int> trial_set;
 
-  bool chromosome[population][total_cluster]; // use array representive
+  //CO20261017 - rows of one array, not a variable-length array (a C++ extension); chromosome[i] is still a bool* for GetTrialSet()
+  std::unique_ptr<bool[]> chromosome_data(new bool[(size_t)population*total_cluster]());
+  vector<bool*> chromosome(population); // use array representive
+  for (int i=0; i<population; i++) chromosome[i]=chromosome_data.get()+(size_t)i*total_cluster;
   vector<fittness> fit_score;
 
   ofstream myfile;
@@ -1108,7 +1111,10 @@ vector<int> GeneticAlgorithm( vector<cestructure> & str_list,
       int(_REPRODUCTION_RATE*population) % 2; // always be even
 
     vector<fittness> fit_score_offspring;
-    bool parent[reproduction_num][total_cluster];
+    //CO20261017 - rows of one array, not a variable-length array (a C++ extension); parent[i] is still a bool* for GetTrialSet()
+    std::unique_ptr<bool[]> parent_data(new bool[(size_t)reproduction_num*total_cluster]());
+    vector<bool*> parent(reproduction_num);
+    for (int i=0; i<reproduction_num; i++) parent[i]=parent_data.get()+(size_t)i*total_cluster;
     vector<int> reproduction_pool;
 
     for (int i=0; i<reproduction_num; i++) {
@@ -2661,7 +2667,7 @@ void GenerateAflowInputFile(string structure_type,
   input_file << "[VASP_FORCE_OPTION]AUTO_PSEUDOPOTENTIALS=potpaw_PBE   // pot_LDA | pot_GGA | potpaw_LDA | potpaw_GGA | potpaw_PBE | potpaw_LDA_KIN | potpaw_PBE_KIN  " << endl;
   input_file << "[VASP_FORCE_OPTION]NBANDS                             // Estimate Bands (better than VASP)" << endl;
   input_file << "[VASP_FORCE_OPTION]SPIN=ON,REMOVE_RELAX_1             // (ON | OFF  (default ON)), REMOVE_RELAX_1 | _2" << endl;
-  input_file << "#[VASP_FORCE_OPTION]AUTO_MAGMOM=ON                    // ON | OFF (default OFF)" << endl;
+  input_file << "#[VASP_FORCE_OPTION]MAGMOM=AUTO                       // AUTO | HIGH | LOW | user-input (initial magnetic moment guess; special modes or provided as input from command-line)" << endl;
   input_file << "[VASP_FORCE_OPTION]RELAX_MODE=ENERGY                  // ENERGY | FORCES | ENERGY_FORCES | FORCES_ENERGY (default ENERGY) " << endl;
   input_file << "[VASP_FORCE_OPTION]PREC=MEDIUM                        // (LOW | MEDIUM | NORMAL | HIGH | ACCURATE), PRESERVED (default=MEDIUM)" << endl;
   input_file << "[VASP_FORCE_OPTION]ALGO=FAST                          // (NORMAL | VERYFAST | FAST | ALL | DAMPED), PRESERVED (default=NORMAL)" << endl;

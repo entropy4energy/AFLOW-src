@@ -14,6 +14,8 @@
 #include "aflow_pocc.h" //CO20200624
 #include "aflow_symmetry_spacegroup.h" //DX20200929
 #include "aflowlib.h" //SD20221207
+#include <mutex> //CO20261004 - ChaosCheckDirectory
+#include <atomic> //CO20261009 - ChaosCheckSuspended
 
 const string _DEVIL_PROTOTYPES_STRING_ = "64,65,549,550,f8269,f9083,f8819";
 
@@ -41,6 +43,7 @@ namespace aflowlib {
     auid=b.auid;
     vauid=b.vauid;vauid.clear();for(uint i=0;i<b.vauid.size();i++) vauid.push_back(b.vauid.at(i));
     aurl=b.aurl;vaurl.clear();for(uint i=0;i<b.vaurl.size();i++) vaurl.push_back(b.vaurl.at(i));
+    pocc_system=b.pocc_system;  //CO20261008
     system_name=b.system_name;
     vkeywords.clear();for(uint i=0;i<b.vkeywords.size();i++) vkeywords.push_back(b.vkeywords.at(i));
     aflowlib_date=b.aflowlib_date;vaflowlib_date.clear();for(uint i=0;i<b.vaflowlib_date.size();i++) vaflowlib_date.push_back(b.vaflowlib_date.at(i)); //CO20200624 - adding LOCK date
@@ -65,9 +68,14 @@ namespace aflowlib {
     compound=b.compound;
     density=b.density;
     density_orig=b.density_orig; //DX20190124 - add original crystal info
+    distance_hull=b.distance_hull; //HP20260820
+    deed=b.deed; //HP20260820
     dft_type=b.dft_type;vdft_type.clear();for(uint i=0;i<b.vdft_type.size();i++) vdft_type.push_back(b.vdft_type.at(i));
     eentropy_cell=b.eentropy_cell;eentropy_atom=b.eentropy_atom;
     Egap=b.Egap;Egap_fit=b.Egap_fit;
+    // SAMRIDHI_CHORDIA: Copy Egap_DOS fields
+    Egap_DOS=b.Egap_DOS;Egap_DOS_fit=b.Egap_DOS_fit;Egap_DOS_net=b.Egap_DOS_net;
+    // END SAMRIDHI_CHORDIA
     energy_cell=b.energy_cell;energy_atom=b.energy_atom;energy_atom_relax1=b.energy_atom_relax1;
     energy_cutoff=b.energy_cutoff;
     delta_electronic_energy_convergence=b.delta_electronic_energy_convergence;
@@ -92,6 +100,9 @@ namespace aflowlib {
     files_WEB=b.files_WEB;vfiles_WEB.clear();for(uint i=0;i<b.vfiles_WEB.size();i++) vfiles_WEB.push_back(b.vfiles_WEB.at(i));
     forces=b.forces;vforces.clear();for(uint i=0;i<b.vforces.size();i++) vforces.push_back(b.vforces.at(i));
     Egap_type=b.Egap_type;
+    // SAMRIDHI_CHORDIA: Copy Egap_DOS_type
+    Egap_DOS_type=b.Egap_DOS_type;
+    // END SAMRIDHI_CHORDIA
     geometry=b.geometry;vgeometry.clear();for(uint i=0;i<b.vgeometry.size();i++) vgeometry.push_back(b.vgeometry.at(i));
     geometry_orig=b.geometry_orig;vgeometry_orig.clear();for(uint i=0;i<b.vgeometry_orig.size();i++) vgeometry_orig.push_back(b.vgeometry_orig.at(i)); //DX20190124 - add original crystal info
     lattice_system_orig=b.lattice_system_orig;lattice_variation_orig=b.lattice_variation_orig;
@@ -247,6 +258,25 @@ namespace aflowlib {
     volume_atom_qha_300K = b.volume_atom_qha_300K; //AS20201008
     energy_free_atom_qha_300K = b.energy_free_atom_qha_300K; //AS20201008
     energy_free_cell_qha_300K = b.energy_free_cell_qha_300K; //AS20201207
+    // POCC HEA properties (ST20251031) were not copied //CO20260924
+    lat_distortion_misfit_mean_0K = b.lat_distortion_misfit_mean_0K;
+    lat_distortion_misfit_stdev_0K = b.lat_distortion_misfit_stdev_0K;
+    lat_distortion_relax_distance_mean_0K = b.lat_distortion_relax_distance_mean_0K;
+    lat_distortion_relax_distance_stdev_0K = b.lat_distortion_relax_distance_stdev_0K;
+    solubility_parameter_0K = b.solubility_parameter_0K;
+    lat_distortion_misfit_mean_300K = b.lat_distortion_misfit_mean_300K;
+    lat_distortion_misfit_stdev_300K = b.lat_distortion_misfit_stdev_300K;
+    lat_distortion_relax_distance_mean_300K = b.lat_distortion_relax_distance_mean_300K;
+    lat_distortion_relax_distance_stdev_300K = b.lat_distortion_relax_distance_stdev_300K;
+    solubility_parameter_300K = b.solubility_parameter_300K;
+    param_geo_radius_covalent_PT_atom = b.param_geo_radius_covalent_PT_atom;
+    S_config_atom = b.S_config_atom;
+    S_config_partial_atom = b.S_config_partial_atom;
+    VEC = b.VEC;
+    Hmix_miedema = b.Hmix_miedema;
+    species_sublattice = b.species_sublattice;
+    delta_electronegativity_Pearson_sublattice = b.delta_electronegativity_Pearson_sublattice;
+    delta_radius_covalent_PT_sublattice = b.delta_radius_covalent_PT_sublattice;
     // BADER
     bader_net_charges=b.bader_net_charges;vbader_net_charges.clear();for(uint i=0;i<b.vbader_net_charges.size();i++) vbader_net_charges.push_back(b.vbader_net_charges.at(i));
     bader_atomic_volumes=b.bader_atomic_volumes;vbader_atomic_volumes.clear();for(uint i=0;i<b.vbader_atomic_volumes.size();i++) vbader_atomic_volumes.push_back(b.vbader_atomic_volumes.at(i));
@@ -283,6 +313,86 @@ namespace aflowlib {
     //  free();*this=b;
     copy(b);
   }
+  //WJ20230807 START added comparison functions NOTE: still need to add more
+  bool _aflowlib_entry::operator==(const _aflowlib_entry& other) const{
+    if(this->auid == other.auid){return true;} else{return false;}
+  }
+
+  // ********************* FOR ATOMIC AND 1D TENSOR *********************
+
+  bool _aflowlib_entry::equalTo(const string& compProp, const uint& pos, const double& val){
+      return (!greaterThan(compProp, pos, val) && !lessThan(compProp, pos, val));
+  }
+  bool _aflowlib_entry::greaterThan(const string& compProp, const uint& pos, const double& val){
+    if(compProp == "bader_net_charges"){
+      if(vbader_net_charges.size() < 1){return false;}
+      return (vbader_net_charges[pos] > val);
+    }else if(compProp == "bader_atomic_volumes"){
+      if(vbader_atomic_volumes.size() < 1){return false;}
+      return (vbader_atomic_volumes[pos] > val);
+    }else if(compProp == "stress_tensor"){
+      if(vstress_tensor.size() < 1){return false;}
+      return (vstress_tensor[pos] > val);
+    }else if(compProp == "nbondxx"){
+      if(vnbondxx.size() < 1){return false;}
+      return (vnbondxx[pos] > val);
+    }else{return 0;}
+  }
+  bool _aflowlib_entry::lessThan(const string& compProp, const uint& pos, const double& val){
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    if(compProp == "bader_net_charges"){
+      if(vbader_net_charges.size() < 1){
+        if(LDEBUG){cout << "BAD ENTRY AUID: " << auid << endl;}
+        return false;
+      }
+      return (vbader_net_charges[pos] < val);
+    }else if(compProp == "bader_atomic_volumes"){
+      if(vbader_atomic_volumes.size() < 1){
+        if(LDEBUG){cout << "BAD ENTRY AUID: " << auid << endl;}
+        return false;
+      }
+      return (vbader_atomic_volumes[pos] < val);
+    }else if(compProp == "stress_tensor"){
+    if(vstress_tensor.size() < 1){
+        if(LDEBUG){cout << "BAD ENTRY AUID: " << auid << endl;}
+        return false;
+      }
+      return (vstress_tensor[pos] < val);
+    }else if(compProp == "nbondxx"){
+    if(vnbondxx.size() < 1){
+        if(LDEBUG){cout << "BAD ENTRY AUID: " << auid << endl;}
+        return false;
+      }
+      return (vnbondxx[pos] < val);
+    }else{return 0;}
+  }
+  bool _aflowlib_entry::greaterThanOrEqual(const string& compProp, const uint& pos, const double& val){
+    return (greaterThan(compProp,pos,val) || equalTo(compProp, pos,val));
+  }
+  bool _aflowlib_entry::lessThanOrEqual(const string& compProp, const uint& pos, const double& val){
+    return (lessThan(compProp,pos,val) || equalTo(compProp, pos,val));
+  }
+  // ************************ FOR 2D TENSOR ******************************
+
+  bool _aflowlib_entry::equalTo(const string& compProp, const uint& pos1, const uint& pos2, const double& val){
+      return (!greaterThan(compProp, pos1, pos2, val) && !lessThan(compProp, pos1, pos2, val));
+  }
+  bool _aflowlib_entry::greaterThan(const string& compProp, const uint& pos1, const uint& pos2, const double& val){
+      if(compProp == "ael_stiffness_tensor"){return (ael_stiffness_tensor.getcol(pos2)[pos1] > val);
+      }else{return 0;}
+  }
+  bool _aflowlib_entry::lessThan(const string& compProp, const uint& pos1, const uint& pos2, const double& val){
+      if(compProp == "ael_stiffness_tensor"){return (ael_stiffness_tensor.getcol(pos2)[pos1] < val);
+      }else{return 0;}
+  }
+  bool _aflowlib_entry::greaterThanOrEqual(const string& compProp, const uint& pos1, const uint& pos2, const double& val){
+    return (greaterThan(compProp,pos1,pos2,val) || equalTo(compProp, pos1,pos2,val));
+  }
+  bool _aflowlib_entry::lessThanOrEqual(const string& compProp, const uint& pos1, const uint& pos2, const double& val){
+    return (lessThan(compProp,pos1,pos2,val) || equalTo(compProp, pos1,pos2,val));
+  }
+
+  //WJ20230807 STOP
 
   void _aflowlib_entry::free() { // free PRIVATE
     //[CO20200829 - OBSOLETE]ventry.clear();
@@ -330,6 +440,7 @@ namespace aflowlib {
     auid.clear();
     vauid.clear();vauid.clear();
     aurl.clear();vaurl.clear();
+    pocc_system.clear();  //CO20261008
     system_name.clear();
     keywords.clear();vkeywords.clear();
     aflowlib_date.clear();vaflowlib_date.clear(); //CO20200624 - adding LOCK date
@@ -339,7 +450,7 @@ namespace aflowlib {
     aflow_version.clear();
     catalog.clear();
     data_api="aapi1.2"; // new version of the API
-    data_source="aflowlib";
+    data_source="s4e";  //CO20261004 - every entry of this AFLOW is an s4e entry (was "aflowlib", and "s4e" only on two named hosts)
     data_language="";
     error_status.clear();
     author.clear();vauthor.clear();
@@ -355,10 +466,16 @@ namespace aflowlib {
     compound.clear();
     density=AUROSTD_NAN;
     density_orig=AUROSTD_NAN; //DX20190124 - add original crystal info
+    distance_hull=AUROSTD_NAN; //HP20260820
+    deed=AUROSTD_NAN; //HP20260820
     dft_type.clear();vdft_type.clear();
     eentropy_cell=AUROSTD_NAN;eentropy_atom=AUROSTD_NAN;
     Egap=AUROSTD_NAN;Egap_fit=AUROSTD_NAN;
     Egap_type.clear();
+    // SAMRIDHI_CHORDIA: Initialize Egap_DOS fields
+    Egap_DOS=AUROSTD_NAN;Egap_DOS_fit=AUROSTD_NAN;Egap_DOS_net=AUROSTD_NAN;
+    Egap_DOS_type.clear();
+    // END SAMRIDHI_CHORDIA
     energy_cell=AUROSTD_NAN;energy_atom=AUROSTD_NAN;energy_atom_relax1=AUROSTD_NAN;
     energy_cutoff=AUROSTD_NAN;
     delta_electronic_energy_convergence=AUROSTD_NAN;
@@ -533,6 +650,25 @@ namespace aflowlib {
     volume_atom_qha_300K = AUROSTD_NAN;//AS20201008
     energy_free_atom_qha_300K = AUROSTD_NAN;//AS20201008
     energy_free_cell_qha_300K = AUROSTD_NAN;//AS20201207
+    // POCC HEA properties (ST20251031) were never initialized, so unset fields carried stack garbage into aflowlib.out/json //CO20260924
+    lat_distortion_misfit_mean_0K = AUROSTD_NAN;
+    lat_distortion_misfit_stdev_0K = AUROSTD_NAN;
+    lat_distortion_relax_distance_mean_0K = AUROSTD_NAN;
+    lat_distortion_relax_distance_stdev_0K = AUROSTD_NAN;
+    solubility_parameter_0K = AUROSTD_NAN;
+    lat_distortion_misfit_mean_300K = AUROSTD_NAN;
+    lat_distortion_misfit_stdev_300K = AUROSTD_NAN;
+    lat_distortion_relax_distance_mean_300K = AUROSTD_NAN;
+    lat_distortion_relax_distance_stdev_300K = AUROSTD_NAN;
+    solubility_parameter_300K = AUROSTD_NAN;
+    param_geo_radius_covalent_PT_atom = AUROSTD_NAN;
+    S_config_atom = AUROSTD_NAN;
+    S_config_partial_atom = AUROSTD_NAN;
+    VEC = AUROSTD_NAN;
+    Hmix_miedema = AUROSTD_NAN;
+    species_sublattice.clear();
+    delta_electronegativity_Pearson_sublattice.clear();
+    delta_radius_covalent_PT_sublattice.clear();
     // BADER
     bader_net_charges.clear();vbader_net_charges.clear();
     bader_atomic_volumes.clear();vbader_atomic_volumes.clear();
@@ -574,6 +710,28 @@ namespace aflowlib {
     Load(entry,oss);
   }
 
+  /// @brief read a POCC HEA per-site list; null, nan or inf leave that site unset (AUROSTD_NAN) //CO20260927
+  static void heaSublatticeValues(const string& content, vector<double>& values) {
+    vector<string> tokens;
+    aurostd::string2tokens(content, tokens, ",");
+    values.clear();
+    for (const string& token : tokens) values.push_back(aurostd::string2finite(token)); //CO20261004
+  }
+
+  /// @brief true when a POCC HEA property is set: on a disordered system, or on any entry for
+  /// which one was loaded (the AFLUX engine loads only the fields named in a query) //CO20260927
+  static bool hasPoccHEAFields(const _aflowlib_entry& e) {
+    const double scalars[] = {e.lat_distortion_misfit_mean_0K, e.lat_distortion_misfit_stdev_0K,
+      e.lat_distortion_relax_distance_mean_0K, e.lat_distortion_relax_distance_stdev_0K, e.solubility_parameter_0K,
+      e.lat_distortion_misfit_mean_300K, e.lat_distortion_misfit_stdev_300K,
+      e.lat_distortion_relax_distance_mean_300K, e.lat_distortion_relax_distance_stdev_300K, e.solubility_parameter_300K,
+      e.param_geo_radius_covalent_PT_atom, e.S_config_atom, e.S_config_partial_atom, e.VEC, e.Hmix_miedema};
+    for (const double x : scalars) {
+      if (x != AUROSTD_NAN && std::isfinite(x)) return true;
+    }
+    return !e.species_sublattice.empty() || !e.delta_electronegativity_Pearson_sublattice.empty() || !e.delta_radius_covalent_PT_sublattice.empty();
+  }
+
   /// @brief Set the value of a member
   /// @param keyword name of the member
   /// @param content value to set
@@ -598,10 +756,20 @@ namespace aflowlib {
         vauid.clear();
         aflowlib::auid2vauid(auid, vauid); // create VAUID
         } break;
-      case (aurostd::ctcrc64("aurl")): {
-        aurl = content;
-        aurostd::string2tokens(content, stokens, ":");
+      case (aurostd::ctcrc64("chaos_id")): { //CO20261008 - the identifier as CHAOS writes it; auid is read too
+        auid = content;
+        vauid.clear();
+        aflowlib::auid2vauid(auid, vauid); // create VAUID
+        } break;
+      case (aurostd::ctcrc64("aurl")):
+      case (aurostd::ctcrc64("chaos_path")): { //CO20261008 - the run's path as CHAOS writes it (LIBn/...), kept as an AURL inside AFLOW; aurl is read too
+        aurl = aflowlib::ChaosPath2AURL(content);
+        vaurl.clear();
+        aurostd::string2tokens(aurl, stokens, ":");
         for (uint j = 0; j < stokens.size(); j++) vaurl.push_back(stokens.at(j));
+        } break;
+      case (aurostd::ctcrc64("pocc_system")): { //CO20261008
+        pocc_system = content;
         } break;
       //else if(keyword=="title") {title=content;}  //ME20190129 // OBSOLETE ME20200829 - not used anymore
       case (aurostd::ctcrc64("keywords")): {
@@ -655,6 +823,8 @@ namespace aflowlib {
       case (aurostd::ctcrc64("compound")): { compound = content; } break;
       case (aurostd::ctcrc64("density")): { density = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("density_orig")): { density_orig = aurostd::string2utype<double>(content); } break; //DX20190124 - add original crystal info
+      case (aurostd::ctcrc64("distance_hull")): { distance_hull = aurostd::string2utype<double>(content); } break; //HP20260820
+      case (aurostd::ctcrc64("deed")): { deed = aurostd::string2utype<double>(content); } break; //HP20260820
       case (aurostd::ctcrc64("dft_type")): {
         dft_type = content;
         aurostd::string2tokens(content, stokens, ",");
@@ -664,6 +834,11 @@ namespace aflowlib {
       case (aurostd::ctcrc64("eentropy_atom")): { eentropy_atom = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("Egap")): { Egap = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("Egap_fit")): { Egap_fit = aurostd::string2utype<double>(content); } break;
+      // SAMRIDHI_CHORDIA: Parse Egap_DOS fields
+      case (aurostd::ctcrc64("Egap_DOS")): { Egap_DOS = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("Egap_DOS_fit")): { Egap_DOS_fit = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("Egap_DOS_net")): { Egap_DOS_net = aurostd::string2utype<double>(content); } break;
+      // END SAMRIDHI_CHORDIA
       case (aurostd::ctcrc64("energy_cell")): { energy_cell = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("energy_atom")): { energy_atom = aurostd::string2utype<double>(content); energy_atom_relax1 = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("energy_cutoff")): { energy_cutoff = aurostd::string2utype<double>(content); } break;
@@ -836,6 +1011,9 @@ namespace aflowlib {
         for (uint j = 0; j < stokens.size(); j++) vstoichiometry.push_back(aurostd::string2utype<double>(stokens.at(j)));
         } break;
       case (aurostd::ctcrc64("Egap_type")): { Egap_type = content; } break;
+      // SAMRIDHI_CHORDIA: Parse Egap_DOS_type
+      case (aurostd::ctcrc64("Egap_DOS_type")): { Egap_DOS_type = content; } break;
+      // END SAMRIDHI_CHORDIA
       case (aurostd::ctcrc64("valence_cell_std")): { valence_cell_std = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("valence_cell_iupac")): { valence_cell_iupac = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("volume_cell")): { volume_cell = aurostd::string2utype<double>(content); } break;
@@ -1042,6 +1220,25 @@ namespace aflowlib {
       case (aurostd::ctcrc64("volume_atom_qha_300K")): { volume_atom_qha_300K = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("energy_free_atom_qha_300K")): { energy_free_atom_qha_300K = aurostd::string2utype<double>(content); } break;
       case (aurostd::ctcrc64("energy_free_cell_qha_300K")): { energy_free_cell_qha_300K = aurostd::string2utype<double>(content); } break;
+      // POCC HEA properties (ST20251031) //CO20260924
+      case (aurostd::ctcrc64("lat_distortion_misfit_mean_0K")): { lat_distortion_misfit_mean_0K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_misfit_stdev_0K")): { lat_distortion_misfit_stdev_0K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_relax_distance_mean_0K")): { lat_distortion_relax_distance_mean_0K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_relax_distance_stdev_0K")): { lat_distortion_relax_distance_stdev_0K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("solubility_parameter_0K")): { solubility_parameter_0K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_misfit_mean_300K")): { lat_distortion_misfit_mean_300K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_misfit_stdev_300K")): { lat_distortion_misfit_stdev_300K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_relax_distance_mean_300K")): { lat_distortion_relax_distance_mean_300K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("lat_distortion_relax_distance_stdev_300K")): { lat_distortion_relax_distance_stdev_300K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("solubility_parameter_300K")): { solubility_parameter_300K = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("param_geo_radius_covalent_PT_atom")): { param_geo_radius_covalent_PT_atom = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("S_config_atom")): { S_config_atom = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("S_config_partial_atom")): { S_config_partial_atom = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("VEC")): { VEC = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("Hmix_miedema")): { Hmix_miedema = aurostd::string2utype<double>(content); } break;
+      case (aurostd::ctcrc64("species_sublattice")): { aurostd::string2tokens(content, species_sublattice, ";"); } break; // one item per disordered site, sites separated by ; //CO20260927
+      case (aurostd::ctcrc64("delta_electronegativity_Pearson_sublattice")): { heaSublatticeValues(content, delta_electronegativity_Pearson_sublattice); } break; //CO20260927
+      case (aurostd::ctcrc64("delta_radius_covalent_PT_sublattice")): { heaSublatticeValues(content, delta_radius_covalent_PT_sublattice); } break; //CO20260927
       //AS20201008 END
       // BADER
       case (aurostd::ctcrc64("bader_net_charges")): { bader_net_charges = content; aurostd::string2tokens<double>(content, vbader_net_charges, ","); } break;
@@ -1085,6 +1282,8 @@ namespace aflowlib {
     clear();
     for (size_t member_index=0; member_index<content.size(); member_index++)  {
       std::string single_content = content[member_index];
+      // species_sublattice is a list of strings that contain commas: keep the sites apart //CO20260927
+      if (key_hash[member_index] == aurostd::ctcrc64("species_sublattice")) aurostd::StringSubst(single_content, "\",\"", ";");
       aurostd::StringSubst(single_content, "\"", "");
       aurostd::StringSubst(single_content, "],[", ";");
       aurostd::StringSubst(single_content, "[", "");
@@ -1149,6 +1348,8 @@ namespace aflowlib {
       oss << "compound=" << compound << (html?"<br>":"") << endl;
       oss << "density=" << density << (html?"<br>":"") << endl;
       oss << "density_orig=" << density_orig << (html?"<br>":"") << endl; //DX20190124 - add original crystal info
+      oss << "distance_hull=" << distance_hull << (html?"<br>":"") << endl; //HP20260820
+      oss << "deed=" << deed << (html?"<br>":"") << endl; //HP20260820
       oss << "dft_type=" << dft_type << (html?"<br>":"") << "  vdft_type= ";for(uint j=0;j<vdft_type.size();j++) oss << vdft_type.at(j) << " "; oss << (html?"<br>":"") << endl;
       oss << "eentropy_cell=" << eentropy_cell << (html?"<br>":"") << endl; 
       oss << "eentropy_atom=" << eentropy_atom << (html?"<br>":"") << endl; 
@@ -1357,6 +1558,25 @@ namespace aflowlib {
       oss << "volume_atom_qha_300K=" << volume_atom_qha_300K << (html?"<br>":"") << endl;
       oss << "energy_free_atom_qha_300K=" << energy_free_atom_qha_300K << (html?"<br>":"") << endl;
       oss << "energy_free_cell_qha_300K=" << energy_free_cell_qha_300K << (html?"<br>":"") << endl;
+      // POCC HEA properties (ST20251031) //CO20260924
+      oss << "lat_distortion_misfit_mean_0K=" << lat_distortion_misfit_mean_0K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_misfit_stdev_0K=" << lat_distortion_misfit_stdev_0K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_relax_distance_mean_0K=" << lat_distortion_relax_distance_mean_0K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_relax_distance_stdev_0K=" << lat_distortion_relax_distance_stdev_0K << (html?"<br>":"") << endl;
+      oss << "solubility_parameter_0K=" << solubility_parameter_0K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_misfit_mean_300K=" << lat_distortion_misfit_mean_300K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_misfit_stdev_300K=" << lat_distortion_misfit_stdev_300K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_relax_distance_mean_300K=" << lat_distortion_relax_distance_mean_300K << (html?"<br>":"") << endl;
+      oss << "lat_distortion_relax_distance_stdev_300K=" << lat_distortion_relax_distance_stdev_300K << (html?"<br>":"") << endl;
+      oss << "solubility_parameter_300K=" << solubility_parameter_300K << (html?"<br>":"") << endl;
+      oss << "param_geo_radius_covalent_PT_atom=" << param_geo_radius_covalent_PT_atom << (html?"<br>":"") << endl;
+      oss << "S_config_atom=" << S_config_atom << (html?"<br>":"") << endl;
+      oss << "S_config_partial_atom=" << S_config_partial_atom << (html?"<br>":"") << endl;
+      oss << "VEC=" << VEC << (html?"<br>":"") << endl;
+      oss << "Hmix_miedema=" << Hmix_miedema << (html?"<br>":"") << endl;
+      oss << "species_sublattice=";for(uint j=0;j<species_sublattice.size();j++) oss << species_sublattice.at(j) << " "; oss << (html?"<br>":"") << endl;
+      oss << "delta_electronegativity_Pearson_sublattice=";for(uint j=0;j<delta_electronegativity_Pearson_sublattice.size();j++) oss << delta_electronegativity_Pearson_sublattice.at(j) << " "; oss << (html?"<br>":"") << endl;
+      oss << "delta_radius_covalent_PT_sublattice=";for(uint j=0;j<delta_radius_covalent_PT_sublattice.size();j++) oss << delta_radius_covalent_PT_sublattice.at(j) << " "; oss << (html?"<br>":"") << endl;
       //AS20201008 END
       // BADER
       oss << "bader_net_charges=" << bader_net_charges << "  vbader_net_charges= ";for(uint j=0;j<vbader_net_charges.size();j++) oss << vbader_net_charges.at(j) << " "; oss << (html?"<br>":"") << endl; 
@@ -1410,16 +1630,26 @@ namespace aflowlib {
   }
 
   // aflowlib2string
-  string _aflowlib_entry::aflowlib2string(string mode, bool PRINT_NULL) {
+  //CO20261007 - json_keys renames JSON keys (key -> new name) or leaves them out (key -> ""); the CHAOS API
+  //passes aflux::responseKeyMap(). Only the JSON format uses it: the "out" format is written whole, since
+  //AFLOW's own clients read the identifier and the path from it.
+  //CO20261008 - the files lib2raw writes (modes "out" and "json") name the identifier and the path auid and
+  //aurl, as the import that reads them expects, until lib2raw itself switches; mode "chaos" is the out format
+  //with the names CHAOS answers with (chaos_path=LIBn/..., chaos_id=), which the CHAOS API's format(aflow)
+  //writes; the JSON answers rename with json_keys.
+  string _aflowlib_entry::aflowlib2string(string mode, bool PRINT_NULL, const std::map<string,string>& json_keys) {
     stringstream sss("");
     //  string eendl="\n";
 
     // this is the normal aflowlib.out mode
-    if(mode=="" || mode=="out" || mode=="OUT") {
+    if(mode=="" || mode=="out" || mode=="OUT" || mode=="chaos" || mode=="CHAOS") {  //CO20261008 - chaos too
       string eendl="";
 
-      if(auid.size()) sss << "" << "aurl=" << aurl << eendl;
-      if(auid.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "auid=" << auid << eendl;
+      //CO20261008 - mode chaos: the run's path and the identifier as CHAOS names them; out: aurl and auid
+      const bool chaos_names=(mode=="chaos" || mode=="CHAOS");
+      if(auid.size()) sss << "" << (chaos_names ? "chaos_path=" : "aurl=") << (chaos_names ? aflowlib::AURL2ChaosPath(aurl) : aurl) << eendl;
+      if(auid.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << (chaos_names ? "chaos_id=" : "auid=") << auid << eendl;
+      if(pocc_system.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "pocc_system=" << pocc_system << eendl;
       //if(!title.empty()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "title=" << title << eendl;  //ME20190125 // OBSOLETE ME20200829 - not used anymore
       if(data_api.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "data_api=" << data_api << eendl;
       if(data_source.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "data_source=" << data_source << eendl;
@@ -1442,6 +1672,8 @@ namespace aflowlib {
       if(composition.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "composition=" << composition << eendl;
       if(density!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "density=" << density << eendl;
       if(density_orig!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "density_orig=" << density_orig << eendl; //DX20190124 - add original crystal info
+      if(!aurostd::isNaN(distance_hull) && std::isfinite(distance_hull)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "distance_hull=" << distance_hull << eendl; //HP20260820
+      if(!aurostd::isNaN(deed) && std::isfinite(deed)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "deed=" << deed << eendl; //HP20260820
       if(scintillation_attenuation_length!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "scintillation_attenuation_length=" << scintillation_attenuation_length << eendl;
       if(stoichiometry.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "stoichiometry=" << stoichiometry << eendl;
       if(species.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "species=" << species << eendl;
@@ -1473,6 +1705,13 @@ namespace aflowlib {
       if(Egap!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap=" << Egap << eendl;
       if(Egap_fit!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_fit=" << Egap_fit << eendl;
       if(Egap_type.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_type=" << Egap_type << eendl;
+      // SAMRIDHI_CHORDIA: Output Egap_DOS fields to aflowlib.out
+      if(Egap_DOS!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_DOS=" << Egap_DOS << eendl;
+      // Dec 16, 2025: SAMRIDHI_CHORDIA: Egap_DOS_fit is not required 
+      // SAMIRIDHI_CHORDIA: if(Egap_DOS_fit!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_DOS_fit=" << Egap_DOS_fit << eendl;
+      if(Egap_DOS_net!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_DOS_net=" << Egap_DOS_net << eendl;
+      if(Egap_DOS_type.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Egap_DOS_type=" << Egap_DOS_type << eendl;
+      // END SAMRIDHI_CHORDIA
       if(energy_cell!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "energy_cell=" << energy_cell << eendl;
       if(energy_atom!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "energy_atom=" << energy_atom << eendl;
       if(energy_cutoff!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "energy_cutoff=" << energy_cutoff << eendl;
@@ -1667,6 +1906,50 @@ namespace aflowlib {
       if(energy_free_atom_qha_300K!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "energy_free_atom_qha_300K=" << energy_free_atom_qha_300K << eendl; //AS20201008
       if(energy_free_cell_qha_300K!=AUROSTD_NAN) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "energy_free_cell_qha_300K=" << energy_free_cell_qha_300K << eendl; //AS20201207
       //AS20201008 END
+      // ST20251103 POCC HEA properties
+      if(not pocc_parameters.empty() || hasPoccHEAFields(*this)){ // ST20251219 Only print these for pocc system; CO20260927 or when loaded without pocc_parameters (AFLUX)
+        if(lat_distortion_misfit_mean_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_mean_0K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_misfit_mean_0K=" << lat_distortion_misfit_mean_0K << eendl;
+        if(lat_distortion_misfit_stdev_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_stdev_0K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_misfit_stdev_0K=" << lat_distortion_misfit_stdev_0K << eendl;
+        if(lat_distortion_relax_distance_mean_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_mean_0K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_relax_distance_mean_0K=" << lat_distortion_relax_distance_mean_0K << eendl;
+        if(lat_distortion_relax_distance_stdev_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_stdev_0K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_relax_distance_stdev_0K=" << lat_distortion_relax_distance_stdev_0K << eendl;
+        if(solubility_parameter_0K!=AUROSTD_NAN && std::isfinite(solubility_parameter_0K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "solubility_parameter_0K=" << solubility_parameter_0K << eendl;
+        if(lat_distortion_misfit_mean_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_mean_300K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_misfit_mean_300K=" << lat_distortion_misfit_mean_300K << eendl;
+        if(lat_distortion_misfit_stdev_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_stdev_300K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_misfit_stdev_300K=" << lat_distortion_misfit_stdev_300K << eendl;
+        if(lat_distortion_relax_distance_mean_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_mean_300K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_relax_distance_mean_300K=" << lat_distortion_relax_distance_mean_300K << eendl;
+        if(lat_distortion_relax_distance_stdev_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_stdev_300K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "lat_distortion_relax_distance_stdev_300K=" << lat_distortion_relax_distance_stdev_300K << eendl;
+        if(solubility_parameter_300K!=AUROSTD_NAN && std::isfinite(solubility_parameter_300K)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "solubility_parameter_300K=" << solubility_parameter_300K << eendl;
+        if(param_geo_radius_covalent_PT_atom!=AUROSTD_NAN && std::isfinite(param_geo_radius_covalent_PT_atom)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "param_geo_radius_covalent_PT_atom=" << param_geo_radius_covalent_PT_atom << eendl;
+        if(S_config_atom!=AUROSTD_NAN && std::isfinite(S_config_atom)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "S_config_atom=" << S_config_atom << eendl;
+        if(S_config_partial_atom!=AUROSTD_NAN && std::isfinite(S_config_partial_atom)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "S_config_partial_atom=" << S_config_partial_atom << eendl;
+        if(VEC!=AUROSTD_NAN && std::isfinite(VEC)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "VEC=" << VEC << eendl;
+        if(Hmix_miedema!=AUROSTD_NAN && std::isfinite(Hmix_miedema)) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "Hmix_miedema=" << Hmix_miedema << eendl;
+
+        if (!species_sublattice.empty()) {
+          sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "species_sublattice=";
+          for (size_t i = 0; i < species_sublattice.size(); ++i) {
+            sss << species_sublattice[i] << (i < species_sublattice.size() - 1 ? ";" : ""); // each site is itself a comma list //CO20260927
+          }
+          sss << eendl;
+        }
+        if (!delta_electronegativity_Pearson_sublattice.empty()) {
+          sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "delta_electronegativity_Pearson_sublattice=";
+          for (size_t i = 0; i < delta_electronegativity_Pearson_sublattice.size(); ++i) {
+            if(delta_electronegativity_Pearson_sublattice[i]!=AUROSTD_NAN && std::isfinite(delta_electronegativity_Pearson_sublattice[i])) {sss << delta_electronegativity_Pearson_sublattice[i];} else {sss << "null";} //CO20260927
+            sss << (i < delta_electronegativity_Pearson_sublattice.size() - 1 ? "," : "");
+          }
+          sss << eendl;
+        }
+        if (!delta_radius_covalent_PT_sublattice.empty()) {
+          sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "delta_radius_covalent_PT_sublattice=";
+          for (size_t i = 0; i < delta_radius_covalent_PT_sublattice.size(); ++i) {
+            if(delta_radius_covalent_PT_sublattice[i]!=AUROSTD_NAN && std::isfinite(delta_radius_covalent_PT_sublattice[i])) {sss << delta_radius_covalent_PT_sublattice[i];} else {sss << "null";} //CO20260927
+            sss << (i < delta_radius_covalent_PT_sublattice.size() - 1 ? "," : "");
+          }
+          sss << eendl;
+        }
+      }
+      // ST20251103 END
+      
       // BADER
       if(bader_net_charges.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "bader_net_charges=" << bader_net_charges << eendl;
       if(bader_atomic_volumes.size()) sss << _AFLOWLIB_ENTRY_SEPARATOR_ << "bader_atomic_volumes=" << bader_atomic_volumes << eendl;
@@ -1716,6 +1999,15 @@ namespace aflowlib {
         sscontent_json << "\"auid\":\"" << auid << "\"";
       } else {
         if(PRINT_NULL) sscontent_json << "\"auid\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+
+      //////////////////////////////////////////////////////////////////////////
+      if(pocc_system.size()) {  //CO20261008
+        sscontent_json << "\"pocc_system\":\"" << pocc_system << "\"";
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"pocc_system\":null";
       }
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
@@ -1865,6 +2157,24 @@ namespace aflowlib {
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
       //DX20190124 - add original crystal info - END
+
+      //////////////////////////////////////////////////////////////////////////
+      if(!aurostd::isNaN(distance_hull) && std::isfinite(distance_hull)) { //HP20260820
+        sscontent_json << "\"distance_hull\":" << distance_hull; //HP20260820
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"distance_hull\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+
+      //////////////////////////////////////////////////////////////////////////
+      if(!aurostd::isNaN(deed) && std::isfinite(deed)) { //HP20260820
+        sscontent_json << "\"deed\":" << deed; //HP20260820
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"deed\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
 
       //////////////////////////////////////////////////////////////////////////
       if(scintillation_attenuation_length!=AUROSTD_NAN) {
@@ -2144,6 +2454,45 @@ namespace aflowlib {
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
 
+      // SAMRIDHI_CHORDIA: JSON output for Egap_DOS fields
+      //////////////////////////////////////////////////////////////////////////
+      if(Egap_DOS!=AUROSTD_NAN) {
+        sscontent_json << "\"Egap_DOS\":" << Egap_DOS;
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"Egap_DOS\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+
+      //////////////////////////////////////////////////////////////////////////
+      // Dec 16, 2025 - SAMRIDHI_CHORDIA - do NOT print Egap_DOS_fit
+      //if(Egap_DOS_fit!=AUROSTD_NAN) {
+      //  sscontent_json << "\"Egap_DOS_fit\":" << Egap_DOS_fit;
+      //} else {
+      //  if(PRINT_NULL) sscontent_json << "\"Egap_DOS_fit\":null";
+      //}
+      //vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+
+      //////////////////////////////////////////////////////////////////////////
+      if(Egap_DOS_net!=AUROSTD_NAN) {
+        sscontent_json << "\"Egap_DOS_net\":" << Egap_DOS_net;
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"Egap_DOS_net\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+
+      //////////////////////////////////////////////////////////////////////////
+      if(Egap_DOS_type.size()) {
+        sscontent_json << "\"Egap_DOS_type\":\"" << Egap_DOS_type << "\"";
+      } else {
+        if(PRINT_NULL) sscontent_json << "\"Egap_DOS_type\":null";
+      }
+      vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      //////////////////////////////////////////////////////////////////////////
+      // END SAMRIDHI_CHORDIA
+
       //////////////////////////////////////////////////////////////////////////
       if(energy_cell!=AUROSTD_NAN) {
         sscontent_json << "\"energy_cell\":" << energy_cell;
@@ -2217,7 +2566,8 @@ namespace aflowlib {
       // [NOT_PRINTED]     //////////////////////////////////////////////////////////////////////////
 
       //////////////////////////////////////////////////////////////////////////
-      if(kpoints.size()) {
+      // MB20240718 loosen restriction on kpoints to allow for specific kpoint queries
+      if(kpoints.size() || sum(kpoints_nnn_relax) > 0 || sum(kpoints_nnn_static) > 0 || kpoints_pairs.size() || kpoints_bands_path_grid!=0) {
         //this one is a bit complicated, so we will test if the string was created, and then recreate the json array on the spot
         ss_helper.str("");
         vs.clear();
@@ -2263,11 +2613,21 @@ namespace aflowlib {
         }
         vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);  //ME20190124
       }
-      if(!ss_helper.str().empty()){ //CO20180216 - !empty() is better for strings than !size()
+      if (kpoints.size()) { // MB20240718 START - no additional kpoints requested, but kpoints are present
+        vector<string> tokens;
+        aurostd::string2tokens(kpoints, tokens,";");
+        sscontent_json << "\"kpoints\":[";
+        for (uint i = 0; i < tokens.size(); i++) {
+          sscontent_json << "[" << tokens[i] << "]";
+          if (i < tokens.size() - 1) sscontent_json << ",";
+        }
+        sscontent_json << "]";
+        // MB20240718 END
+      } else if(!ss_helper.str().empty()){ //CO20180216 - !empty() is better for strings than !size()
         sscontent_json << "\"kpoints\":[" << ss_helper.str() << "]"; ss_helper.str("");
       } else {
         if(PRINT_NULL) sscontent_json << "\"kpoints\":null";
-      }
+      } 
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
 
@@ -3707,6 +4067,136 @@ namespace aflowlib {
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
       //AS20200901 END
+      
+      // POCC HEA ST20251103
+      if(not pocc_parameters.empty() || hasPoccHEAFields(*this)){ // ST20251219 Only print these for pocc system; CO20260927 or when loaded without pocc_parameters (AFLUX)
+        if(lat_distortion_misfit_mean_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_mean_0K)) {
+          sscontent_json << "\"lat_distortion_misfit_mean_0K\":" << lat_distortion_misfit_mean_0K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_misfit_mean_0K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_misfit_stdev_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_stdev_0K)) {
+          sscontent_json << "\"lat_distortion_misfit_stdev_0K\":" << lat_distortion_misfit_stdev_0K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_misfit_stdev_0K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_relax_distance_mean_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_mean_0K)) {
+          sscontent_json << "\"lat_distortion_relax_distance_mean_0K\":" << lat_distortion_relax_distance_mean_0K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_relax_distance_mean_0K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_relax_distance_stdev_0K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_stdev_0K)) {
+          sscontent_json << "\"lat_distortion_relax_distance_stdev_0K\":" << lat_distortion_relax_distance_stdev_0K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_relax_distance_stdev_0K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(solubility_parameter_0K!=AUROSTD_NAN && std::isfinite(solubility_parameter_0K)) {
+          sscontent_json << "\"solubility_parameter_0K\":" << solubility_parameter_0K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"solubility_parameter_0K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_misfit_mean_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_mean_300K)) {
+          sscontent_json << "\"lat_distortion_misfit_mean_300K\":" << lat_distortion_misfit_mean_300K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_misfit_mean_300K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_misfit_stdev_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_misfit_stdev_300K)) {
+          sscontent_json << "\"lat_distortion_misfit_stdev_300K\":" << lat_distortion_misfit_stdev_300K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_misfit_stdev_300K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_relax_distance_mean_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_mean_300K)) {
+          sscontent_json << "\"lat_distortion_relax_distance_mean_300K\":" << lat_distortion_relax_distance_mean_300K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_relax_distance_mean_300K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(lat_distortion_relax_distance_stdev_300K!=AUROSTD_NAN && std::isfinite(lat_distortion_relax_distance_stdev_300K)) {
+          sscontent_json << "\"lat_distortion_relax_distance_stdev_300K\":" << lat_distortion_relax_distance_stdev_300K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"lat_distortion_relax_distance_stdev_300K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(solubility_parameter_300K!=AUROSTD_NAN && std::isfinite(solubility_parameter_300K)) {
+          sscontent_json << "\"solubility_parameter_300K\":" << solubility_parameter_300K;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"solubility_parameter_300K\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(param_geo_radius_covalent_PT_atom!=AUROSTD_NAN && std::isfinite(param_geo_radius_covalent_PT_atom)) {
+          sscontent_json << "\"param_geo_radius_covalent_PT_atom\":" << param_geo_radius_covalent_PT_atom;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"param_geo_radius_covalent_PT_atom\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(S_config_atom!=AUROSTD_NAN && std::isfinite(S_config_atom)) {
+          sscontent_json << "\"S_config_atom\":" << S_config_atom;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"S_config_atom\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(S_config_partial_atom!=AUROSTD_NAN && std::isfinite(S_config_partial_atom)) {
+          sscontent_json << "\"S_config_partial_atom\":" << S_config_partial_atom;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"S_config_partial_atom\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+        if(VEC!=AUROSTD_NAN && std::isfinite(VEC)) {
+          sscontent_json << "\"VEC\":" << VEC;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"VEC\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+
+        if(Hmix_miedema!=AUROSTD_NAN && std::isfinite(Hmix_miedema)) {
+          sscontent_json << "\"Hmix_miedema\":" << Hmix_miedema;
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"Hmix_miedema\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+
+        if (!species_sublattice.empty()) {
+          sscontent_json << "\"species_sublattice\":[";
+          for (size_t i = 0; i < species_sublattice.size(); ++i) {
+            sscontent_json << '"' << species_sublattice[i] << '"' << (i < species_sublattice.size() - 1 ? "," : "");
+          }
+          sscontent_json << "]";
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"species_sublattice\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      
+        if (!delta_electronegativity_Pearson_sublattice.empty()) {
+          sscontent_json << "\"delta_electronegativity_Pearson_sublattice\":[";
+          for (size_t i = 0; i < delta_electronegativity_Pearson_sublattice.size(); ++i) {
+            if(delta_electronegativity_Pearson_sublattice[i]!=AUROSTD_NAN && std::isfinite(delta_electronegativity_Pearson_sublattice[i])) {sscontent_json << delta_electronegativity_Pearson_sublattice[i];} else {sscontent_json << "null";} //CO20260924
+            sscontent_json << (i < delta_electronegativity_Pearson_sublattice.size() - 1 ? "," : "");
+          }
+          sscontent_json << "]";
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"delta_electronegativity_Pearson_sublattice\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      
+        if (!delta_radius_covalent_PT_sublattice.empty()) {
+          sscontent_json << "\"delta_radius_covalent_PT_sublattice\":[";
+          for (size_t i = 0; i < delta_radius_covalent_PT_sublattice.size(); ++i) {
+            if(delta_radius_covalent_PT_sublattice[i]!=AUROSTD_NAN && std::isfinite(delta_radius_covalent_PT_sublattice[i])) {sscontent_json << delta_radius_covalent_PT_sublattice[i];} else {sscontent_json << "null";} //CO20260924
+            sscontent_json << (i < delta_radius_covalent_PT_sublattice.size() - 1 ? "," : "");
+          }
+          sscontent_json << "]";
+        } else {
+          if(PRINT_NULL) sscontent_json << "\"delta_radius_covalent_PT_sublattice\":null";
+        }
+        vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
+      }
 
       // BADER
       //////////////////////////////////////////////////////////////////////////
@@ -3808,6 +4298,28 @@ namespace aflowlib {
       vcontent_json.push_back(sscontent_json.str()); aurostd::StringstreamClean(sscontent_json);
       //////////////////////////////////////////////////////////////////////////
 
+      //CO20261007 START - rename or leave out the keys in json_keys; every item is "key":value. A key renamed
+      //to a name the entry already prints is left out, so the object never has the same key twice (e.g. auid
+      //printed as chaos_id once lib2raw writes chaos_id itself).
+      if(!json_keys.empty()) {
+        std::set<string> printed;
+        for(const string& item : vcontent_json) {
+          const size_t key_end=item.find("\":");
+          if(item.size()>=2 && item[0]=='"' && key_end!=string::npos) {printed.insert(item.substr(1,key_end-1));}
+        }
+        vector<string> vcontent_kept;
+        for(const string& item : vcontent_json) {
+          const size_t key_end=item.find("\":");
+          if(item.size()<2 || item[0]!='"' || key_end==string::npos) {vcontent_kept.push_back(item); continue;}
+          const std::map<string,string>::const_iterator it=json_keys.find(item.substr(1,key_end-1));
+          if(it==json_keys.end()) {vcontent_kept.push_back(item); continue;}
+          if(it->second.empty() || printed.count(it->second)) {continue;}
+          vcontent_kept.push_back("\""+it->second+item.substr(key_end));
+        }
+        vcontent_json.swap(vcontent_kept);
+      }
+      //CO20261007 STOP
+
       sss << "{" << aurostd::joinWDelimiter(vcontent_json,eendl)  << "}";
       vcontent_json.clear();
 
@@ -3840,6 +4352,83 @@ namespace aflowlib {
       if(T==0 && enthalpy_formation_cce_0K_atom!=AUROSTD_NAN) return enthalpy_formation_cce_0K_atom;
     }
     return enthalpy_formation_atom;
+  }
+
+  bool _aflowlib_entry::hasPoccChildren() const {
+    for(uint i=0,fl_size_i=vfiles.size();i<fl_size_i;i++){
+      if(vfiles[i].find("ARUN.POCC_")!=string::npos){return true;}
+    }
+    return false;
+  }
+
+  bool _aflowlib_entry::isPoccChild() const {
+    return prototype.find("ARUN.POCC_")==0 || aurl.find("/ARUN.POCC_")!=string::npos;
+  }
+
+  bool _aflowlib_entry::isPoccParent() const {
+    if(isPoccChild()){return false;}
+    return (prototype.find(":POCC_")!=std::string::npos || hasPoccChildren());
+  }
+
+  bool _aflowlib_entry::hasMatchingPoccAurl(const string& other_aurl) const {
+    if(aurl.empty() || other_aurl.empty()){return false;}
+    return normalizePoccAurlForParentMatch(aurl)==normalizePoccAurlForParentMatch(other_aurl);
+  }
+
+  string _aflowlib_entry::getPoccParentAurlKey() const {
+    return getPoccParentAurlKey(aurl);
+  }
+
+  string _aflowlib_entry::getPoccParentRelativePath(const string& filesystem_collection) const {
+    return getPoccParentRelativePath(aurl,filesystem_collection);
+  }
+
+  bool _aflowlib_entry::isPoccChildOf(const _aflowlib_entry& parent) const {
+    string parent_aurl=parent.getPoccParentAurlKey();
+    string child_aurl=normalizePoccAurlForParentMatch(aurl);
+    if(parent_aurl.empty() || child_aurl.size()<=parent_aurl.size()+1){return false;}
+    if(child_aurl.compare(0,parent_aurl.size(),parent_aurl)!=0){return false;}
+    return child_aurl[parent_aurl.size()]=='/';
+  }
+
+  string _aflowlib_entry::normalizePoccAurlForParentMatch(const string& aurl) {
+    vector<string> tokens;
+    aurostd::string2tokens(aurl,tokens,"/");
+    if(tokens.size()<4){return aurl;}
+    for(uint i=0,fl_size_i=tokens.size();i<fl_size_i;i++){
+      if(tokens[i].find("LIB")==0 || tokens[i].find("ICSD")==0){
+        if(i+2<tokens.size()){tokens.erase(tokens.begin()+i+1);}
+        break;
+      }
+    }
+    return aurostd::joinWDelimiter(tokens,"/");
+  }
+
+  string _aflowlib_entry::getPoccParentAurlKey(const string& aurl) {
+    string key=normalizePoccAurlForParentMatch(aurl);
+    string arun_marker="/ARUN.POCC_";
+    string::size_type arun_pos=key.rfind(arun_marker);
+    if(arun_pos!=string::npos){key=key.substr(0,arun_pos);}
+    return key;
+  }
+
+  string _aflowlib_entry::getPoccParentRelativePath(const string& aurl,const string& filesystem_collection) {
+    if(aurl.empty()){return "";}
+    string relative=aurl;
+    string aflowdata_marker=":AFLOWDATA/";
+    string::size_type marker_pos=relative.find(aflowdata_marker);
+    if(marker_pos!=string::npos){relative=relative.substr(marker_pos+1);}
+    else{
+      aflowdata_marker="AFLOWDATA/";
+      marker_pos=relative.find(aflowdata_marker);
+      if(marker_pos!=string::npos){relative=relative.substr(marker_pos);}
+    }
+    if(relative.find("AFLOWDATA/")==0){relative=relative.substr(string("AFLOWDATA/").size());}
+    string arun_marker="/ARUN.POCC_";
+    string::size_type arun_pos=relative.rfind(arun_marker);
+    if(arun_pos!=string::npos){relative=relative.substr(0,arun_pos);}
+    relative=std::regex_replace(relative,aurostd::regex_aurl2file,"$1/"+filesystem_collection+"/");
+    return relative;
   }
 }
 
@@ -4172,29 +4761,89 @@ namespace aflowlib {
 } // namespace aflowlib
 
 namespace aflowlib {
+  //CO20261002 START - AURL host and path for any host (s4e.ai, another, or none), see the unit test aurl_host
+  /// @brief remove the host of an AURL: "host:AFLOWDATA/LIB3_RAW/..." -> "AFLOWDATA/LIB3_RAW/..."
+  /// @note only what precedes the first AFLOWDATA is removed, so the later colons of LIB1 AURLs
+  ///       ("s4e.ai:AFLOWDATA/LIB1_RAW/Pt:PAW_PBE:05Jan2001/A6") stay
+  string AURLStripHost(const string& aurl) {
+    string::size_type pos=aurl.find("AFLOWDATA");
+    if(pos!=string::npos && pos>0 && aurl[pos-1]==':') {return aurl.substr(pos);}
+    return aurl;
+  }
+  /// @brief the path of an AURL below AFLOWDATA/: "host:AFLOWDATA/LIB3_RAW/X" -> "LIB3_RAW/X"
+  /// @note replaces aurl.substr(28), which assumed a 28-character "host:AFLOWDATA/" and cut into
+  ///       the path of every s4e.ai AURL ("s4e.ai:AFLOWDATA/" is 17 characters)
+  string AURLPath(const string& aurl) {
+    string path=AURLStripHost(aurl);
+    if(path.compare(0,10,"AFLOWDATA/")==0){path=path.substr(10);}
+    return path;
+  }
+  //CO20261002 STOP
+  //CO20261008 START - chaos_path: where a run sits, from its catalog (Corey, 2026-10-08); see the unit test chaos_path
+  /// @brief the run's path as CHAOS writes it: "host:AFLOWDATA/LIB5_WEB/X" -> "LIB5/X"
+  /// @param aurl an AURL of any host, with LIBn_WEB, LIBn_RAW, LIBn_LIB or ICSD_WEB...
+  /// @return the catalog and the folders below it, which are the folders under the catalog's LIB
+  ///         (the runs) and RAW (lib2raw's output) on the machine that keeps them; anything that is
+  ///         not a library AURL (empty, already a chaos_path, DEED) comes back unchanged
+  /// @note no host and no AFLOWDATA: where the catalogs are is the machine's business
+  string AURL2ChaosPath(const string& aurl) {
+    static const std::regex library("^(LIB[0-9]+|ICSD)_(WEB|RAW|LIB)/(.+)$");
+    const string path=AURLPath(aurl);
+    if(path==aurl && aurl.find("AFLOWDATA/")==string::npos){return aurl;}  //not an AURL
+    std::smatch m;
+    if(std::regex_match(path,m,library)){return m.str(1)+"/"+m.str(3);}
+    return aurl;
+  }
+  /// @brief the AURL AFLOW keeps inside for a chaos_path: "LIB5/X" -> "s4e.ai:AFLOWDATA/LIB5_WEB/X"
+  /// @note the inverse of AURL2ChaosPath() for the AURLs CHAOS holds (s4e.ai, _WEB); anything else,
+  ///       an AURL included, comes back unchanged, so old files that say aurl= read as before
+  string ChaosPath2AURL(const string& chaos_path) {
+    static const std::regex path("^(LIB[0-9]+|ICSD)/(.+)$");
+    std::smatch m;
+    if(std::regex_match(chaos_path,m,path)){return AFLOWLIB_SERVER_DEFAULT+":AFLOWDATA/"+m.str(1)+"_WEB/"+m.str(2);}
+    return chaos_path;
+  }
+  /// @brief the path of the POCC system a supercell belongs to: "LIB5/S/P:POCC_X/ARUN.POCC_05_H0C4" -> "LIB5/S/P:POCC_X"
+  /// @return "" for anything that is not a POCC supercell
+  string ChaosPathPoccSystem(const string& chaos_path) {
+    const string::size_type pos=chaos_path.rfind("/ARUN.POCC_");
+    if(pos==string::npos || pos==0){return "";}
+    return chaos_path.substr(0,pos);
+  }
+  //CO20261008 STOP
+  //CO20261003 START
+  /// @brief the server a --server= value names: s4e.ai by default, the legacy AFLOWLIB server only when
+  ///        it is asked for by name (Corey, 2026-10-03); see the unit test server_option
+  /// @param value the text after --server= (case and surrounding white space do not matter)
+  /// @return AFLOWLIB_SERVER_DEFAULT for "default" or that host, AFLOWLIB_SERVER_LEGACY for "aflowlib" or
+  ///         that host, "" for anything else (refused)
+  /// @note the CHAOS API key is never sent to the legacy server: httpGet() attaches it only for s4e.ai hosts
+  string AFLOWLIBServerFromOption(const string& value) {
+    const string v=aurostd::tolower(aurostd::RemoveWhiteSpacesFromTheFrontAndBack(value));
+    if(v=="default" || v==AFLOWLIB_SERVER_DEFAULT) {return AFLOWLIB_SERVER_DEFAULT;}
+    if(v=="aflowlib" || v==AFLOWLIB_SERVER_LEGACY) {return AFLOWLIB_SERVER_LEGACY;}
+    return "";
+  }
+  //CO20261003 STOP
+  /// @brief the AFLOWLIB server of this run: the host --server= names (init::InitMachine() checked it),
+  ///        s4e.ai otherwise //CO20261006
+  string AFLOWLIBServer() {
+    if(XHOST.vflag_control.flag("AFLOWLIB_SERVER")){return XHOST.vflag_control.getattachedscheme("AFLOWLIB_SERVER");}
+    return AFLOWLIB_SERVER_DEFAULT;
+  }
   string _aflowlib_entry::getPathAURL(ostream& oss, bool load_from_common) const { //CO20200404
     ofstream FileMESSAGE;
     return getPathAURL(FileMESSAGE, oss, load_from_common);
   }
   string _aflowlib_entry::getPathAURL(ofstream& FileMESSAGE,ostream& oss, bool load_from_common) const {  //CO20200404
     bool LDEBUG=(FALSE || XHOST.DEBUG);
-    stringstream message;
+    (void) FileMESSAGE; (void) oss; //CO20261004 - they served only the removed if(0) block
     string path = "";
     if (aurl.empty()) {return path;}
-    vector<string> tokens;
-    aurostd::string2tokens(aurl, tokens, ":");
-    //LIB1 presents problems here (3 colons): aflowlib.duke.edu:AFLOWDATA/LIB1_RAW/Pt:PAW_PBE:05Jan2001/A6
-    if(0){
-      if (tokens.size() != 2) {
-        message << "Odd AURL format for entry " << auid << ": " << aurl;
-        pflow::logger(__AFLOW_FILE__, __AFLOW_FUNC__, message, FileMESSAGE, oss, _LOGGER_WARNING_);
-        return path;
-      }
-    }
-
-    //instead just erase first item, join others, assume we're okay...
-    tokens.erase(tokens.begin());
-    path=aurostd::joinWDelimiter(tokens,":");
+    //CO20261004 - AURLStripHost, was string2tokens on ':', the first token erased and the rest joined (with a dead if(0) block);
+    //same path for "host:AFLOWDATA/..." (LIB1 colons kept: s4e.ai:AFLOWDATA/LIB1_RAW/Pt:PAW_PBE:05Jan2001/A6),
+    //and an AURL without a host now keeps its path (the first token, the whole path, was erased)
+    path=AURLStripHost(aurl);
 
     string server="",path_full="";
     if(1&&load_from_common){
@@ -4228,8 +4877,7 @@ namespace aflowlib {
         if(aurostd::IsDirectory(path_full)){return path_full;}
       }
     }
-    if(XHOST.vflag_control.flag("AFLOWLIB_SERVER")){server=XHOST.vflag_control.getattachedscheme("AFLOWLIB_SERVER");}
-    else{server="aflowlib.duke.edu";}
+    server=AFLOWLIBServer(); //CO20261006
 
     path_full=server+"/"+path;
     return path_full;
@@ -4239,8 +4887,9 @@ namespace aflowlib {
   /// @return directory path
   /// @authors
   /// @mod{SD,20221207,created}
+  /// @mod{CO,20261002,strip any AURL host instead of a fixed 28-character prefix}
   string _aflowlib_entry::getPathDirectory(const string& filesystem_collection) {
-    string path_full = DEFAULT_ENTRY_LOADER_FS_PATH + (*this).aurl.substr(28) + "/";
+    string path_full = DEFAULT_ENTRY_LOADER_FS_PATH + AURLPath((*this).aurl) + "/"; //CO20261002
     path_full = std::regex_replace(path_full, aurostd::regex_aurl2file, "$1/" + filesystem_collection + "/");
     return path_full;
   }
@@ -4276,10 +4925,9 @@ namespace aflowlib {
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " aurl=" << aurl << endl;}
     vector<string> vspecies_aurl;
     if(aurl.empty()){return vspecies_aurl;}
-    string path=aurl.substr(aurl.find(":")+1,string::npos);
+    string path=AURLStripHost(aurl); //CO20261004 - AURLStripHost, was substr(find(":")+1), which cut a LIB1 AURL without a host at its first colon
     vector<string> tokens;
     //[CO20221111 - slow]aurostd::string2tokens(aurl,tokens,":");
-    //[CO20221111 - slow]//erase first item (aflowlib.duke.edu), join others, assume we're okay...
     //[CO20221111 - slow]tokens.erase(tokens.begin());
     //[CO20221111 - slow]string path=aurostd::joinWDelimiter(tokens,":");
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " path=" << path << endl;}
@@ -4384,7 +5032,7 @@ namespace aflowlib {
     if(LDEBUG){cerr << __AFLOW_FUNC__ << " METADATA_AUID.JSON=" << endl << metadata_auid_json << endl;}
     //aurostd::string2file(metadata_auid_json,"metadata_auid.json");
     crc=aurostd::crc64(0,metadata_auid_json); // DONT TOUCH THIS
-    auid="aflow:"+aurostd::crc2string(crc);
+    auid=getAUIDPrefix()+":"+aurostd::crc2string(crc);  //CO20230525 - prefix
 
     //find conflicts
     string aurl_found="";
@@ -4397,7 +5045,7 @@ namespace aflowlib {
         if(LDEBUG){cerr << __AFLOW_FUNC__ << " METADATA_AUID.JSON=" << endl << metadata_auid_json << endl;}
         //aurostd::string2file(metadata_auid_json,"metadata_auid.json");
         crc=aurostd::crc64(0,metadata_auid_json); // DONT TOUCH THIS
-        auid="aflow:"+aurostd::crc2string(crc);
+        auid=getAUIDPrefix()+":"+aurostd::crc2string(crc);  //CO20230525 - prefix
       } else {
         message << "CONFLICT TRIVIAL   " << auid << " " << aurl_found << " " << aurl;pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,_LOGGER_MESSAGE_);
       }
@@ -4431,7 +5079,7 @@ namespace aflowlib {
       for(uint i=0;i<vfiles2.size();i++) 
         if(aurostd::FileExist(directory+"/"+vfiles2.at(i)))
           crc=aurostd::crc64(crc,aurostd::efile2string(directory+"/"+vfiles2.at(i))); // DONT TOUCH THIS
-      auid="aflow:"+aurostd::crc2string(crc);
+      auid=getAUIDPrefix()+":"+aurostd::crc2string(crc);  //CO20230525 - prefix
 
       if(LDEBUG) cerr << __AFLOW_FUNC__ << " [1]" << endl;
 
@@ -4509,7 +5157,9 @@ namespace aflowlib {
     bool LDEBUG=(FALSE || XHOST.DEBUG);
     if(LDEBUG) cerr << XPID << "aflowlib::auid2present: BEGIN mode=" << mode << endl;
     string loop="",json="";aurl="";
-    if(auid=="" || auid.size()!=22) { cerr << XPID << "aflowlib::auid2present: auid.size() needs to be 22 characters long" << endl; return FALSE;}
+    if(auid=="" || 
+        !((getAUIDPrefix()=="s4e"&&auid.size()==20) || (getAUIDPrefix()=="aflow"&&auid.size()==22))
+        ) { cerr << XPID << "aflowlib::auid2present: auid.size() needs to be 20/22 characters long" << endl; return FALSE;}
 
     // [OBSOLETE]    if(mode==0) {
     // [OBSOLETE]    if(XHOST_vAUID.size()==0 || XHOST_vAURL.size()==0) init::InitGlobalObject("vLIBS","",FALSE);
@@ -4524,7 +5174,12 @@ namespace aflowlib {
     // [OBSOLETE]   }
     if(mode==1) { // PICK THIS ONE DEFAULT
       //  bool aflowlib::auid2present(string auid,string& aurl)
-      string jsonl_file=XHOST_LIBRARY_JSONL+"/"; for(uint i=0;i<8;i++) jsonl_file+=auid.at(i); jsonl_file+=".jsonl";
+      string jsonl_file=XHOST_LIBRARY_JSONL+"/"; //[CO20230525 - generalizing for arbtirary]for(uint i=0;i<8;i++) jsonl_file+=auid.at(i); jsonl_file+=".jsonl";
+      //CO20230525 START
+      string::size_type loc=auid.find(':');
+      if(loc==string::npos){throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "no namespace delimiter found", _FILE_NOT_FOUND_);}
+      jsonl_file+=auid.substr(0,loc+3)+".jsonl";
+      //CO20230525 STOP
       bool found=FALSE;
       jsonl_file=aurostd::CleanFileName(jsonl_file);
       for(uint i=0;i<XHOST.vext.size()&&aurl.empty()&&!found;i++) {
@@ -4577,7 +5232,14 @@ namespace aflowlib {
   uint auid2vauid(const string auid, deque<string>& vauid) {                // splits the auid into vauid
     vauid.clear();
     //    vauid.push_back(auid.substr(0,6)); for(uint i=6;i<=20;i+=2) vauid.push_back(auid.substr(i,2));  // splitting aflow:/ab/cd..
-    vauid.push_back(auid.substr(0,8)); for(uint i=8;i<=20;i+=2) vauid.push_back(auid.substr(i,2));  // splitting aflow:ab/cd..
+    //[CO20230525 - obsolete]vauid.push_back(auid.substr(0,8)); for(uint i=8;i<=20;i+=2) vauid.push_back(auid.substr(i,2));  // splitting aflow:ab/cd..
+
+    //CO20230525 - generalizing for arbitrary namespace
+    string::size_type loc=auid.find(':');
+    if(loc==string::npos){throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, "no namespace delimiter found", _FILE_NOT_FOUND_);}
+    vauid.push_back(auid.substr(0,loc+3));
+    for(uint i=loc+3;i<auid.length();i+=2) vauid.push_back(auid.substr(i,2)); //splitting NAMESPACE:ab/cd...
+
     return vauid.size();
   }
 
@@ -4700,6 +5362,7 @@ namespace aflowlib {
 
     for(uint i=0;i<vaflowlib_entry.size();i++) {
       if(aurostd::substring2bool(vaflowlib_entry.at(i),"aurl=")) data_aurl=aurostd::substring2string(vaflowlib_entry.at(i),"arl=");
+      else if(aurostd::substring2bool(vaflowlib_entry.at(i),"chaos_path=")) data_aurl=ChaosPath2AURL(aurostd::substring2string(vaflowlib_entry.at(i),"chaos_path=",1,TRUE));  //CO20261008
       if(aurostd::substring2bool(vaflowlib_entry.at(i),"sg=")) {
         aurostd::string2tokens(vaflowlib_entry.at(i),tokens,",");
         if(tokens.size()==0) {
@@ -4855,7 +5518,6 @@ namespace aflowlib {
 //    if( a_Summons == "#" ) {
 //      Summons = "";
 //      //DX20210615 [OBSOLETE - old path] API_Path = "/search/API/?";
-//      //DX20210615 [OBSOLETE - old domain] Domain = "aflowlib.duke.edu";
 //      API_Path = "/API/aflux/?"; //DX20210615 - new path
 //      Domain = "aflow.org"; //DX20210615 - new domain
 //    } else {
@@ -4917,30 +5579,637 @@ namespace aflowlib {
     string summons = aurostd::joinWDelimiter(matchbook,",");
     return AFLUXCall(summons);
   }
+    // Read server and path list from aflow.rc
+  void readServerAndPathLists(std::vector<std::string>& serverVector, std::vector<std::string>& pathVector) {
+      std::string serverList = DEFAULT_ENTRY_LOADER_AFLUX_SERVER_LIST;
+      std::string pathList = DEFAULT_ENTRY_LOADER_AFLUX_PATH_LIST;
+
+      aurostd::string2tokens(serverList, serverVector, ",");
+      aurostd::string2tokens(pathList, pathVector, ",");
+
+  }
   string AFLUXCall(const string& summons){
     // Performs AFLUX call based on summons input
-    // switched to aurostd::xhttp //HE20220407
-    bool LDEBUG=(false || XHOST.DEBUG);
-    string url = "http://aflow.org/API/aflux/?" + aurostd::httpPercentEncodingFull(summons);
-    if(LDEBUG) {
-      cerr << __AFLOW_FUNC__ << ": Summons = " << summons << endl;
-      cerr << __AFLOW_FUNC__ << ": URL = " << url << endl;
-      cerr << __AFLOW_FUNC__ << ": Performing call ... please be patient ..." << endl;
+    const bool LDEBUG=XHOST.DEBUG; //CO20260930 - debug output was always on
+    std::vector<string> m_aflux_server_vector;
+    std::vector<string> m_aflux_path_vector;
+    std::vector<string> serverResponses;
+    readServerAndPathLists(m_aflux_server_vector, m_aflux_path_vector);
+    string response;
+    //CO20261004 - paging(0) in format(aflow) goes as pages (the s4e.ai gate refuses paging(0)), with the entry loader's getAFLUXPages()
+    const string query="?"+aurostd::httpPercentEncodingFull(summons);
+    const bool page_all=AFLUXPagingAll(query);
+    // Iterate over each server in the list to fetch data
+    for (size_t i = 0; i < m_aflux_server_vector.size(); ++i) {
+        string server = m_aflux_server_vector[i];
+        string path = (i < m_aflux_path_vector.size()) ? m_aflux_path_vector[i] : "";
+        string url = "https://" + server + path + query; //CO20261004 - query encoded once, above
+        if (LDEBUG) {
+            cerr << "Loop iteration: " << i << ", Server vector size: " << m_aflux_server_vector.size() << endl;
+            cerr << "current_loop_server: " << server << endl;
+            cerr << "current_loop_path: " << path << endl;
+            cerr << __AFLOW_FUNC__ << ": Summons = " << summons << endl;
+            cerr << __AFLOW_FUNC__ << ": URL = " << url << endl;
+            cerr << __AFLOW_FUNC__ << ": Performing call ... please be patient ..." << endl;
+        }
+
+        int status_code = 0;
+        string s_response;
+        if (page_all) { //CO20261004 START
+            aflowlib::EntryLoader el(cerr);  // its messages to cerr: the answer goes to cout
+            el.m_aflux_server = server;
+            el.m_aflux_path = path;
+            vector<string> lines;
+            el.getAFLUXPages(query, page_all, lines, status_code);
+            s_response = aurostd::joinWDelimiter(lines, "\n");
+        } else { //CO20261004 STOP
+            s_response = aurostd::httpGet(url, status_code);
+        }
+        if (LDEBUG) {
+            cerr << "Response from " << server + path << "is: " << s_response << endl;
+        }
+        const bool http_ok=(status_code>=200 && status_code<400); //CO20260930
+        if (!http_ok) {
+            string message = "Bad status code for AFLUX request (" + aurostd::utype2string<int>(status_code) + ").";
+            const string hint = aurostd::httpChaosApiKeyHint(server, status_code); //CO20261002
+            if (!hint.empty()) {message += " " + hint;}
+            throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_HTTP_);        
+        }
+        if ((s_response.find("Lux Fail") != string::npos)
+            || (s_response.find("DB Fail") != string::npos)
+            || (s_response.find("Count Fail") != string::npos)) {
+            string message = "Bad response: " + s_response + ".";
+            throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        }
+        if (!s_response.empty()) {
+            if (!response.empty()) response += "\n";
+            response += s_response;
+        }
     }
-    //ME20220426 - add error handling
-    int status_code = 0;
-    string response = aurostd::httpGet(url, status_code);
-    if (status_code < 200 || status_code >= 400) {
-      string message = "Bad status code for AFLUX request (" + aurostd::utype2string<int>(status_code) + ").";
-      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_HTTP_);
-    }
-    if ((response.find("Lux Fail") != string::npos)
-      || (response.find("DB Fail") != string::npos)
-      || (response.find("Count Fail") != string::npos)) {
-      string message = "Bad response: " + response + ".";
-      throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+    if (LDEBUG) {
+        cerr << "Final response: " << response << endl;
     }
     return response;
+  }
+
+}
+
+// ***************************************************************************
+// aflowlib::ChaosRuns - the runs already in CHAOS //CO20261004
+// ***************************************************************************
+namespace aflowlib {
+  ChaosRuns::ChaosRuns() {url=CHAOS_API_URL_DEFAULT;systems.clear();runs.clear();paths.clear();complete=false;complete_time=0;entries_read=0;entries_end=-1;}
+
+  string ChaosRuns::systemName(const vector<string>& elements) {
+    vector<string> els=elements;
+    std::sort(els.begin(),els.end());
+    els.erase(std::unique(els.begin(),els.end()),els.end());
+    return aurostd::joinWDelimiter(els,",");
+  }
+
+  string ChaosRuns::runName(const string& prototype,const vector<string>& elements,bool ldau) {
+    //joined here (it runs for every entry of the list): PROTOTYPE:El1:El2...[:LDAU2]
+    const vector<string>* els=&elements;
+    vector<string> sorted;
+    if(!std::is_sorted(elements.begin(),elements.end())){sorted=elements;std::sort(sorted.begin(),sorted.end());els=&sorted;}
+    string name=prototype;
+    name+=':';
+    for(size_t i=0;i<els->size();i++){if(i>0){name+=':';}name+=(*els)[i];}
+    if(ldau){name+=":LDAU2";}
+    return name;
+  }
+
+  //CO20261004 - the last two folders of an aurl below its host, without the quotes the CHAOS database keeps
+  //around it; a child run (ARUN.*: POCC supercells, phonon distortions) counts as its parent run,
+  //the folder KBIN starts. Plain string operations (it runs for every entry of the list); returns
+  //how many folders there are
+  static size_t chaosAURLTail(const string& aurl,string& system,string& run) {
+    system="";run="";
+    string cleaned;
+    const string* p=&aurl;
+    if(aurl.find_first_of(" \t\r\n")!=string::npos){
+      cleaned=aurl;
+      cleaned.erase(std::remove_if(cleaned.begin(),cleaned.end(),[](char c){return c==' ' || c=='\t' || c=='\r' || c=='\n';}),cleaned.end());
+      p=&cleaned;
+    }
+    const string& a=*p;
+    size_t b=0,e=a.size();
+    while(b<e && (a[b]=='"' || a[b]=='\'')){b++;}
+    while(e>b && (a[e-1]=='"' || a[e-1]=='\'')){e--;}
+    size_t colon=a.find(':',b),slash=a.find('/',b);
+    if(colon!=string::npos && slash!=string::npos && colon<slash && colon<e){b=colon+1;}  //the host
+    const size_t nmax=64;
+    size_t start[nmax],length[nmax],n=0;
+    while(b<e){
+      size_t next=a.find('/',b);
+      if(next==string::npos || next>e){next=e;}
+      if(next>b){
+        if(n==nmax){return 0;}  //no aurl is that deep
+        start[n]=b;length[n]=next-b;n++;
+      }
+      b=next+1;
+    }
+    while(n>0 && length[n-1]>=5 && a.compare(start[n-1],5,"ARUN.")==0){n--;}  //child run: its parent
+    if(n>=1){run=a.substr(start[n-1],length[n-1]);}
+    if(n>=2){system=a.substr(start[n-2],length[n-2]);}
+    return n;
+  }
+
+  //the run name from the run folder of an aurl (:LDAU2 marks the +U run)
+  static string chaosRunFromFolder(const string& run_folder,const vector<string>& elements) {
+    string folder=run_folder;
+    bool ldau=false;
+    const string ldau_tag=":LDAU2";
+    if(folder.size()>ldau_tag.size() && folder.compare(folder.size()-ldau_tag.size(),ldau_tag.size(),ldau_tag)==0){
+      ldau=true;
+      folder=folder.substr(0,folder.size()-ldau_tag.size());
+    }
+    return ChaosRuns::runName(folder,elements,ldau);
+  }
+
+  //the run folder is the last directory of the aurl; :LDAU2 marks the +U run
+  string ChaosRuns::runFromAURL(const string& aurl,const vector<string>& elements) {
+    string system,run;
+    if(chaosAURLTail(aurl,system,run)<2){return "";}
+    return chaosRunFromFolder(run,elements);
+  }
+
+  //CHAOS reads field(condition) terms only: no bare field names, no $ prefix (?help(queries));
+  //chaos_path(*) first, so the results are sorted by the path and the pages are stable //CO20261008 - was aurl(*)
+  string ChaosRuns::summons(const vector<string>& elements,uint page,uint page_size) {
+    string system=systemName(elements);
+    vector<string> els;aurostd::string2tokens(system,els,",");
+    return "chaos_path(*),species("+system+"),nspecies("+aurostd::utype2string<uint>(els.size())+"),format(aflow)"
+      +",paging("+aurostd::utype2string<uint>(page)+","+aurostd::utype2string<uint>(page_size)+")";
+  }
+
+  //CO20261004 - the system and run folders of an entry, as AFLOW writes them under LIBn/LIB or
+  //AFLOWDATA: s4e.ai:AFLOWDATA/LIB2_WEB/Ni_pvO/AB_cF8_225_a_b.AB:LDAU2 -> Ni_pvO/AB_cF8_225_a_b.AB:LDAU2
+  string ChaosRuns::pathFromAURL(const string& aurl) {
+    string system,run;
+    if(chaosAURLTail(aurl,system,run)<3){return "";}  //AFLOWDATA/LIBn_WEB/SYSTEM/RUN at least
+    return system+"/"+run;
+  }
+
+  string ChaosRuns::pathFromDirectory(const string& directory) {
+    vector<string> parts,folders;aurostd::string2tokens(directory,parts,"/");
+    for(size_t i=0;i<parts.size();i++){
+      string f=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(parts[i]);
+      if(f.empty() || f=="." || f==_AFLOWIN_){continue;}
+      folders.push_back(f);
+    }
+    if(folders.size()<2){return "";}
+    return folders[folders.size()-2]+"/"+folders[folders.size()-1];
+  }
+
+  vector<string> ChaosRuns::elementsFromSystemFolder(const string& folder) {
+    string name=folder.substr(0,folder.find(':'));  //O:PAW_PBE -> O
+    name=std::regex_replace(name,aurostd::regex_ppclean,"");
+    vector<string> elements;
+    for(std::sregex_iterator it(name.begin(),name.end(),aurostd::regex_elements);it!=std::sregex_iterator();++it){elements.push_back(it->str());}
+    std::sort(elements.begin(),elements.end());
+    elements.erase(std::unique(elements.begin(),elements.end()),elements.end());
+    return elements;
+  }
+
+  string ChaosRuns::defaultListFile() {
+    const char* env=getenv("CHAOS_RUNS_LIST");
+    if(env!=NULL && string(env).size()>0){return string(env);}
+    string home=XHOST.home;
+    if(home.empty()){const char* h=getenv("HOME");if(h!=NULL){home=string(h);}}
+    return home+"/.s4e/chaos_runs.txt";
+  }
+
+  double ChaosRuns::maxAgeHours() {
+    const char* env=getenv("CHAOS_RUNS_MAX_AGE_HOURS");
+    if(env!=NULL && string(env).size()>0){double h=aurostd::string2utype<double>(string(env));if(h>0){return h;}}
+    return CHAOS_RUNS_MAX_AGE_HOURS_DEFAULT;
+  }
+
+  string ChaosRuns::listURL() {
+    const char* env=getenv("CHAOS_RUNS_LIST_URL");
+    if(env!=NULL && string(env).size()>0){return string(env);}
+    return "";  //the list names restricted records: the public gate does not serve it
+  }
+
+  bool ChaosRuns::hasSystem(const vector<string>& elements) const {return complete || systems.count(systemName(elements))>0;}
+  bool ChaosRuns::hasRun(const string& run_name) const {return runs.count(run_name)>0;}
+  bool ChaosRuns::hasPath(const string& path) const {return paths.count(path)>0;}
+
+  void ChaosRuns::addAURL(const string& aurl,const vector<string>& elements) {
+    string system,run;
+    size_t n=chaosAURLTail(aurl,system,run);  //once for both
+    if(n>=3){paths.insert(system+"/"+run);}
+    if(!elements.empty() && n>=2){runs.insert(chaosRunFromFolder(run,elements));}
+  }
+
+  double ChaosRuns::ageHours() const {
+    if(!complete || complete_time<=0){return -1.0;}
+    return (double)((long long)time(NULL)-complete_time)/3600.0;
+  }
+
+  //a complete list, at most maxAgeHours() old; otherwise false and why in problem
+  bool ChaosRuns::readListFile(const string& file,string& problem) {
+    problem="";
+    if(!aurostd::FileExist(file)){problem="no list of CHAOS runs at "+file;return false;}
+    readFile(file);
+    if(!complete){problem=file+" is not a list of every run in CHAOS (no \"complete\" line)";return false;}
+    //a copy cut short still has its "complete" line: the end line says how many entries there are
+    if(entries_end<0){problem=file+" is cut short (no \"end\" line); aflow --chaos_runs_update fetches a whole one";return false;}
+    if(entries_end!=entries_read){problem=file+" is cut short or damaged ("+aurostd::utype2string<long long>(entries_read)+" entries, its end line says "+aurostd::utype2string<long long>(entries_end)+"); aflow --chaos_runs_update fetches a whole one";return false;}
+    if(complete_time<=0){problem=file+" does not say when it was written";return false;}
+    double age=ageHours();
+    if(age<-1.0){problem=file+" was written "+aurostd::utype2string<int>((int)(-age))+" h ahead of this machine's clock; check the clock";return false;}
+    if(age>maxAgeHours()){
+      problem=file+" is "+aurostd::utype2string<int>((int)age)+" h old (more than "+aurostd::utype2string<int>((int)maxAgeHours())+" h); aflow --chaos_runs_update fetches the current one";
+      return false;
+    }
+    return true;
+  }
+
+  uint ChaosRuns::addAFLUXResponse(const string& response,const vector<string>& elements) {
+    vector<vector<std::pair<string,string> > > records=getPropertiesFromAFLUXResponse(response);
+    uint nadded=0;
+    for(size_t i=0;i<records.size();i++){
+      for(size_t j=0;j<records[i].size();j++){
+        if(records[i][j].first!="aurl" && records[i][j].first!="chaos_path"){continue;}  //CO20261008 - chaos_path too
+        size_t nruns=runs.size();
+        addAURL(ChaosPath2AURL(records[i][j].second),elements);  //CO20261004 - the path too
+        if(runs.size()>nruns){nadded++;}
+      }
+    }
+    systems.insert(systemName(elements));
+    return nadded;
+  }
+
+  void ChaosRuns::query(const vector<string>& elements) {
+    bool LDEBUG=(FALSE || XHOST.DEBUG);
+    string system=systemName(elements);
+    vector<string> els;aurostd::string2tokens(system,els,",");
+    if(els.empty()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no elements",_INPUT_MISSING_);}
+    const uint page_size=AFLUX_PAGE_SIZE_DEFAULT; //CO20261006 - was 10000
+    string response="";
+    for(uint page=1;;page++){
+      string aflux_query=summons(els,page,page_size);
+      int status_code=0;
+      string response_page=aurostd::httpGet(url+"?"+aurostd::httpPercentEncodingFull(aflux_query),status_code);
+      string answer=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(response_page,true).substr(0,200);  //CHAOS's message, if any
+      if(status_code<0){
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no answer from CHAOS ("+url+") to the query for "+system+"; is the network up?",_RUNTIME_HTTP_);
+      }
+      string head="CHAOS ("+url+") answered HTTP "+aurostd::utype2string<int>(status_code)+" to the query for "+system;
+      //401, 403, 429: what to do, from the CHAOS API key handling in aurostd (httpGet already
+      //waited and asked again on 429 and 503)
+      string hint=aurostd::httpChaosApiKeyHint(aurostd::httpParseURL(url).host,status_code);
+      if(status_code==401 || status_code==403 || status_code==429){
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,head+": "+(hint.empty()?string("refused"):hint)+" ("+answer+")",_RUNTIME_HTTP_);
+      }
+      if(status_code==400){
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,head+": CHAOS could not read the query "+aflux_query+" ("+answer+")",_RUNTIME_HTTP_);
+      }
+      if(status_code<200 || status_code>=300){
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,head+" ("+answer+")",_RUNTIME_HTTP_);
+      }
+      if(response_page.find("Lux Fail")!=string::npos || response_page.find("DB Fail")!=string::npos || response_page.find("Count Fail")!=string::npos){
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"CHAOS ("+url+") answered with an error for "+system+": "+answer,_RUNTIME_ERROR_);
+      }
+      string trimmed=aurostd::RemoveWhiteSpaces(response_page);
+      if(trimmed.empty() || trimmed=="[]"){break;}
+      response+=response_page+"\n";
+      if(getPropertiesFromAFLUXResponse(response_page).size()<page_size){break;}  //short page: the last one
+      if(page>=1000){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"more than 1000 pages for "+system,_RUNTIME_ERROR_);}
+    }
+    uint nadded=addAFLUXResponse(response,els);
+    if(LDEBUG){cerr << __AFLOW_FUNC__ << " " << system << ": " << nadded << " runs in " << url << endl;}
+  }
+
+  void ChaosRuns::queryMissing(const vector<vector<string> >& vsystems) {
+    for(size_t i=0;i<vsystems.size();i++){if(!hasSystem(vsystems[i])){query(vsystems[i]);}}
+  }
+
+  //list file: lines "system El1,El2,...", "run PROTOTYPE:El1:El2...[:LDAU2]"; # starts a comment
+  //CO20261004 - lines: "system El1,El2", "run NAME", "path SYSTEM/RUN", "complete <UTC time>"
+  //(a list of every run in CHAOS, written at that time), and AFLUX lines "aurl=...|species=..."
+  //(format(aflow)); # starts a comment
+  //the fields of an entry line of the list (aurl=...|auid=...|loop=...|species=..., any order)
+  //between b and e; quotes and brackets (JSON as the CHAOS database keeps them) are left to the
+  //caller //CO20261004
+  //CO20261008 - a value without the quotes the CHAOS database keeps around strings: "\"LIB2/X\"" -> LIB2/X
+  static string chaosFieldCleanQuotes(const string& field) {
+    string out=aurostd::RemoveWhiteSpacesFromTheFrontAndBack(field);
+    if(out.size()>=2 && (out[0]=='"' || out[0]=='\'') && out[out.size()-1]==out[0]){out=out.substr(1,out.size()-2);}
+    return out;
+  }
+  //CO20261008 - chaos_path= and chaos_id= (as CHAOS writes them) or aurl= and auid= (before); the path
+  //comes back as an AURL, which is what the callers take apart
+  static void chaosEntryFields(const string& raw,size_t b,size_t e,string& aurl,string& auid,string& loop,string& species) {
+    aurl="";auid="";loop="";species="";
+    size_t start=b;
+    while(start<e){
+      size_t bar=raw.find('|',start);
+      if(bar==string::npos || bar>e){bar=e;}
+      size_t f=raw.find_first_not_of(" \t",start);
+      if(f!=string::npos && f<bar){
+        if(raw.compare(f,5,"aurl=")==0){aurl=raw.substr(f+5,bar-f-5);}
+        else if(raw.compare(f,11,"chaos_path=")==0){aurl=ChaosPath2AURL(chaosFieldCleanQuotes(raw.substr(f+11,bar-f-11)));}
+        else if(raw.compare(f,5,"auid=")==0){auid=raw.substr(f+5,bar-f-5);}
+        else if(raw.compare(f,9,"chaos_id=")==0){auid=raw.substr(f+9,bar-f-9);}
+        else if(raw.compare(f,5,"loop=")==0){loop=raw.substr(f+5,bar-f-5);}
+        else if(raw.compare(f,8,"species=")==0){species=raw.substr(f+8,bar-f-8);}
+      }
+      start=bar+1;
+    }
+  }
+
+  //a field without quotes, brackets and blanks: "aflow:01" -> aflow:01, ["Mg","O"] -> Mg,O
+  static string chaosFieldClean(const string& field) {
+    string out;
+    out.reserve(field.size());
+    for(size_t k=0;k<field.size();k++){
+      char c=field[k];
+      if(c!='"' && c!='\'' && c!='[' && c!=']' && c!=' ' && c!='\t' && c!='\r' && c!='\n'){out+=c;}
+    }
+    return out;
+  }
+
+  void ChaosRuns::readFile(const string& file) {
+    if(!aurostd::FileExist(file)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no file "+file,_FILE_NOT_FOUND_);}
+    //line by line, entry lines with plain string operations: a list of every run in CHAOS has
+    //about 250,000 of them, and --aflow_proto reads it on every call
+    std::ifstream in(file.c_str());
+    if(!in.good()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"cannot read "+file,_FILE_ERROR_);}
+    vector<string> tokens,els;
+    string raw,line;
+    while(std::getline(in,raw)){
+      size_t b=raw.find_first_not_of(" \t\r\n");
+      if(b==string::npos || raw[b]=='#'){continue;}
+      size_t e=raw.find_last_not_of(" \t\r\n")+1;
+      if(raw.compare(b,5,"aurl=")==0 || raw.compare(b,11,"chaos_path=")==0){  //CO20261008 - chaos_path too
+        string aurl="",auid="",loop="",species="";
+        chaosEntryFields(raw,b,e,aurl,auid,loop,species);
+        els.clear();
+        string tok;
+        for(size_t k=0;k<species.size();k++){
+          char c=species[k];
+          if(c==','){if(!tok.empty()){els.push_back(tok);}tok.clear();}
+          else if(c!='"' && c!='\'' && c!='[' && c!=']' && c!=' ' && c!='\t'){tok+=c;}
+        }
+        if(!tok.empty()){els.push_back(tok);}
+        addAURL(aurl,els);
+        entries_read++;
+        continue;
+      }
+      line=raw.substr(b,e-b);
+      aurostd::string2tokens(line,tokens," ");
+      if(tokens.size()!=2){continue;}
+      if(tokens[0]=="system"){vector<string> els;aurostd::string2tokens(tokens[1],els,",");systems.insert(systemName(els));}
+      else if(tokens[0]=="run"){runs.insert(tokens[1]);}
+      else if(tokens[0]=="path"){paths.insert(tokens[1]);entries_read++;}
+      else if(tokens[0]=="end"){entries_end=aurostd::string2utype<long long>(tokens[1]);}
+      else if(tokens[0]=="complete"){
+        int Y=0,M=0,D=0,h=0,m=0,s=0;
+        if(sscanf(tokens[1].c_str(),"%d-%d-%dT%d:%d:%d",&Y,&M,&D,&h,&m,&s)==6){
+          std::tm t={};t.tm_year=Y-1900;t.tm_mon=M-1;t.tm_mday=D;t.tm_hour=h;t.tm_min=m;t.tm_sec=s;
+          complete=true;complete_time=(long long)timegm(&t);
+        }
+      }
+    }
+  }
+
+  string ChaosRuns::toString() const {
+    stringstream ss;
+    ss << "# runs in CHAOS (" << url << "), aflow " << AFLOW_VERSION << ", " << aurostd::get_datetime(true) << endl;
+    for(std::set<string>::const_iterator it=systems.begin();it!=systems.end();++it){ss << "system " << *it << endl;}
+    if(complete && complete_time>0){  //CO20261004
+      std::time_t t=(std::time_t)complete_time;std::tm g={};gmtime_r(&t,&g);
+      char buf[32];strftime(buf,sizeof(buf),"%Y-%m-%dT%H:%M:%SZ",&g);
+      ss << "complete " << buf << endl;
+    }
+    for(std::set<string>::const_iterator it=runs.begin();it!=runs.end();++it){ss << "run " << *it << endl;}
+    for(std::set<string>::const_iterator it=paths.begin();it!=paths.end();++it){ss << "path " << *it << endl;}
+    if(complete && complete_time>0){ss << "end " << paths.size() << endl;}  //the entries above, for a copy cut short
+    return ss.str();
+  }
+
+  void ChaosRuns::writeFile(const string& file) const {aurostd::string2file(toString(),file);}
+
+  //aflow --chaos_runs=Mg,O[:Al,Mg,O...] [--chaos_runs_file=FILE] [--chaos_url=URL]
+  //queries CHAOS for each system (elements separated by commas, systems by colons) and prints
+  //the list, or adds it to FILE (systems already in FILE are not queried again)
+  void ChaosRunsCommand(const aurostd::xoption& vpflow) {
+    ChaosRuns chaos;
+    if(!vpflow.getattachedscheme("CHAOS_RUNS::URL").empty()){chaos.url=vpflow.getattachedscheme("CHAOS_RUNS::URL");}
+    string file=vpflow.getattachedscheme("CHAOS_RUNS::FILE");
+    if(!file.empty() && aurostd::FileExist(file)){chaos.readFile(file);}
+    vector<string> vsys,els;
+    aurostd::string2tokens(vpflow.getattachedscheme("CHAOS_RUNS"),vsys,":");
+    if(vsys.empty()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"give the systems, e.g., --chaos_runs=Mg,O:Al,Mg,O",_INPUT_MISSING_);}
+    vector<vector<string> > vsystems;
+    for(size_t i=0;i<vsys.size();i++){aurostd::string2tokens(vsys[i],els,",");vsystems.push_back(els);}
+    chaos.queryMissing(vsystems);
+    if(file.empty()){cout << chaos.toString();}
+    else{
+      chaos.writeFile(file);
+      stringstream message;
+      message << chaos.systems.size() << " systems, " << chaos.runs.size() << " runs in " << file;
+      pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,_LOGGER_MESSAGE_,cerr);
+    }
+  }
+
+  // ***************************************************************************
+  // the check of new runs against CHAOS //CO20261004
+  // ***************************************************************************
+  // one list per process, read at the first check and again whenever the file changes
+  static std::mutex chaos_check_mutex;
+  static ChaosRuns chaos_check_runs;
+  static int chaos_check_state=-1;  //-1 not read, 0 no list (ask CHAOS), 1 list in use, 2 list not usable
+  static string chaos_check_file="",chaos_check_problem="";
+  static string chaos_check_signature="";  //the list file as it was read
+
+  //inode, size and modification time of the list file, "" when there is none: aflow
+  //--chaos_runs_update puts a new file in place, so a process that runs for days sees each new list
+  static string chaosListSignature(const string& file) {
+    struct stat st;
+    if(file.empty() || ::stat(file.c_str(),&st)!=0){return "";}
+    return file+":"+std::to_string((unsigned long long)st.st_ino)+":"+std::to_string((long long)st.st_size)+":"+std::to_string((long long)st.st_mtime);
+  }
+
+  void ChaosCheckReset() {
+    std::lock_guard<std::mutex> lock(chaos_check_mutex);
+    chaos_check_runs=ChaosRuns();chaos_check_state=-1;chaos_check_file="";chaos_check_problem="";chaos_check_signature="";
+  }
+
+  static std::atomic<int> chaos_check_suspended(0);  //CO20261009 - live ChaosCheckSuspended objects
+  ChaosCheckSuspended::ChaosCheckSuspended() {chaos_check_suspended++;}
+  ChaosCheckSuspended::~ChaosCheckSuspended() {chaos_check_suspended--;}
+  //CO20261017 - the check needs CHAOS: a list of its runs (ChaosRuns::defaultListFile()) or a CHAOS API key to ask
+  //CHAOS. Without either, as for anyone outside the group, runs are written without the check, with one note
+  static bool chaosCheckUnavailable() {
+    if(!aurostd::httpChaosApiKey().empty() || aurostd::FileExist(ChaosRuns::defaultListFile())) {return false;}
+    static std::atomic<bool> noted(false);
+    if(!noted.exchange(true)) {cerr << "MMMMM  No list of CHAOS runs and no CHAOS API key: runs are written without checking CHAOS" << endl;}
+    return true;
+  }
+  bool ChaosCheckDisabled() {return chaos_check_suspended.load()>0 || aurostd::args2flag(XHOST.argv,"--no_chaos_check") || chaosCheckUnavailable();}
+
+  //database runs: AFLOW writes them under LIBn/LIB/SYSTEM/RUN or AFLOWDATA/SYSTEM/RUN
+  bool ChaosCheckApplies(const string& directory) {
+    vector<string> folders;aurostd::string2tokens(directory,folders,"/");
+    for(size_t i=0;i<folders.size();i++){
+      const string& f=folders[i];
+      if(f=="AFLOWDATA"){return true;}
+      if(f.size()>3 && f.compare(0,3,"LIB")==0 && f.find_first_not_of("0123456789",3)==string::npos){return true;}
+    }
+    return false;
+  }
+
+  //SYSTEM/RUN in runs: the folder itself, or the run name (label.DECORATION:El1:El2[:LDAU2], as
+  //aflow --redecorate matches), so that the run under another pseudopotential folder counts too
+  static bool chaosCheckHas(const ChaosRuns& runs,const string& path,const string& where,string& reason) {
+    if(runs.hasPath(path)){reason=path+" is in "+where;return true;}
+    string run=ChaosRuns::runFromAURL(path,ChaosRuns::elementsFromSystemFolder(path.substr(0,path.find('/'))));
+    if(!run.empty() && runs.hasRun(run)){reason=path+" is in "+where+" as "+run+" (another system folder)";return true;}
+    reason=path+" is not in "+where;
+    return false;
+  }
+
+  //is the run in this directory in CHAOS? elements (optional) are used only when CHAOS is asked
+  //directly; without them they are read from the system folder
+  ChaosCheck ChaosCheckDirectory(const string& directory,const vector<string>& elements,string& reason) {
+    std::lock_guard<std::mutex> lock(chaos_check_mutex);
+    reason="";
+    //a list that changed since it was read is read again
+    if(chaos_check_state>=0 && chaosListSignature(ChaosRuns::defaultListFile())!=chaos_check_signature){
+      chaos_check_runs=ChaosRuns();chaos_check_state=-1;chaos_check_problem="";
+    }
+    if(chaos_check_state<0){
+      chaos_check_file=ChaosRuns::defaultListFile();
+      chaos_check_signature=chaosListSignature(chaos_check_file);
+      if(aurostd::FileExist(chaos_check_file)){
+        try{chaos_check_state=(chaos_check_runs.readListFile(chaos_check_file,chaos_check_problem)?1:2);}
+        catch(aurostd::xerror& e){chaos_check_state=2;chaos_check_problem=chaos_check_file+" cannot be read: "+e.what();}
+      }
+      else{chaos_check_state=0;chaos_check_problem="no list of CHAOS runs at "+chaos_check_file;}
+    }
+    //a list that became too old while this process runs is not used any more
+    if(chaos_check_state==1 && chaos_check_runs.ageHours()>ChaosRuns::maxAgeHours()){
+      chaos_check_state=2;
+      chaos_check_problem=chaos_check_file+" is "+aurostd::utype2string<int>((int)chaos_check_runs.ageHours())+" h old (more than "+aurostd::utype2string<int>((int)ChaosRuns::maxAgeHours())+" h); aflow --chaos_runs_update fetches the current one";
+    }
+    string path=ChaosRuns::pathFromDirectory(directory);
+    if(path.empty()){reason="no system and run folder in "+directory;return CHAOS_CHECK_NEW;}
+    if(chaos_check_state==1){
+      return chaosCheckHas(chaos_check_runs,path,chaos_check_file,reason)?CHAOS_CHECK_IN:CHAOS_CHECK_NEW;
+    }
+    if(chaos_check_state==2){reason=chaos_check_problem;return CHAOS_CHECK_UNKNOWN;}
+    //no list: ask CHAOS for the system
+    vector<string> els=elements;
+    if(els.empty()){els=ChaosRuns::elementsFromSystemFolder(path.substr(0,path.find('/')));}
+    if(els.empty()){reason=chaos_check_problem+", and no elements in "+path;return CHAOS_CHECK_UNKNOWN;}
+    if(!chaos_check_runs.hasSystem(els)){
+      try{chaos_check_runs.query(els);}
+      catch(aurostd::xerror& e){reason=chaos_check_problem+", and CHAOS could not be asked: "+e.what();return CHAOS_CHECK_UNKNOWN;}
+    }
+    return chaosCheckHas(chaos_check_runs,path,"CHAOS ("+ChaosRuns::systemName(els)+" asked)",reason)?CHAOS_CHECK_IN:CHAOS_CHECK_NEW;
+  }
+
+  //CO20261004 - AFLOW's tables of calculated entries (the "vLIBS" tables, Duke's list before) from
+  //the list of runs in CHAOS
+  uint ChaosCalculatedEntries(const string& file,vector<string>& vaurl,vector<string>& vauid,vector<string>& vloop,vector<vector<string> >& vlibrary,string& problem) {
+    vaurl.clear();vauid.clear();vloop.clear();
+    vlibrary.assign(11,vector<string>());
+    problem="";
+    if(file.empty() || !aurostd::FileExist(file)){problem="no list of CHAOS runs at "+file+" (aflow --chaos_runs_update puts one in place): the tables of calculated entries are empty";return 0;}
+    std::ifstream in(file.c_str());
+    if(!in.good()){problem="cannot read "+file+": the tables of calculated entries are empty";return 0;}
+    vector<std::set<string> > seen(11);
+    bool complete=false;
+    long long complete_time=0,entries_end=-1;
+    string raw,aurl,auid,loop,species,system,run;
+    while(std::getline(in,raw)){
+      size_t b=raw.find_first_not_of(" \t\r\n");
+      if(b==string::npos || raw[b]=='#'){continue;}
+      size_t e=raw.find_last_not_of(" \t\r\n")+1;
+      if(raw.compare(b,5,"aurl=")!=0 && raw.compare(b,11,"chaos_path=")!=0){  //CO20261008 - chaos_path too
+        int Y=0,M=0,D=0,h=0,m=0,s=0;
+        if(raw.compare(b,9,"complete ")==0 && sscanf(raw.c_str()+b+9,"%d-%d-%dT%d:%d:%d",&Y,&M,&D,&h,&m,&s)==6){
+          std::tm t={};t.tm_year=Y-1900;t.tm_mon=M-1;t.tm_mday=D;t.tm_hour=h;t.tm_min=m;t.tm_sec=s;
+          complete=true;complete_time=(long long)timegm(&t);
+        }
+        else if(raw.compare(b,4,"end ")==0){entries_end=aurostd::string2utype<long long>(raw.substr(b+4,e-b-4));}
+        continue;
+      }
+      chaosEntryFields(raw,b,e,aurl,auid,loop,species);
+      aurl=chaosFieldClean(aurl);
+      if(aurl.empty()){continue;}
+      vaurl.push_back(aurl);
+      vauid.push_back(chaosFieldClean(auid));
+      vloop.push_back(chaosFieldClean(loop));
+      //the library: the folder after AFLOWDATA/ (LIBn_..., ICSD_...)
+      size_t a=aurl.find("AFLOWDATA/");
+      if(a==string::npos){continue;}
+      a+=10;
+      int library=-1;
+      if(aurl.compare(a,3,"LIB")==0 && a+3<aurl.size() && aurl[a+3]>='0' && aurl[a+3]<='9' && (a+4==aurl.size() || aurl[a+4]=='_' || aurl[a+4]=='/')){library=aurl[a+3]-'0';}
+      else if(aurl.compare(a,4,"ICSD")==0){library=10;}
+      if(library<0){continue;}
+      if(chaosAURLTail(aurl,system,run)<3){continue;}
+      string path=system+"/"+run;
+      if(seen[library].insert(path).second){vlibrary[library].push_back(path);}
+    }
+    long long nread=(long long)vaurl.size();
+    if(!complete){problem=file+" is not a list of every run in CHAOS (no \"complete\" line)";}
+    else if(entries_end!=nread){problem=file+" is cut short or damaged ("+aurostd::utype2string<long long>(nread)+" entries, its end line says "+aurostd::utype2string<long long>(entries_end)+")";}
+    else{
+      double age=(double)((long long)time(NULL)-complete_time)/3600.0;
+      if(age>ChaosRuns::maxAgeHours()){problem=file+" is "+aurostd::utype2string<int>((int)age)+" h old; aflow --chaos_runs_update fetches the current one";}
+    }
+    return (uint)vaurl.size();
+  }
+
+  //aflow --chaos_runs_update [--chaos_runs_list=FILE] [--chaos_runs_url=URL|FILE]: the list of
+  //runs in CHAOS, from CHAOS (or a copy of the list), checked, then put in place in one step
+  void ChaosRunsUpdate(const aurostd::xoption& vpflow) {
+    string file=vpflow.getattachedscheme("CHAOS_RUNS_UPDATE::LIST");
+    if(file.empty()){file=ChaosRuns::defaultListFile();}
+    string source=vpflow.getattachedscheme("CHAOS_RUNS_UPDATE::URL");
+    if(source.empty()){source=ChaosRuns::listURL();}
+    if(source.empty()){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"where from? --chaos_runs_url=URL|FILE or CHAOS_RUNS_LIST_URL: the list is written once a day on the CHAOS server and copied to each machine",_INPUT_MISSING_);}
+    string body="";
+    if(source.compare(0,8,"https://")==0 || source.compare(0,7,"http://")==0){
+      int status_code=0;
+      body=aurostd::httpGet(source,status_code);
+      if(status_code!=200){
+        string hint=aurostd::httpChaosApiKeyHint(aurostd::httpParseURL(source).host,status_code);
+        throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"the list of CHAOS runs could not be fetched from "+source+" (HTTP "+aurostd::utype2string<int>(status_code)+")"+(hint.empty()?string(""):": "+hint),_RUNTIME_HTTP_);
+      }
+    }
+    else{
+      if(!aurostd::FileExist(source)){throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"no file "+source,_FILE_NOT_FOUND_);}
+      aurostd::file2string(source,body);
+    }
+    string dir=aurostd::dirname(file);
+    //the list names restricted records too: readable by the owner only
+    if(!dir.empty() && !aurostd::IsDirectory(dir)){aurostd::DirectoryMake(dir);::chmod(dir.c_str(),S_IRWXU);}
+    string tmp=file+".tmp."+aurostd::utype2string<int>((int)getpid());
+    aurostd::string2file("",tmp);::chmod(tmp.c_str(),S_IRUSR|S_IWUSR);
+    aurostd::string2file(body,tmp);
+    ChaosRuns check;string problem="";
+    bool usable=false;
+    try{usable=check.readListFile(tmp,problem);}
+    catch(aurostd::xerror& e){problem=e.what();}
+    if(usable && check.paths.empty()){usable=false;problem="no entries";}
+    if(!usable){
+      aurostd::RemoveFile(tmp);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"the list of CHAOS runs from "+source+" was not used: "+problem,_RUNTIME_ERROR_);
+    }
+    if(std::rename(tmp.c_str(),file.c_str())!=0){
+      aurostd::RemoveFile(tmp);
+      throw aurostd::xerror(__AFLOW_FILE__,__AFLOW_FUNC__,"could not put the list in place at "+file,_FILE_ERROR_);
+    }
+    stringstream message;
+    message << file << ": " << check.paths.size() << " entries in CHAOS, written " << aurostd::utype2string<int>((int)check.ageHours()) << " h ago";
+    pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,message,_LOGGER_MESSAGE_,cerr);
   }
 }
 
@@ -4968,16 +6237,21 @@ namespace aflowlib {
       vector<std::pair<string,string> > property_pairs;
       for(uint i=0;i<fields.size();i++){
         aurostd::string2tokens(fields[i],key_value,"=");
-        if(key_value.size()<2 && !aurostd::substring2bool(fields[i],"example") && !aurostd::substring2bool(fields[i],"description")){
-          string message = "Cannot find key-value pair splitting on \"=\" for the following field: \"" + fields[i] + "\".";
-          throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
-        }
+        //if(key_value.size()<2 && !aurostd::substring2bool(fields[i],"example") && !aurostd::substring2bool(fields[i],"description")){
+          //string message = "Cannot find key-value pair splitting on \"=\" for the following field: \"" + fields[i] + "\".";
+          //throw aurostd::xerror(__AFLOW_FILE__, __AFLOW_FUNC__, message, _RUNTIME_ERROR_);
+        //}
         std::pair<string,string> property; 
         property.first = aurostd::RemoveWhiteSpaces(key_value[0]);  // key 
         // ME20220419 - some entries have = inside a value,
         // so remove first element and join the rest
-        key_value.erase(key_value.begin());
-        property.second = aurostd::RemoveWhiteSpaces(aurostd::joinWDelimiter(key_value, "=")); // value
+        if (key_value.size() == 1) {
+            property.second = "";
+        } else {
+
+            key_value.erase(key_value.begin());
+            property.second = aurostd::RemoveWhiteSpaces(aurostd::joinWDelimiter(key_value, "=")); // value
+        }
         property_pairs.push_back(property);
       }
       properties_response.push_back(property_pairs);
@@ -5253,31 +6527,13 @@ namespace aflowlib {
       string directory_AUID_LIB="",directory_AUID_RAW="",directory_AUID_WEB="";
       string url_WEB;
       string label="";
-      // string line_gif="<br><img border=0 width=60% height=2 src=http://materials.duke.edu/auro/images/line.gif><br><br>";
       // string art058_link=" https://doi.org/10.1016/j.commatsci.2010.05.010";
       // string art064_link=" https://doi.org/10.1021/co200012w";
       // string icsd_link=" https://www.fiz-karlsruhe.com/icsd.html";
-      // string aflow_ael_readme=" http://materials.duke.edu/AFLOW/README_AFLOW_AEL.TXT"; //CO20180817
       // string art096_link=" https://doi.org/10.1103/PhysRevB.90.174107";
       // string art100_link=" https://www.nature.com/articles/sdata20159";
-      // string aflow_agl_readme=" http://materials.duke.edu/AFLOW/README_AFLOW_AGL.TXT"; //CO20180817
       // string art115_link=" https://doi.org/10.1103/PhysRevMaterials.1.015401"; //CO20180817
-      // string aflow_sym_readme=" http://materials.duke.edu/AFLOW/README_AFLOW_SYM.TXT"; //CO20180817
       // string art135_link=" https://doi.org/10.1107/S2053273318003066"; //CO20180817
-
-      //DX20180817
-      // string bravais_lattice_orig_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#bravais_lattice_orig";
-      // string bravais_lattice_relax_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#bravais_lattice_relax";
-      // string lattice_system_orig_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#lattice_system_orig";
-      // string lattice_variation_orig_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#lattice_variation_orig";
-      // string lattice_system_relax_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#lattice_system_relax";
-      // string lattice_variation_relax_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#lattice_variation_relax";
-      // string Pearson_symbol_orig_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#pearson_symbol_orig";
-      // string Pearson_symbol_relax_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#pearson_symbol_relax";
-      // string sg_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#sg";
-      // string sg2_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#sg2";
-      // string spacegroup_orig_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#spacegroup_orig";
-      // string spacegroup_relax_wiki_link=" http://aflowlib.duke.edu/aflowwiki/doku.php?id=documentation:all_keywords&#spacegroup_relax";
 
       aflowlib::_aflowlib_entry aentry;
 
@@ -5315,15 +6571,19 @@ namespace aflowlib {
       // **********************************************************************************************************
       // ME20200707 - Also check for AUIDs without the aflow: prefix
       string option_orig = option;
-      if ((option.size() == 16) && aurostd::_ishex(option)) option = "aflow:" + option;
-      if(!vflags.flag("FLAG::FOUND") && aurostd::substring2bool(aurostd::tolower(option),"aflow:")) { // CHECK AUID
+      if ((option.size() == 16) && aurostd::_ishex(option)) option = getAUIDPrefix() + ":" + option;  //CO20230525 - prefix
+      if(!vflags.flag("FLAG::FOUND") && aurostd::substring2bool(aurostd::tolower(option),getAUIDPrefix()+":")) { // CHECK AUID  //CO20230525 - prefix
         if(LDEBUG) cout << "WEB_Aflowlib_Entry: option=" << option << endl;
         string auid=aurostd::tolower(option);
         if(auid.size()!=22) {
           errormsg="aflowlib::WEB_Aflowlib_Entry:_error_on_size_of_auid="+auid;
         } else {
           // NEW
-          directory_AUID_LIB=init::AFLOW_Projects_Directories("AUID")+"/"+auid.substr(0,8); for(uint i=8;i<=20;i+=2) directory_AUID_LIB+="/"+auid.substr(i,2);  // splitting aflow:ab/cd..
+          directory_AUID_LIB=init::AFLOW_Projects_Directories("AUID")+"/"; //[CO20230525 - generalizing for arbitrary prefix]+auid.substr(0,8); for(uint i=8;i<=20;i+=2) directory_AUID_LIB+="/"+auid.substr(i,2);  // splitting aflow:ab/cd..
+          //CO20230525 START - generalizing for arbitrary prefix
+          deque<string> vauid;auid2vauid(auid,vauid);
+          directory_AUID_LIB+=aurostd::joinWDelimiter(vauid,"/");
+          //CO20230525 STOP - generalizing for arbitrary prefix
           directory_AUID_WEB=directory_AUID_LIB+"/WEB";
           directory_AUID_RAW=directory_AUID_LIB+"/RAW";
           directory_AUID_LIB=directory_AUID_LIB+"/LIB";
@@ -5337,8 +6597,7 @@ namespace aflowlib {
             _aflowlib_entry entry_tmp(string(directory_AUID_RAW+"/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT));
             directory=entry_tmp.aurl;
             auid=entry_tmp.aurl;
-            aurostd::StringSubst(directory,"aflowlib.duke.edu:","");
-            aurostd::StringSubst(directory,"materials.duke.edu:","");
+            directory=AURLStripHost(directory); //CO20261002
             aurostd::StringSubst(directory,"AFLOWDATA/ICSD_RAW/","");aurostd::StringSubst(directory,"AFLOWDATA/ICSD_WEB/","");
             aurostd::StringSubst(directory,"AFLOWDATA/LIB0_RAW/","");aurostd::StringSubst(directory,"AFLOWDATA/LIB0_WEB/","");
             aurostd::StringSubst(directory,"AFLOWDATA/LIB1_RAW/","");aurostd::StringSubst(directory,"AFLOWDATA/LIB1_WEB/","");
@@ -5445,8 +6704,7 @@ namespace aflowlib {
           _aflowlib_entry entry_tmp(string(directory_ICSD2LINK+"/RAW/"+DEFAULT_FILE_AFLOWLIB_ENTRY_OUT));
           directory=entry_tmp.aurl;
           auid=entry_tmp.aurl;
-          aurostd::StringSubst(directory,"aflowlib.duke.edu:","");
-          aurostd::StringSubst(directory,"materials.duke.edu:","");
+          directory=AURLStripHost(directory); //CO20261002
           aurostd::StringSubst(directory,"AFLOWDATA/ICSD_RAW/","");aurostd::StringSubst(directory,"AFLOWDATA/ICSD_WEB/","");
           vflags.flag("FLAG::ICSD",TRUE);
           vflags.flag("FLAG::FOUND",TRUE);
@@ -5803,4 +7061,3 @@ namespace aflowlib {
 // *           Aflow STEFANO CURTAROLO - Duke University 2003-2023           *
 // *                                                                         *
 // ***************************************************************************
-

@@ -4,8 +4,6 @@
 *                High-Throughput ab-initio Materials Discovery                          *
 *                                                                                                                     *
 ********************************************************************************
-LATEST VERSION OF THE FILE:        materials.duke.edu/AFLOW/README_AFLOW_AEL.TXT
-********************************************************************************
 
 
 Elastic properties calculated directly from stress-strain data.

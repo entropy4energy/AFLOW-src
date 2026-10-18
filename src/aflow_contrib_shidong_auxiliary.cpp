@@ -78,7 +78,8 @@ void CalculateNewStateAFLOW(string & SL_name) {
     // child process
 
     // change to the new working directory
-    chdir(pwd.c_str()); //CO20181019 - avoid strncat warning of size()
+    int result=chdir(pwd.c_str()); //CO20181019 - avoid strncat warning of size()
+    if(result!=0){pflow::logger(__AFLOW_FILE__,__AFLOW_FUNC__,"chdir returned "+aurostd::utype2string(result),_LOGGER_WARNING_);}  //CO20250406
 
     // run the program generate new state
     char cmd_name[] = "aflow";
